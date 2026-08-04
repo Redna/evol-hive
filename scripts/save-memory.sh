@@ -26,7 +26,7 @@ git fetch origin memory:memory 2>/dev/null || {
   git add events.jsonl
   git commit -m "Initialize YAAM memory"
   git push origin memory
-  git checkout -
+  git checkout main
   rm /tmp/yaam-events-save.jsonl
   echo "Memory branch created and pushed."
   exit 0
@@ -55,6 +55,6 @@ else
   done
 fi
 
-git checkout -
+git checkout main
 rm /tmp/yaam-events-save.jsonl
 echo "Memory save complete."
