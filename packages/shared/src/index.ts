@@ -1,0 +1,14 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// evol-hive / shared — Re-exports
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Types
+export * from './types/agent.js';
+export * from './types/affordance.js';
+export * from './types/cognition.js';
+export * from './types/engine.js';
+export * from './types/memory.js';
+export * from './types/world.js';
+
+// Schemas
+export * from './schemas/llm-schemas.js';

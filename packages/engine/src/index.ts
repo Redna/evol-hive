@@ -1,0 +1,81 @@
+/**
+ * @evol-hive/engine — Deterministic Game Engine
+ * ──────────────────────────────────────────────
+ * Sections 2, 6, 9: Game loop, physics simulation, spatial management,
+ * asynchronous state management, and action routing.
+ *
+ * The engine runs at a deterministic FPS while LLM calls happen
+ * asynchronously. Agents in "is_thinking" state don't block the loop.
+ */
+
+// ── Game Loop ────────────────────────────────────────────────────────────────
+
+/** The core game loop. Manages ticks, physics updates, and agent queries. */
+export interface GameLoop {
+  /** Start the simulation. */
+  start(): void;
+  /** Stop the simulation. */
+  stop(): void;
+  /** Register a system to be updated each tick. */
+  registerSystem(system: EngineSystem): void;
+  /** Current simulation tick info. */
+  currentTick(): import('@evol-hive/shared').GameTick;
+}
+
+/** A pluggable engine system (physics, cognition scheduler, memory, etc.). */
+export interface EngineSystem {
+  name: string;
+  /** Called every tick at engine FPS. */
+  update(tick: import('@evol-hive/shared').GameTick): void;
+}
+
+// ── Physics ──────────────────────────────────────────────────────────────────
+
+/** The deterministic physics subsystem. */
+export interface PhysicsSystem extends EngineSystem {
+  /** Execute an affordance's engine effect on the world. */
+  executeAffordance(
+    objectId: string,
+    affordanceId: string,
+    agentId: string,
+  ): Promise<import('@evol-hive/shared').AffordanceResult>;
+}
+
+// ── Spatial ──────────────────────────────────────────────────────────────────
+
+/** Spatial management with debouncing (Section 6.1). */
+export interface SpatialSystem extends EngineSystem {
+  /** Get objects visible in the agent's current room (passive perception). */
+  getObjectsInRoom(roomId: string): import('@evol-hive/shared').SmartObject[];
+  /** Check if a perception tick should fire (spatial debouncing). */
+  shouldTriggerPerception(agentId: string): boolean;
+  /** Record that a perception tick fired for an agent. */
+  recordPerceptionTick(agentId: string, simulationTime: number): void;
+}
+
+// ── Routing (Section 9) ───────────────────────────────────────────────────────
+
+/** Routes LLM responses to the appropriate engine subsystem. */
+export interface ActionRouter {
+  /** Route an LLM action response to physics, cognitive tools, or observation. */
+  route(agentId: string, response: import('@evol-hive/shared').LLMActionResponse): Promise<void>;
+}
+
+/** Manages the asynchronous execution of LLM calls (Section 9.1). */
+export interface LLMConcurrencyManager {
+  /** Maximum concurrent LLM calls allowed. */
+  maxConcurrent: number;
+  /** Queue an LLM call. Returns when a slot is available. */
+  acquireSlot(): Promise<void>;
+  /** Release a slot after the LLM call completes. */
+  releaseSlot(): void;
+  /** Current number of active LLM calls. */
+  activeCount: number;
+}
+
+// ── Re-exports ────────────────────────────────────────────────────────────────
+
+export * from './loop/index.js';
+export * from './physics/index.js';
+export * from './spatial/index.js';
+export * from './routing/index.js';
