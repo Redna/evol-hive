@@ -19,11 +19,13 @@
     "clean": "pnpm -r run clean && rm -rf node_modules"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.0.0",
     "eslint": "^9.0.0",
     "prettier": "^3.4.0",
+    "tsup": "^8.3.0",
     "typescript": "^5.7.0",
-    "vitest": "^2.1.0",
-    "tsup": "^8.3.0"
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^2.1.0"
   }
 }
