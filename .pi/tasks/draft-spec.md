@@ -8,7 +8,8 @@ Steps:
 5. Create a YAAM workspace for this feature: `yaam_workspace_initialize("feature-NNN-name", "...")`
 6. Record your design decisions as YAAM notes
 7. Commit the spec file with message: "spec: draft spec for issue #${ISSUE_NUMBER}"
-8. Post the spec summary as a comment on the issue
-9. Add label "Status: Ready for Dev" to the issue
+8. Push the commit: `git push origin main`
+9. Post the spec summary as a comment on the issue
+10. Add label "Status: Ready for Dev" to the issue
 
 The spec must follow the format in your system prompt. Every requirement must map to at least one acceptance criterion.
