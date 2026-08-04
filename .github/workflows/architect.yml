@@ -38,11 +38,33 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
         run: |
-          export ISSUE_FILE=".pi/tasks/current-issue.md"
-          gh issue view $ISSUE_NUMBER --json body,title,labels > $ISSUE_FILE
+          set -x
 
-          pi -p "/goal $(cat .pi/tasks/draft-spec.md)" \
+          # Debug: verify environment
+          echo "=== Environment ==="
+          which pi && pi --version || echo "pi not found"
+          echo "ISSUE_NUMBER: $ISSUE_NUMBER"
+          echo "models.json exists: $(test -f ~/.pi/agent/models.json && echo yes || echo no)"
+          cat ~/.pi/agent/models.json | python3 -c "import sys,json; d=json.load(sys.stdin); p=d['providers']['ollama']; print(f'baseUrl: {p["baseUrl"]}'); print(f'apiKey set: {bool(p.get("apiKey"))}'); print(f'models: {[m["id"] for m in p.get("models",[])]}')" 2>/dev/null || echo "models.json parse failed"
+
+          # Get issue data
+          export ISSUE_FILE=".pi/tasks/current-issue.md"
+          gh issue view $ISSUE_NUMBER --json body,title,labels > $ISSUE_FILE || { echo "gh issue view failed"; exit 1; }
+          echo "=== Issue data ==="
+          cat $ISSUE_FILE | head -5
+
+          # Interpolate ISSUE_NUMBER into the task template
+          TASK_CONTENT=$(ISSUE_NUMBER=$ISSUE_NUMBER envsubst < .pi/tasks/draft-spec.md)
+          echo "=== Task content (first 200 chars) ==="
+          echo "$TASK_CONTENT" | head -c 200
+          echo ""
+
+          # Run the agent
+          echo "=== Starting Pi ==="
+          pi -p "/goal $TASK_CONTENT" \
             --append-system-prompt "$(cat .pi/agents/architect.md)" \
             --model ollama/glm-5.2 \
             --thinking high \
-            --tools read,bash
+            --tools read,bash \
+            --verbose || echo "Pi exited with code $?"
+          echo "=== Pi finished ==="
