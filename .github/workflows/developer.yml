@@ -1,0 +1,59 @@
+name: Developer
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  implement:
+    if: github.event.label.name == 'Status: Ready for Dev'
+    runs-on: [self-hosted, llm]
+    timeout-minutes: 60
+    permissions:
+      issues: write
+      contents: write
+      pull-requests: write
+      checks: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Pi
+        run: |
+          npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+          pi install npm:@narumitw/pi-goal
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure Git
+        run: |
+          git config user.name "evol-hive-dev[bot]"
+          git config user.email "dev-bot@evol-hive.local"
+
+      - name: Run Developer Agent
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+          OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
+        run: |
+          # Find the spec file for this issue
+          export SPEC_FILE=$(grep -rl "issue #${ISSUE_NUMBER}" docs/specs/ | head -1)
+          
+          if [ -z "$SPEC_FILE" ]; then
+            echo "No spec found for issue #${ISSUE_NUMBER}"
+            gh issue comment $ISSUE_NUMBER --body "No spec file found. Architect must draft a spec first."
+            exit 1
+          fi
+          
+          pi -p "/goal $(cat .pi/tasks/implement.md)" \
+            --append-system-prompt "$(cat .pi/agents/developer.md)" \
+            --model ollama/glm-5.2:cloud \
+            --thinking medium \
+            --tools read,write,edit,bash
