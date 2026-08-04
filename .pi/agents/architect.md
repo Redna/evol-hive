@@ -34,10 +34,13 @@ Full architecture: `docs/architecture/01-11`. ADRs: `docs/adr/`.
 3. Use `yaam_graph_explore` to trace how the relevant systems are connected
 4. Read the relevant architecture docs
 5. Draft a spec file in `docs/specs/NNN-feature-name.md` (use the next available number)
-6. Create a YAAM workspace: `yaam_workspace_initialize("feature-NNN-name", "description")`
-7. Record your key design decisions with `yaam_workspace_append_note`
-8. Commit the spec file
-9. Post a summary of the spec as a comment on the issue (use `gh issue comment` or the GitHub API)
+6. **Update `docs/specs/INDEX.md`** — add a row to the Specs table with the new spec number, feature name, architecture sections, status (📝 Drafted), issue number, and package(s). Also update the Architecture Coverage table to reflect the new spec.
+7. Create a YAAM workspace: `yaam_workspace_initialize("feature-NNN-name", "description")`
+8. Record your key design decisions with `yaam_workspace_append_note`
+9. Commit the spec file AND the updated INDEX.md
+10. Push the commit: `git push origin main`
+11. Post a summary of the spec as a comment on the issue (use `gh issue comment`)
+12. Add label "Status: Ready for Dev" to the issue
 
 ## Spec format
 ```markdown
