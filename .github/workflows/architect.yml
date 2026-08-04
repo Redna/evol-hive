@@ -59,9 +59,9 @@ jobs:
           echo "$TASK_CONTENT" | head -c 200
           echo ""
 
-          # Run the agent
+          # Run the agent (print mode does multi-turn tool use, no /goal needed)
           echo "=== Starting Pi ==="
-          pi -p "/goal $TASK_CONTENT" \
+          pi -p "$TASK_CONTENT" \
             --append-system-prompt "$(cat .pi/agents/architect.md)" \
             --model ollama/glm-5.2 \
             --thinking high \
