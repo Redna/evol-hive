@@ -1,18 +1,15 @@
 name: Architect
 
 on:
-  issues:
-    types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
-        description: 'Issue number to process'
+        description: "Issue number to process"
         required: true
         type: string
 
 jobs:
   draft-spec:
-    if: github.event.label.name == 'Status: Needs Architecture' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -37,13 +34,13 @@ jobs:
 
       - name: Run Architect Agent
         env:
-          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
         run: |
           export ISSUE_FILE=".pi/tasks/current-issue.md"
           gh issue view $ISSUE_NUMBER --json body,title,labels > $ISSUE_FILE
-          
+
           pi -p "/goal $(cat .pi/tasks/draft-spec.md)" \
             --append-system-prompt "$(cat .pi/agents/architect.md)" \
             --model ollama/glm-5.2 \
