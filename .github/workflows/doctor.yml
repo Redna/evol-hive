@@ -6,8 +6,12 @@ on:
 
 jobs:
   diagnose:
-    if: github.event.check_run.conclusion == 'failure' && github.event.check_run.name == 'CI'
-    runs-on: [self-hosted, llm]
+    # Only run on PRs from the same repo (not forks) and only on CI failures
+    if: |
+      github.event.check_run.conclusion == 'failure' &&
+      github.event.check_run.name == 'CI' &&
+      github.event.check_run.check_suite.pull_requests[0].head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: write
@@ -20,30 +24,23 @@ jobs:
         with:
           ref: ${{ github.event.check_run.check_suite.head_sha }}
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
 
-      - name: Install Pi
-        run: |
-          npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-          pi install npm:@narumitw/pi-goal
-
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
-
-      - name: Configure Git
-        run: |
-          git config user.name "evol-hive-doctor[bot]"
-          git config user.email "doctor-bot@evol-hive.local"
+      - name: Bootstrap agent environment
+        env:
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+        run: bash scripts/bootstrap-agent.sh
 
       - name: Run Doctor Agent
         env:
           PR_NUMBER: ${{ github.event.check_run.check_suite.pull_requests[0].number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
-          OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
         run: |
           if [ -z "$PR_NUMBER" ]; then
             echo "No PR associated with this check run"
@@ -52,6 +49,6 @@ jobs:
           
           pi -p "/goal $(cat .pi/tasks/diagnose.md)" \
             --append-system-prompt "$(cat .pi/agents/doctor.md)" \
-            --model ollama/glm-5.2:cloud \
+            --model ollama/glm-5.2 \
             --thinking high \
             --tools read,bash,edit,write

@@ -1,0 +1,53 @@
+{
+  "providers": {
+    "ollama": {
+      "api": "openai-completions",
+      "apiKey": "REPLACE_ME",
+      "baseUrl": "https://ollama.com/v1",
+      "models": [
+        {
+          "_launch": true,
+          "contextWindow": 1000000,
+          "id": "glm-5.2",
+          "input": ["text"],
+          "reasoning": true
+        },
+        {
+          "_launch": true,
+          "contextWindow": 262144,
+          "id": "kimi-k3",
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "_launch": true,
+          "contextWindow": 524288,
+          "id": "minimax-m3",
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "_launch": true,
+          "contextWindow": 262144,
+          "id": "kimi-k2.6",
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "_launch": true,
+          "contextWindow": 262144,
+          "id": "nemotron-3-super",
+          "input": ["text"],
+          "reasoning": true
+        },
+        {
+          "_launch": true,
+          "contextWindow": 262144,
+          "id": "qwen3.5:397b",
+          "input": ["text", "image"],
+          "reasoning": true
+        }
+      ]
+    }
+  }
+}
