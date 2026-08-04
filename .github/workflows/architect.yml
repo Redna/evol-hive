@@ -19,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -41,14 +43,11 @@ jobs:
           path: ~/.yaam/models
           key: yaam-model-v1
 
-      # Cache events.jsonl for inter-agent memory persistence
+      # Restore YAAM memory from the memory branch (durable, versioned)
       - name: Restore YAAM memory
-        uses: actions/cache@v4
-        with:
-          path: events.jsonl
-          key: yaam-events-${{ github.run_id }}
-          restore-keys: |
-            yaam-events-
+        run: bash scripts/restore-memory.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Bootstrap agent environment
         env:
@@ -80,7 +79,6 @@ jobs:
 
       - name: Push agent commits
         run: |
-          # Check if there are unpushed commits and push them
           if git log --branches --not --remotes --oneline | grep -q .; then
             echo "Pushing agent commits..."
             git push origin HEAD:main
@@ -88,10 +86,10 @@ jobs:
             echo "No unpushed commits."
           fi
 
-      # Save updated events.jsonl for the next agent run
+      # Save YAAM memory to the memory branch (durable, versioned)
       - name: Save YAAM memory
         if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: events.jsonl
-          key: yaam-events-${{ github.run_id }}
+        run: bash scripts/save-memory.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
