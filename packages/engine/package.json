@@ -2,7 +2,7 @@
   "name": "@evol-hive/engine",
   "version": "0.1.0",
   "private": true,
-  "description": "Deterministic TypeScript game engine — physics, game loop, spatial management, async routing",
+  "description": "Deterministic game engine — physics, game loop, spatial management, async routing, world objects, agent state, drives, plans",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

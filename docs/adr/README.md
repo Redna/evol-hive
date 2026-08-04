@@ -7,7 +7,7 @@ This directory contains ADRs for evol-hive.
 Each ADR should follow this structure:
 
 ```
-# ADR-N: Title
+# ADR-NNN: Title
 
 ## Status
 Proposed | Accepted | Deprecated | Superseded
@@ -26,4 +26,4 @@ Proposed | Accepted | Deprecated | Superseded
 
 | ADR | Title | Status |
 |-----|-------|--------|
-| (none yet) | — | — |
+| [0001](0001-lean-monorepo-structure.md) | Lean Monorepo Package Structure | Accepted |

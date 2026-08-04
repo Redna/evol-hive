@@ -32,21 +32,44 @@ Built around a fluid **PPER loop** (Perceive → Plan → Execute → Reflect) u
 
 ## Project Structure
 
+See [ADR-0001](docs/adr/0001-lean-monorepo-structure.md) for the rationale behind this structure.
+
 ```
 evol-hive/
 ├── packages/
-│   ├── shared/       — Shared types, schemas, and interfaces
-│   ├── engine/       — Deterministic TypeScript game engine
-│   ├── cognition/    — LLM cognitive layer (PPER loop, tools, guardrails)
-│   ├── classifier/   — System 0 fast-path classifier (embedding-based pruning)
-│   ├── memory/       — Memory architecture (vector store, retrieval, reflection)
-│   ├── world/        — Smart objects, affordances, scenes
-│   └── agents/       — Agent management (state, drives, plans)
+│   ├── shared/       — Shared types, JSON schemas, interfaces (no deps)
+│   ├── engine/       — Deterministic game engine
+│   │                   ├── loop/        — Game loop, engine systems
+│   │                   ├── physics/     — Affordance execution, preconditions
+│   │                   ├── spatial/     — Room management, spatial debouncing
+│   │                   ├── routing/     — Async LLM concurrency, action routing
+│   │                   ├── world/       — Smart objects, affordances, scenes
+│   │                   └── agents/      — Agent state, drives, plans
+│   ├── cognition/    — LLM cognitive layer
+│   │                   ├── pper/        — PPER loop orchestration
+│   │                   ├── llm/         — LLM client (Ollama, vLLM, llama.cpp)
+│   │                   ├── tools/       — Cognitive tools (formulate_plan, query_memory, ...)
+│   │                   ├── guardrails/  — Affordance masking, contextual forcing, plan validation
+│   │                   ├── classifier/  — System 0: embedding model, affordance pruning
+│   │                   └── schemas/     — Prompt templates, structured output config
+│   └── memory/       — Memory architecture
+│                       ├── store/       — Vector store (in-memory, LanceDB, ChromaDB)
+│                       ├── retrieval/   — Weighted scoring (recency × importance × relevance)
+│                       └── reflection/  — Background reflection & consolidation
 ├── docs/
-│   ├── architecture/ — Architecture specification documents
+│   ├── architecture/ — Architecture specification documents (§1-§11)
 │   └── adr/          — Architecture Decision Records
 ├── config/           — Runtime configuration
 └── .github/workflows — CI/CD pipelines
+```
+
+### Dependency Graph
+
+```
+shared ←── engine
+shared ←── cognition
+shared ←── memory
+memory  ←── cognition
 ```
 
 ## Getting Started

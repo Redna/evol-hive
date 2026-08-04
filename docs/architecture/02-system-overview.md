@@ -44,12 +44,24 @@ Built around a fluid **PPER** (Perceive, Plan, Execute, Reflect) loop, utilizing
 
 ## Package Map
 
+See [ADR-0001](../adr/0001-lean-monorepo-structure.md) for the rationale behind this structure.
+
 | Package | Responsibility |
 |---------|---------------|
-| `@evol-hive/engine` | Game loop, physics, spatial management, async routing |
-| `@evol-hive/cognition` | PPER loop, cognitive tools, LLM client, guardrails |
-| `@evol-hive/classifier` | System 0 embedding model, affordance pruning |
+| `@evol-hive/shared` | Shared types, JSON schemas, interfaces |
+| `@evol-hive/engine` | Game loop, physics, spatial management, async routing, **world** (smart objects, affordances, scenes), **agents** (state, drives, plans) |
+| `@evol-hive/cognition` | PPER loop, cognitive tools, LLM client, guardrails, **System 0 classifier** (embedding-based affordance pruning) |
 | `@evol-hive/memory` | Vector store, weighted retrieval, reflection loop |
-| `@evol-hive/world` | Smart objects, affordances, scenes/rooms |
-| `@evol-hive/agents` | Agent state, drives, plans |
-| `@evol-hive/shared` | Shared types, schemas, interfaces |
+
+### Dependency Graph
+
+```
+shared ←── engine
+shared ←── cognition
+shared ←── memory
+memory  ←── cognition
+```
+
+`engine` and `cognition` do not directly depend on each other. The engine triggers
+cognition and cognition writes back agent state through **interfaces in `shared`**.
+This keeps the package graph acyclic.

@@ -47,6 +47,6 @@ Only these 5 affordances → sent to System 2 LLM
 
 ## Implementation Location
 
-- **Type definitions**: `packages/classifier/src/index.ts`
-- **Embedding providers**: `packages/classifier/src/embedding/`
-- **Pruning logic**: `packages/classifier/src/pruning/`
+- **Type definitions**: `packages/cognition/src/classifier/index.ts`
+- **Embedding providers**: `packages/cognition/src/classifier/embedding/`
+- **Pruning logic**: `packages/cognition/src/classifier/pruning/`

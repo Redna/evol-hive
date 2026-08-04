@@ -2,7 +2,7 @@
   "name": "@evol-hive/cognition",
   "version": "0.1.0",
   "private": true,
-  "description": "LLM cognitive layer — PPER loop, cognitive tools, structured outputs, guardrails",
+  "description": "LLM cognitive layer — PPER loop, cognitive tools, structured outputs, guardrails, System 0 classifier",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

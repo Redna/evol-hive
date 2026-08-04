@@ -75,7 +75,14 @@ export interface LLMConcurrencyManager {
 
 // ── Re-exports ────────────────────────────────────────────────────────────────
 
+// Engine core
 export * from './loop/index.js';
 export * from './physics/index.js';
 export * from './spatial/index.js';
 export * from './routing/index.js';
+
+// World (smart objects, affordances, scenes) — Section 4
+export * from './world/index.js';
+
+// Agents (state, drives, plans) — Section 3
+export * from './agents/index.js';

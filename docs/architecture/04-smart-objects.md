@@ -66,5 +66,5 @@ effects   (prevents infinite loop)
 ## Implementation Location
 
 - **Type definitions**: `packages/shared/src/types/affordance.ts`
-- **Object registry**: `packages/world/src/objects/`
-- **Affordance registry**: `packages/world/src/affordances/`
+- **Object registry**: `packages/engine/src/world/objects/`
+- **Affordance registry**: `packages/engine/src/world/affordances/`

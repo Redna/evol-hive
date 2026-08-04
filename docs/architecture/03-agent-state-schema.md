@@ -45,6 +45,6 @@ When `currentPlan` is `null`, Cognitive Guardrails (§10) restrict available act
 ## Implementation Location
 
 - **Type definitions**: `packages/shared/src/types/agent.ts`
-- **State management**: `packages/agents/src/state/`
-- **Drive system**: `packages/agents/src/drives/`
-- **Plan management**: `packages/agents/src/plans/`
+- **State management**: `packages/engine/src/agents/state/`
+- **Drive system**: `packages/engine/src/agents/drives/`
+- **Plan management**: `packages/engine/src/agents/plans/`

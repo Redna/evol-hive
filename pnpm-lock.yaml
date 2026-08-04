@@ -27,38 +27,6 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
 
-  packages/agents:
-    dependencies:
-      '@evol-hive/shared':
-        specifier: workspace:*
-        version: link:../shared
-    devDependencies:
-      tsup:
-        specifier: ^8.3.0
-        version: 8.5.1(postcss@8.5.25)(supports-color@7.2.0)(typescript@5.9.3)
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
-
-  packages/classifier:
-    dependencies:
-      '@evol-hive/shared':
-        specifier: workspace:*
-        version: link:../shared
-    devDependencies:
-      tsup:
-        specifier: ^8.3.0
-        version: 8.5.1(postcss@8.5.25)(supports-color@7.2.0)(typescript@5.9.3)
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
-
   packages/cognition:
     dependencies:
       '@evol-hive/shared':
@@ -108,22 +76,6 @@ importers:
         version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
 
   packages/shared:
-    devDependencies:
-      tsup:
-        specifier: ^8.3.0
-        version: 8.5.1(postcss@8.5.25)(supports-color@7.2.0)(typescript@5.9.3)
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
-
-  packages/world:
-    dependencies:
-      '@evol-hive/shared':
-        specifier: workspace:*
-        version: link:../shared
     devDependencies:
       tsup:
         specifier: ^8.3.0
