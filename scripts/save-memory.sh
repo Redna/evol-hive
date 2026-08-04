@@ -14,8 +14,10 @@ LINES=$(wc -l < events.jsonl)
 SIZE=$(du -h events.jsonl | cut -f1)
 echo "events.jsonl: $LINES events, $SIZE"
 
-# Save events.jsonl to a temp location
+# Save events.jsonl to a temp location, then remove from working tree
+# (events.jsonl is untracked on main, would block branch switch)
 cp events.jsonl /tmp/yaam-events-save.jsonl
+rm -f events.jsonl
 
 # Fetch or create the memory branch
 git fetch origin memory:memory 2>/dev/null || {
@@ -56,5 +58,7 @@ else
 fi
 
 git checkout main
+rm -f events.jsonl
+cp /tmp/yaam-events-save.jsonl events.jsonl
 rm /tmp/yaam-events-save.jsonl
 echo "Memory save complete."
