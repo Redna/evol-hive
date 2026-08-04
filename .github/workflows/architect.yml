@@ -27,6 +27,29 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # Cache YAAM daemon binary (30MB, avoids rebuilding Rust on every run)
+      - name: Cache YAAM binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.yaam-cache
+          key: yaam-binary-v1
+
+      # Cache ONNX model files (134MB, never changes)
+      - name: Cache ONNX model
+        uses: actions/cache@v4
+        with:
+          path: ~/.yaam/models
+          key: yaam-model-v1
+
+      # Cache events.jsonl for inter-agent memory persistence
+      - name: Restore YAAM memory
+        uses: actions/cache@v4
+        with:
+          path: events.jsonl
+          key: yaam-events-${{ github.run_id }}
+          restore-keys: |
+            yaam-events-
+
       - name: Bootstrap agent environment
         env:
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
@@ -40,31 +63,25 @@ jobs:
         run: |
           set -x
 
-          # Debug: verify environment
-          echo "=== Environment ==="
-          which pi && pi --version || echo "pi not found"
-          echo "ISSUE_NUMBER: $ISSUE_NUMBER"
-          echo "models.json exists: $(test -f ~/.pi/agent/models.json && echo yes || echo no)"
-          cat ~/.pi/agent/models.json | python3 -c "import sys,json; d=json.load(sys.stdin); p=d['providers']['ollama']; print(f'baseUrl: {p["baseUrl"]}'); print(f'apiKey set: {bool(p.get("apiKey"))}'); print(f'models: {[m["id"] for m in p.get("models",[])]}')" 2>/dev/null || echo "models.json parse failed"
-
           # Get issue data
           export ISSUE_FILE=".pi/tasks/current-issue.md"
           gh issue view $ISSUE_NUMBER --json body,title,labels > $ISSUE_FILE || { echo "gh issue view failed"; exit 1; }
-          echo "=== Issue data ==="
-          cat $ISSUE_FILE | head -5
 
           # Interpolate ISSUE_NUMBER into the task template
           TASK_CONTENT=$(ISSUE_NUMBER=$ISSUE_NUMBER envsubst < .pi/tasks/draft-spec.md)
-          echo "=== Task content (first 200 chars) ==="
-          echo "$TASK_CONTENT" | head -c 200
-          echo ""
 
-          # Run the agent (print mode does multi-turn tool use, no /goal needed)
-          echo "=== Starting Pi ==="
+          # Run the agent (print mode: multi-turn tool use)
           pi -p "$TASK_CONTENT" \
             --append-system-prompt "$(cat .pi/agents/architect.md)" \
             --model ollama/glm-5.2 \
             --thinking high \
             --tools read,bash \
-            --verbose || echo "Pi exited with code $?"
-          echo "=== Pi finished ==="
+            --verbose
+
+      # Save updated events.jsonl for the next agent run
+      - name: Save YAAM memory
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: events.jsonl
+          key: yaam-events-${{ github.run_id }}
