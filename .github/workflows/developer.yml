@@ -20,6 +20,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -27,6 +29,23 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      - name: Cache YAAM binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.yaam-cache
+          key: yaam-binary-v1
+
+      - name: Cache ONNX model
+        uses: actions/cache@v4
+        with:
+          path: ~/.yaam/models
+          key: yaam-model-v1
+
+      - name: Restore YAAM memory
+        run: bash scripts/restore-memory.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Bootstrap agent environment
         env:
@@ -39,6 +58,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
         run: |
+          set -x
+
           # Find the spec file for this issue
           export SPEC_FILE=$(grep -rl "issue #${ISSUE_NUMBER}" docs/specs/ 2>/dev/null | head -1)
 
@@ -48,8 +69,29 @@ jobs:
             exit 1
           fi
 
-          pi -p "/goal $(cat .pi/tasks/implement.md)" \
+          # Interpolate variables into the task template
+          TASK_CONTENT=$(ISSUE_NUMBER=$ISSUE_NUMBER SPEC_FILE=$SPEC_FILE envsubst < .pi/tasks/implement.md)
+
+          # Run the agent
+          pi -p "$TASK_CONTENT" \
             --append-system-prompt "$(cat .pi/agents/developer.md)" \
             --model ollama/glm-5.2 \
             --thinking medium \
-            --tools read,write,edit,bash
+            --tools read,write,edit,bash \
+            --verbose
+
+      - name: Push agent commits
+        run: |
+          if git log --branches --not --remotes --oneline | grep -q .; then
+            echo "Pushing agent commits..."
+            git push origin HEAD:main
+          else
+            echo "No unpushed commits."
+          fi
+
+      - name: Save YAAM memory
+        if: always()
+        run: bash scripts/save-memory.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
