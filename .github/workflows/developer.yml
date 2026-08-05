@@ -60,14 +60,24 @@ jobs:
         run: |
           set -x
 
-          # Find the spec file for this issue
-          export SPEC_FILE=$(grep -rl "issue #${ISSUE_NUMBER}" docs/specs/ 2>/dev/null | head -1)
+          # Find the spec file for this issue — try INDEX.md, then grep, then fallback
+          export SPEC_FILE=$(grep "issues/${ISSUE_NUMBER}" docs/specs/INDEX.md 2>/dev/null | grep -oP '\d{3}-[^]]*\.md' | head -1)
+
+          if [ -z "$SPEC_FILE" ]; then
+            export SPEC_FILE=$(grep -rl "#${ISSUE_NUMBER}" docs/specs/*.md 2>/dev/null | grep -v INDEX | grep -v TEMPLATE | head -1)
+          fi
+
+          if [ -z "$SPEC_FILE" ]; then
+            export SPEC_FILE=$(ls docs/specs/[0-9]*.md 2>/dev/null | sort | tail -1)
+          fi
 
           if [ -z "$SPEC_FILE" ]; then
             echo "No spec found for issue #${ISSUE_NUMBER}"
             gh issue comment $ISSUE_NUMBER --body "⚠️ No spec file found. The Architect must draft a spec first."
             exit 1
           fi
+
+          echo "Using spec: $SPEC_FILE"
 
           # Interpolate variables into the task template
           TASK_CONTENT=$(ISSUE_NUMBER=$ISSUE_NUMBER SPEC_FILE=$SPEC_FILE envsubst < .pi/tasks/implement.md)
