@@ -5,6 +5,8 @@
  * JSON schema for LLM structured outputs.
  */
 
+import type { Affordance } from './affordance.js';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PPER Loop
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,6 +25,53 @@ export interface PassivePerception {
   /** System feedback injected by the engine (e.g., action failure notes). */
   systemFeedback?: string;
   /** Associative memories auto-injected by Track 1 (Section 11.1). */
+  associativeMemories?: MemorySnippet[];
+}
+
+/**
+ * Projected smart object shape for passive perception (§6.1).
+ * Contains NO deep `state` or `affordances` — those require active `observe`.
+ */
+export interface SmartObjectProjection {
+  id: string;
+  name: string;
+  type: string;
+}
+
+/**
+ * The result of the Perceive phase — bundles passive perception,
+ * pruned affordances, and the primary drive label.
+ */
+export interface PerceptionResult {
+  passive: PassivePerception;
+  prunedAffordances: Affordance[];
+  primaryDriveLabel: string;
+}
+
+/**
+ * Raw input data for building a `PassivePerception`.
+ * Provided by the engine; consumed by the cognition layer.
+ */
+export interface PassivePerceptionInput {
+  roomId: string;
+  objectsInRoom: SmartObjectProjection[];
+  drives: Record<string, number>;
+  systemFeedback?: string;
+  associativeMemories?: MemorySnippet[];
+}
+
+/**
+ * Full input for compiling a `PerceptionResult` (passive perception + pruning).
+ * Extends `PassivePerceptionInput` with the primary drive label and
+ * the full room affordance list for classifier pruning.
+ */
+export interface PerceptionCompileInput {
+  roomId: string;
+  objectsInRoom: SmartObjectProjection[];
+  drives: Record<string, number>;
+  primaryDriveLabel: string;
+  roomAffordances: Affordance[];
+  systemFeedback?: string;
   associativeMemories?: MemorySnippet[];
 }
 

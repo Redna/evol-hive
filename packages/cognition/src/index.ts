@@ -17,13 +17,25 @@ export interface PPEROrchestrator {
 
 // ── Perception Builder ───────────────────────────────────────────────────────
 
+/**
+ * Compiles the Perceive phase: builds passive perception, prunes affordances,
+ * and returns a `PerceptionResult`. Does NOT call the LLM (System 1 only).
+ */
+export interface PerceptionCompiler {
+  /** Build a `PassivePerception` from raw engine data (no deep state). */
+  buildPassivePerception(
+    input: import('@evol-hive/shared').PassivePerceptionInput,
+  ): import('@evol-hive/shared').PassivePerception;
+  /** Run the full perceive phase: passive perception + classifier pruning. */
+  runPerception(
+    input: import('@evol-hive/shared').PerceptionCompileInput,
+  ): Promise<import('@evol-hive/shared').PerceptionResult>;
+}
+
 /** Builds the context window payload for the LLM (passive perception + memory). */
 export interface PerceptionBuilder {
-  /** Construct the perception prompt from passive perception + associative memories. */
-  build(
-    passive: import('@evol-hive/shared').PassivePerception,
-    affordances: import('@evol-hive/shared').Affordance[],
-  ): LLMContextPayload;
+  /** Construct the LLM context payload from a perception result. */
+  build(perceptionResult: import('@evol-hive/shared').PerceptionResult): LLMContextPayload;
 }
 
 /** The full context payload sent to the LLM. */
@@ -91,3 +103,6 @@ export * from './schemas/index.js';
 
 // System 0 Classifier (Section 5) — embedding-based affordance pruning
 export * from './classifier/index.js';
+
+// Config (env-driven)
+export * from './config.js';

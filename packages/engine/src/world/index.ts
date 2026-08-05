@@ -15,6 +15,8 @@ export interface SmartObjectRegistry {
   get(objectId: string): import('@evol-hive/shared').SmartObject | null;
   /** Get all objects in a room. */
   getByRoom(roomId: string): import('@evol-hive/shared').SmartObject[];
+  /** Get projected objects ({ id, name, type }) in a room — no deep state. */
+  getObjectsInRoom(roomId: string): import('@evol-hive/shared').SmartObjectProjection[];
   /** Get all affordances available in a room (for classifier pruning). */
   getAffordancesInRoom(roomId: string): import('@evol-hive/shared').Affordance[];
   /** Update an object's state (after affordance execution). */
