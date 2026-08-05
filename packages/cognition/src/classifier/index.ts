@@ -44,6 +44,21 @@ export interface PruneOptions {
   similarityThreshold?: number;
 }
 
+/** Runtime configuration for the System 0 classifier (env-driven). */
+export interface ClassifierConfig {
+  /** Top-K affordances to retain (CLASSIFIER_TOP_K, default 5). */
+  topK: number;
+  /** Minimum cosine similarity (CLASSIFIER_SIMILARITY_THRESHOLD, default 0.3). */
+  similarityThreshold: number;
+}
+
+/** Default classifier config, read from environment with sensible fallbacks. */
+export function defaultClassifierConfig(): ClassifierConfig {
+  const topK = Number(process.env['CLASSIFIER_TOP_K'] ?? 5);
+  const similarityThreshold = Number(process.env['CLASSIFIER_SIMILARITY_THRESHOLD'] ?? 0.3);
+  return { topK, similarityThreshold };
+}
+
 /** A scored affordance after cosine similarity computation. */
 export interface ScoredAffordance {
   affordance: import('@evol-hive/shared').Affordance;
