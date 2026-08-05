@@ -92,8 +92,17 @@ jobs:
 
       - name: Push agent commits
         run: |
-          if git log --branches --not --remotes --oneline | grep -q .; then
-            echo "Pushing agent commits..."
+          BRANCH=$(git branch --show-current)
+          if [ "$BRANCH" != "main" ]; then
+            echo "On feature branch: $BRANCH"
+            git push -u origin "$BRANCH" 2>/dev/null || echo "Branch already pushed"
+            # Try to create PR using GH_TOKEN (if available) or GITHUB_TOKEN
+            gh pr create --base main --head "$BRANCH" \
+              --title "feat: implementation for issue #${ISSUE_NUMBER}" \
+              --body "Implements spec: ${SPEC_FILE}\n\nCloses #${ISSUE_NUMBER}" 2>/dev/null || \
+              echo "PR creation failed — create manually at: https://github.com/Redna/evol-hive/pull/new/$BRANCH"
+          elif git log --branches --not --remotes --oneline | grep -q .; then
+            echo "Pushing main commits..."
             git push origin HEAD:main
           else
             echo "No unpushed commits."
