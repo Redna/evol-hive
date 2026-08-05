@@ -34,8 +34,8 @@ git fetch origin memory:memory 2>/dev/null || {
   exit 0
 }
 
-# Update the memory branch
-git checkout memory
+# Update the memory branch (force: discard any local changes, we saved events.jsonl already)
+git checkout -f memory
 cp /tmp/yaam-events-save.jsonl events.jsonl
 git add events.jsonl
 
