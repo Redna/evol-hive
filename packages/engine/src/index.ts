@@ -45,8 +45,8 @@ export interface PhysicsSystem extends EngineSystem {
 
 /** Spatial management with debouncing (Section 6.1). */
 export interface SpatialSystem extends EngineSystem {
-  /** Get objects visible in the agent's current room (passive perception). */
-  getObjectsInRoom(roomId: string): import('@evol-hive/shared').SmartObject[];
+  /** Get objects visible in the agent's current room — projected to { id, name, type } (passive perception). */
+  getObjectsInRoom(roomId: string): import('@evol-hive/shared').SmartObjectSummary[];
   /** Check if a perception tick should fire (spatial debouncing). */
   shouldTriggerPerception(agentId: string): boolean;
   /** Record that a perception tick fired for an agent. */

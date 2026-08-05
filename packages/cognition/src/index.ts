@@ -19,11 +19,8 @@ export interface PPEROrchestrator {
 
 /** Builds the context window payload for the LLM (passive perception + memory). */
 export interface PerceptionBuilder {
-  /** Construct the perception prompt from passive perception + associative memories. */
-  build(
-    passive: import('@evol-hive/shared').PassivePerception,
-    affordances: import('@evol-hive/shared').Affordance[],
-  ): LLMContextPayload;
+  /** Construct the LLM context payload from the bundled Perceive-phase result. */
+  build(perceptionResult: import('@evol-hive/shared').PerceptionResult): LLMContextPayload;
 }
 
 /** The full context payload sent to the LLM. */

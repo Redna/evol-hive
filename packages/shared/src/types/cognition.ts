@@ -12,6 +12,8 @@
 /** The four phases of the cognitive loop. */
 export type PPERPhase = 'perceive' | 'plan' | 'execute' | 'reflect';
 
+import type { Affordance } from './affordance.js';
+
 /** Passive perception data (Section 6.1) — high-level object presence. */
 export interface PassivePerception {
   /** Room/scene the agent is currently in. */
@@ -24,6 +26,16 @@ export interface PassivePerception {
   systemFeedback?: string;
   /** Associative memories auto-injected by Track 1 (Section 11.1). */
   associativeMemories?: MemorySnippet[];
+}
+
+/** The bundled output of the Perceive phase (Section 6.1). */
+export interface PerceptionResult {
+  /** Passive perception snapshot of the agent's surroundings. */
+  passive: PassivePerception;
+  /** Top-K affordances retained by the System 0 classifier. */
+  prunedAffordances: Affordance[];
+  /** Semantic label of the agent's primary drive (e.g. "low energy, need to restore energy"). */
+  primaryDriveLabel: string;
 }
 
 /** Active observation result (Section 6.2) — deep JSON state of a target object. */
@@ -107,4 +119,37 @@ export interface MemorySnippet {
   content: string;
   importance: number;
   timestamp: number;
+}
+
+/**
+ * A compact projection of a SmartObject for passive perception — no deep
+ * `state`, no `affordances`. Used by the engine's room queries and the
+ * cognition layer's perception compilation (Section 6.1).
+ */
+export interface SmartObjectSummary {
+  id: string;
+  name: string;
+  type: string;
+}
+
+/**
+ * Bridge interface (defined in `shared`) that lets the cognition layer read
+ * passive world/agent data from the engine without coupling the two packages
+ * (per ADR-0001). The engine implements this; cognition consumes it.
+ */
+export interface PerceptionDataProvider {
+  /** The agent's current room/scene ID. */
+  getAgentLocation(agentId: string): string;
+  /** Smart objects in a room — projected to `{ id, name, type }` (no deep state). */
+  getObjectsInRoom(roomId: string): SmartObjectSummary[];
+  /** Every affordance available in a room (input to the System 0 classifier). */
+  getAffordancesInRoom(roomId: string): Affordance[];
+  /** Snapshot of the agent's current drive values. */
+  getAgentDrives(agentId: string): Record<string, number>;
+  /** Semantic label of the agent's primary (most urgent) drive. */
+  getPrimaryDriveLabel(agentId: string): string;
+  /** Pending system feedback from a failed action (Section 9.2), if any. */
+  getSystemFeedback(agentId: string): string | undefined;
+  /** Associative memories from Track 1 (Section 11.1), if a memory subsystem is wired. */
+  getAssociativeMemories?(agentId: string): MemorySnippet[] | undefined;
 }
