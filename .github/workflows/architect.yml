@@ -79,8 +79,16 @@ jobs:
 
       - name: Push agent commits
         run: |
-          if git log --branches --not --remotes --oneline | grep -q .; then
-            echo "Pushing agent commits..."
+          BRANCH=$(git branch --show-current)
+          if [ "$BRANCH" != "main" ]; then
+            echo "On branch: $BRANCH"
+            git push -u origin "$BRANCH" 2>/dev/null || echo "Branch already pushed"
+            gh pr create --base main --head "$BRANCH" \
+              --title "spec: draft for issue #${ISSUE_NUMBER}" \
+              --body "Drafts specification for issue #${ISSUE_NUMBER}" 2>/dev/null || \
+              echo "PR creation failed — create manually"
+          elif git log --branches --not --remotes --oneline | grep -q .; then
+            echo "Pushing main commits..."
             git push origin HEAD:main
           else
             echo "No unpushed commits."

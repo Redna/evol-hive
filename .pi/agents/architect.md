@@ -38,9 +38,11 @@ Full architecture: `docs/architecture/01-11`. ADRs: `docs/adr/`.
 7. Create a YAAM workspace: `yaam_workspace_initialize("feature-NNN-name", "description")`
 8. Record your key design decisions with `yaam_workspace_append_note`
 9. Commit the spec file AND the updated INDEX.md
-10. Push the commit: `git push origin main`
-11. Post a summary of the spec as a comment on the issue (use `gh issue comment`)
-12. Add label "Status: Ready for Dev" to the issue
+10. Create a branch: `git checkout -b spec/NNN-feature-name`
+11. Push the branch: `git push -u origin spec/NNN-feature-name`
+12. Open a PR: `gh pr create --base main --head spec/NNN-feature-name --title "spec: [feature name]" --body "Drafts spec for issue #${ISSUE_NUMBER}"`
+13. Post a summary of the spec as a comment on the issue
+14. Add label "Status: Ready for Dev" to the issue
 
 ## Spec format
 ```markdown
