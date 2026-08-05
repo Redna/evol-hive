@@ -34,11 +34,13 @@ export interface DriveSystem {
   applyDecay(state: import('@evol-hive/shared').AgentInternalState, deltaSeconds: number): void;
   /** Apply drive changes from an affordance result. */
   applyChanges(agentId: string, changes: Partial<Record<string, number>>): void;
-  /** Get the agent's primary drive (highest urgency). */
+  /** Get the agent's primary drive (lowest value = most urgent, per §3). */
   getPrimaryDrive(state: import('@evol-hive/shared').AgentInternalState): {
     name: string;
     value: number;
   };
+  /** Get the semantic label of the primary drive (e.g. "low energy, need to restore energy"). */
+  getPrimaryDriveLabel(state: import('@evol-hive/shared').AgentInternalState): string;
 }
 
 // ── Plan Manager ─────────────────────────────────────────────────────────────
