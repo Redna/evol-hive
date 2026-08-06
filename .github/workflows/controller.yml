@@ -1,0 +1,29 @@
+name: Controller
+
+on:
+  workflow_run:
+    workflows: ["Architect", "Developer", "QA", "Doctor", "CI"]
+    types: [completed]
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      issues: write
+      pull-requests: write
+      contents: read
+      checks: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Controller
+        env:
+          COMPLETED_WORKFLOW: ${{ github.event.workflow_run.name }}
+          COMPLETED_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          COMPLETED_RUN_ID: ${{ github.event.workflow_run.id }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/controller.sh
