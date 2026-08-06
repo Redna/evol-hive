@@ -3,6 +3,12 @@ name: QA
 on:
   pull_request:
     types: [opened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to verify"
+        required: true
+        type: string
 
 jobs:
   verify-coverage:
@@ -14,9 +20,25 @@ jobs:
       issues: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Generate App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Checkout (pull_request)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Checkout (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ inputs.pr_number }}/head
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
@@ -38,13 +60,6 @@ jobs:
           path: ~/.yaam/models
           key: yaam-model-v1
 
-      - name: Generate App Token
-        uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
       - name: Restore YAAM memory
         run: bash scripts/restore-memory.sh
         env:
@@ -57,7 +72,7 @@ jobs:
 
       - name: Run QA Agent
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
@@ -78,9 +93,10 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          BRANCH=$(git branch --show-current)
           if git log --branches --not --remotes --oneline | grep -q .; then
-            echo "Pushing QA test commits..."
-            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+            echo "Pushing QA test commits to $BRANCH..."
+            git push origin HEAD:$BRANCH 2>/dev/null || echo "Push failed or nothing to push"
           else
             echo "No unpushed commits."
           fi
