@@ -83,6 +83,18 @@ dispatch_workflow() {
   fi
 }
 
+dispatch_ci_and_qa() {
+  local pr_number=$1
+  # CI workflow ID: 326749512
+  api_post "https://api.github.com/repos/$REPO/actions/workflows/326749512/dispatches" \
+    -d "{\"ref\":\"main\",\"inputs\":{\"pr_number\":\"$pr_number\"}}" > /dev/null
+  echo "Dispatched CI for PR #$pr_number"
+  # QA workflow ID: 327684302
+  api_post "https://api.github.com/repos/$REPO/actions/workflows/327684302/dispatches" \
+    -d "{\"ref\":\"main\",\"inputs\":{\"pr_number\":\"$pr_number\"}}" > /dev/null
+  echo "Dispatched QA for PR #$pr_number"
+}
+
 # Also need PR number for Doctor
 dispatch_doctor() {
   # Doctor uses check_run event, not workflow_dispatch with issue number
@@ -120,8 +132,13 @@ case "$COMPLETED_WORKFLOW" in
 
   "Developer")
     if [ "$COMPLETED_CONCLUSION" = "success" ]; then
-      post_comment "issues/$ISSUE" "## 🔨 Developer completed\n\nPR created. CI and QA will run automatically on the PR.\n\nOnce all checks pass, you'll be notified to review and merge."
+      post_comment "issues/$ISSUE" "## 🔨 Developer completed\n\nPR created. Dispatching CI and QA now..."
       echo "Action: posted completion comment on issue #$ISSUE"
+      # Dispatch CI and QA on the PR (App-created PRs don't trigger pull_request events)
+      if [ -n "$PR" ]; then
+        dispatch_ci_and_qa "$PR"
+        post_comment "issues/$PR" "## 🤖 CI and QA dispatched\n\nThe Controller has dispatched CI and QA workflows for this PR. Waiting for results..."
+      fi
     else
       RETRIES=$(count_retries "issues/$ISSUE" "developer")
       if [ "$RETRIES" -lt "$MAX_RETRIES_DEVELOPER" ]; then
