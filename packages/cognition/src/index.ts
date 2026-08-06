@@ -32,6 +32,30 @@ export interface LLMContextPayload {
   responseSchema: object;
 }
 
+// ── Plan Phase (Section 6 — Plan) ─────────────────────────────────────────────
+
+/** Orchestrates the Plan phase: builds LLM context, invokes the LLM, stores the plan. */
+export interface PlanService {
+  /** Formulate and store a plan for the agent given the perception result. */
+  plan(
+    agentId: string,
+    perceptionResult: import('@evol-hive/shared').PerceptionResult,
+  ): Promise<import('@evol-hive/shared').PlanResult>;
+}
+
+/** Builds the LLM context payload specifically for plan formulation. */
+export interface PlanBuilder {
+  /** Construct the LLM context payload from the perception result. */
+  build(perceptionResult: import('@evol-hive/shared').PerceptionResult): LLMContextPayload;
+}
+
+/** Constructor options for {@link PlanServiceImpl}. */
+export interface PlanServiceOptions {
+  planBuilder: PlanBuilder;
+  llmClient: LLMClient;
+  dataProvider: import('@evol-hive/shared').PlanDataProvider;
+}
+
 // ── LLM Client ───────────────────────────────────────────────────────────────
 
 /** Abstraction over local LLM backends (Ollama, vLLM, llama.cpp). */
@@ -40,6 +64,11 @@ export interface LLMClient {
   completeStructured(
     payload: LLMContextPayload,
   ): Promise<import('@evol-hive/shared').LLMActionResponse>;
+
+  /** Send a plan formulation request with formulatePlanSchema as the grammar constraint (Section 7). */
+  completePlan(
+    payload: LLMContextPayload,
+  ): Promise<import('@evol-hive/shared').FormulatePlanResult>;
 
   /** Send a background reflection request (Section 11.3). */
   completeReflection(

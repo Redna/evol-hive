@@ -13,6 +13,7 @@
 export type PPERPhase = 'perceive' | 'plan' | 'execute' | 'reflect';
 
 import type { Affordance } from './affordance.js';
+import type { AgentInternalState, AgentPlan } from './agent.js';
 
 /** Passive perception data (Section 6.1) — high-level object presence. */
 export interface PassivePerception {
@@ -152,4 +153,30 @@ export interface PerceptionDataProvider {
   getSystemFeedback(agentId: string): string | undefined;
   /** Associative memories from Track 1 (Section 11.1), if a memory subsystem is wired. */
   getAssociativeMemories?(agentId: string): MemorySnippet[] | undefined;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plan Phase (Section 6 — Plan)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The outcome of the Plan phase. On success, `plan` contains the stored AgentPlan. On failure, `error` holds the reason. */
+export interface PlanResult {
+  success: boolean;
+  plan?: AgentPlan;
+  error?: string;
+}
+
+/**
+ * Bridge interface (defined in `shared`) that lets the cognition layer
+ * interact with agent state and plan storage in the engine without coupling
+ * the two packages (per ADR-0001). The engine implements this; cognition
+ * consumes it.
+ */
+export interface PlanDataProvider {
+  /** The agent's current internal state, or null if the agent doesn't exist. */
+  getAgentState(agentId: string): AgentInternalState | null;
+  /** Create and store a plan from the formulate_plan tool output, returning the stored AgentPlan. */
+  storePlan(agentId: string, result: FormulatePlanResult): AgentPlan;
+  /** Set the agent's isThinking flag. */
+  setThinking(agentId: string, isThinking: boolean): void;
 }
