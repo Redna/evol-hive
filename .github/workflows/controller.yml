@@ -19,11 +19,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Generate App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Run Controller
         env:
           COMPLETED_WORKFLOW: ${{ github.event.workflow_run.name }}
           COMPLETED_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           COMPLETED_RUN_ID: ${{ github.event.workflow_run.id }}
-          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_PAT: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/controller.sh

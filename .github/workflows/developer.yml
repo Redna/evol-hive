@@ -42,10 +42,17 @@ jobs:
           path: ~/.yaam/models
           key: yaam-model-v1
 
+      - name: Generate App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Restore YAAM memory
         run: bash scripts/restore-memory.sh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Bootstrap agent environment
         env:
@@ -56,7 +63,7 @@ jobs:
         env:
           ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
         run: |
           set -x
@@ -92,6 +99,8 @@ jobs:
             --verbose
 
       - name: Push agent commits
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           BRANCH=$(git branch --show-current)
           if [ "$BRANCH" != "main" ]; then
@@ -113,5 +122,5 @@ jobs:
         if: always()
         run: bash scripts/save-memory.sh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_RUN_ID: ${{ github.run_id }}
