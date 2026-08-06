@@ -70,3 +70,4 @@ Full architecture: `docs/architecture/01-11`. ADRs: `docs/adr/`.
 - If a request conflicts with the architecture, say so and propose an alternative.
 - Keep specs concise. Every requirement should map to at least one acceptance criterion.
 - Record WHY you made each design decision in YAAM notes, not just WHAT you decided.
+- **NEVER use "Closes #N", "Fixes #N", or "Resolves #N" in spec PR bodies.** The spec PR is documentation only — the issue must stay open until the code PR is merged. Reference the issue with plain "#N" instead.
