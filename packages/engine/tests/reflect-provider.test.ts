@@ -1,7 +1,7 @@
 /**
  * Tests for ReflectDataProviderImpl bridge (spec 004, Req 22-23).
  *
- * Covers AC-27 through AC-31, AC-34, AC-40.
+ * Covers AC-27 through AC-31, AC-32, AC-33, AC-34, AC-40.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { MemoryEntryInput, MemoryNode } from '@evol-hive/shared';
@@ -85,14 +85,14 @@ describe('ReflectDataProviderImpl (AC-27, AC-40)', () => {
     expect(typeof ctx.provider.setThinking).toBe('function');
   });
 
-  // getAgentState
-  it('getAgentState delegates to AgentManager.getState', () => {
+  // getAgentState (AC-32)
+  it('getAgentState delegates to AgentManager.getState (AC-32)', () => {
     const state = ctx.provider.getAgentState(AGENT_ID);
     expect(state).not.toBeNull();
     expect(state?.agentId).toBe(AGENT_ID);
   });
 
-  it('getAgentState returns null for unknown agent', () => {
+  it('getAgentState returns null for unknown agent (AC-32)', () => {
     expect(ctx.provider.getAgentState('nonexistent')).toBeNull();
   });
 
@@ -176,8 +176,8 @@ describe('ReflectDataProviderImpl (AC-27, AC-40)', () => {
     expect(ctx.agentManager.getState(AGENT_ID)?.currentPlan).toBeNull();
   });
 
-  // setThinking
-  it('setThinking delegates to AgentManager.updateState', () => {
+  // setThinking (AC-33)
+  it('setThinking delegates to AgentManager.updateState (AC-33)', () => {
     ctx.provider.setThinking(AGENT_ID, true);
     expect(ctx.agentManager.getState(AGENT_ID)?.isThinking).toBe(true);
     ctx.provider.setThinking(AGENT_ID, false);

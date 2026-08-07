@@ -1,6 +1,7 @@
 /**
  * Tests for the Reflect phase — ReflectBuilderImpl and ReflectServiceImpl.
  * Covers acceptance criteria AC-10 through AC-26, AC-35, AC-36, AC-38.
+ * Also covers AC-14 (completeReflect called with built payload).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type {
@@ -503,6 +504,21 @@ describe('ReflectServiceImpl.reflect (AC-15 through AC-26)', () => {
     const { service } = makeService(provider);
     await service.reflect(AGENT_ID, makeExecuteResult());
     expect(provider.clearPlanIfCompleteCalls).toHaveLength(0);
+  });
+
+  // AC-14: completeReflect is called with the payload built by ReflectBuilder.build()
+  it('calls llmClient.completeReflect with the payload from ReflectBuilder.build() (AC-14)', async () => {
+    const { service, llm } = makeService(provider, {});
+    await service.reflect(AGENT_ID, makeExecuteResult());
+
+    expect(llm.completeReflect).toHaveBeenCalledTimes(1);
+    const payload = llm.completeReflect.mock.calls[0]![0] as LLMContextPayload;
+    // The payload should have the reflectSchema as its responseSchema.
+    expect(payload.responseSchema).toEqual(reflectSchema);
+    // The payload should include the agent's current goal in the perception context.
+    expect(payload.perceptionContext).toContain('Stay alive');
+    // The payload should include the execution result status.
+    expect(payload.perceptionContext.toLowerCase()).toContain('success');
   });
 
   it('handles null/undefined LLM response as empty object (AC-15)', async () => {
