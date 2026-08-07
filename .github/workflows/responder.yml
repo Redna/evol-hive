@@ -1,0 +1,109 @@
+name: Responder
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  respond:
+    if: contains(github.event.comment.body, '@evol-hive-agent')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Generate App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Cache YAAM binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.yaam-cache
+          key: yaam-binary-v1
+
+      - name: Cache ONNX model
+        uses: actions/cache@v4
+        with:
+          path: ~/.yaam/models
+          key: yaam-model-v1
+
+      - name: Restore YAAM memory
+        run: bash scripts/restore-memory.sh
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Bootstrap agent environment
+        env:
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+        run: bash scripts/bootstrap-agent.sh
+
+      - name: Run Responder Agent
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          IS_PR: ${{ github.event.issue.pull_request != null }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+        run: |
+          set -x
+
+          # Build context for the agent
+          if [ "$IS_PR" = "true" ]; then
+            # It's a PR comment — get PR diff and details
+            gh pr view $ISSUE_NUMBER --json title,body,headRefName > /tmp/pr-context.json
+            gh pr diff $ISSUE_NUMBER > /tmp/pr-diff.txt 2>/dev/null || true
+            CONTEXT="This is a comment on PR #$ISSUE_NUMBER. The PR title and body are in /tmp/pr-context.json. The PR diff is in /tmp/pr-diff.txt."
+          else
+            # It's an issue comment — get issue details
+            gh issue view $ISSUE_NUMBER --json title,body,labels > /tmp/issue-context.json
+            CONTEXT="This is a comment on issue #$ISSUE_NUMBER. The issue details are in /tmp/issue-context.json."
+          fi
+
+          # Build the prompt from the comment
+          TASK="A human (@$COMMENT_AUTHOR) commented on this PR/issue:
+
+          \"$COMMENT_BODY\"
+
+          $CONTEXT
+
+          Read the comment, understand what they're asking, and respond.
+          Post your response as a comment on the PR/issue using:
+          gh issue comment $ISSUE_NUMBER --body \"your response\"
+
+          Use YAAM search and graph explore to understand the codebase.
+          Use read to examine specific files. Be concise and helpful."
+
+          pi -p "$TASK" \
+            --append-system-prompt "$(cat .pi/agents/responder.md)" \
+            --model ollama/glm-5.2 \
+            --thinking medium \
+            --tools read,bash \
+            --verbose
+
+      - name: Save YAAM memory
+        if: always()
+        run: bash scripts/save-memory.sh
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
