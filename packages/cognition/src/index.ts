@@ -23,6 +23,25 @@ export interface PerceptionBuilder {
   build(perceptionResult: import('@evol-hive/shared').PerceptionResult): LLMContextPayload;
 }
 
+// ── Plan Builder ─────────────────────────────────────────────────────────────
+
+/** Builds the LLM context payload specifically for plan formulation (spec 002). */
+export interface PlanBuilder {
+  /** Construct the plan-formulation context payload from the PerceptionResult. */
+  build(perceptionResult: import('@evol-hive/shared').PerceptionResult): LLMContextPayload;
+}
+
+// ── Plan Service ──────────────────────────────────────────────────────────────
+
+/** Orchestrates the Plan phase of the PPER loop (spec 002). */
+export interface PlanService {
+  /** Formulate and store a plan for the agent, given the Perceive-phase result. */
+  plan(
+    agentId: string,
+    perceptionResult: import('@evol-hive/shared').PerceptionResult,
+  ): Promise<import('@evol-hive/shared').PlanResult>;
+}
+
 /** The full context payload sent to the LLM. */
 export interface LLMContextPayload {
   systemPrompt: string;
@@ -46,6 +65,11 @@ export interface LLMClient {
     systemPrompt: string,
     memoryNodes: import('@evol-hive/shared').MemorySnippet[],
   ): Promise<import('@evol-hive/shared').ReflectionResult>;
+
+  /** Send a plan-formulation request with `formulatePlanSchema` as the grammar constraint (spec 002). */
+  completePlan(
+    payload: LLMContextPayload,
+  ): Promise<import('@evol-hive/shared').FormulatePlanResult>;
 }
 
 // ── Cognitive Tools (Section 8) ───────────────────────────────────────────────
