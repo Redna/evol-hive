@@ -1,6 +1,8 @@
 name: Architect
 
 on:
+  issues:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -10,6 +12,9 @@ on:
 
 jobs:
   draft-spec:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && github.event.label.name == 'Status: Needs Architecture')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -29,21 +34,18 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # Cache YAAM daemon binary (30MB, avoids rebuilding Rust on every run)
       - name: Cache YAAM binary
         uses: actions/cache@v4
         with:
           path: ~/.yaam-cache
           key: yaam-binary-v1
 
-      # Cache ONNX model files (134MB, never changes)
       - name: Cache ONNX model
         uses: actions/cache@v4
         with:
           path: ~/.yaam/models
           key: yaam-model-v1
 
-      # Restore YAAM memory from the memory branch (durable, versioned)
       - name: Generate App Token
         uses: actions/create-github-app-token@v1
         id: app-token
@@ -63,7 +65,7 @@ jobs:
 
       - name: Run Architect Agent
         env:
-          ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
@@ -87,7 +89,7 @@ jobs:
 
       - name: Push agent commits
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}  # PAT for PR creation — triggers pull_request events
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           BRANCH=$(git branch --show-current)
           if [ "$BRANCH" != "main" ]; then
@@ -104,7 +106,6 @@ jobs:
             echo "No unpushed commits."
           fi
 
-      # Save YAAM memory to the memory branch (durable, versioned)
       - name: Save YAAM memory
         if: always()
         run: bash scripts/save-memory.sh
