@@ -42,6 +42,14 @@ export interface PlanService {
   ): Promise<import('@evol-hive/shared').PlanResult>;
 }
 
+// ── Execute Service ───────────────────────────────────────────────────────────
+
+/** Orchestrates the Execute phase of the PPER loop (spec 003). */
+export interface ExecuteService {
+  /** Execute the current plan step for the agent (deterministic — no LLM). */
+  execute(agentId: string): Promise<import('@evol-hive/shared').ExecuteResult>;
+}
+
 /** The full context payload sent to the LLM. */
 export interface LLMContextPayload {
   systemPrompt: string;

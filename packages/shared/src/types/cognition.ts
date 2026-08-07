@@ -12,8 +12,8 @@
 /** The four phases of the cognitive loop. */
 export type PPERPhase = 'perceive' | 'plan' | 'execute' | 'reflect';
 
-import type { Affordance } from './affordance.js';
-import type { AgentInternalState, AgentPlan } from './agent.js';
+import type { Affordance, AffordanceResult } from './affordance.js';
+import type { AgentInternalState, AgentPlan, PlanStep } from './agent.js';
 
 /** Passive perception data (Section 6.1) — high-level object presence. */
 export interface PassivePerception {
@@ -179,4 +179,81 @@ export interface PerceptionDataProvider {
   getSystemFeedback(agentId: string): string | undefined;
   /** Associative memories from Track 1 (Section 11.1), if a memory subsystem is wired. */
   getAssociativeMemories?(agentId: string): MemorySnippet[] | undefined;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Execute Phase (spec 003)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The outcome of the Execute phase (spec 003, Req 1). On success with a
+ * physical affordance, `result` contains the raw `AffordanceResult`. On
+ * failure, `error` contains the failure reason and `result` is `undefined`.
+ * `planComplete` indicates whether the plan has no remaining steps after
+ * this execution. `stepSkipped` is `true` when the current step had no
+ * `targetAffordance` and was advanced without physical execution.
+ */
+export interface ExecuteResult {
+  success: boolean;
+  result?: AffordanceResult;
+  error?: string;
+  planComplete: boolean;
+  stepSkipped?: boolean;
+}
+
+/**
+ * The intermediate result of resolving and attempting an affordance (spec 003,
+ * Req 2). `resolved` is `false` when no smart object in the agent's room exposes
+ * the requested affordance. `preconditionsMet` is `false` when one or more
+ * precondition checks failed (with `failedPreconditions` listing the failed
+ * precondition names). `result` is present only when the affordance was executed
+ * (preconditions passed).
+ */
+export interface ExecutionOutcome {
+  resolved: boolean;
+  objectId?: string;
+  preconditionsMet: boolean;
+  failedPreconditions?: string[];
+  result?: AffordanceResult;
+}
+
+/**
+ * Bridge interface (defined in `shared`) that lets the cognition layer drive
+ * the Execute phase via the engine without coupling the two packages (per
+ * ADR-0001). The engine implements this; cognition consumes it.
+ *
+ * Follows the `PlanDataProvider` and `PerceptionDataProvider` bridge pattern
+ * from specs 001 and 002.
+ */
+export interface ExecuteDataProvider {
+  /** The agent's current internal state, or `null` if the agent does not exist. */
+  getAgentState(agentId: string): AgentInternalState | null;
+  /** The current `PlanStep` in the agent's plan, or `null` if no plan or no step. */
+  getCurrentStep(agentId: string): PlanStep | null;
+  /** Whether the agent's plan has no remaining steps. */
+  isPlanComplete(agentId: string): boolean;
+  /** Resolve an affordance ID to a specific smart object in a room. Returns `null` if no object exposes it. */
+  resolveAffordance(
+    roomId: string,
+    affordanceId: string,
+  ): { objectId: string; affordance: Affordance } | null;
+  /** Check all preconditions for an affordance on a specific object. */
+  checkPreconditions(
+    affordanceId: string,
+    objectId: string,
+  ): { satisfied: boolean; failed: string[] };
+  /** Execute an affordance's engine effect on the world. */
+  executeAffordance(
+    objectId: string,
+    affordanceId: string,
+    agentId: string,
+  ): Promise<AffordanceResult>;
+  /** Advance to the next step in the plan. */
+  advanceStep(agentId: string): void;
+  /** Apply drive changes from an affordance result (clamped to 0–100). */
+  applyDriveChanges(agentId: string, changes: Partial<Record<string, number>>): void;
+  /** Store system feedback for the next Perceive tick (Section 9.2). */
+  setSystemFeedback(agentId: string, feedback: string): void;
+  /** Set the agent's `isThinking` flag (Section 9.1). */
+  setThinking(agentId: string, isThinking: boolean): void;
 }
