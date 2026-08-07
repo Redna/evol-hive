@@ -97,6 +97,12 @@ dispatch_doctor() {
 echo "=== Controller ==="
 echo "Completed: $COMPLETED_WORKFLOW — $COMPLETED_CONCLUSION"
 
+# Skip non-failure conclusions (skipped, neutral, cancelled)
+if [ "$COMPLETED_CONCLUSION" = "skipped" ] || [ "$COMPLETED_CONCLUSION" = "neutral" ] || [ "$COMPLETED_CONCLUSION" = "cancelled" ]; then
+    echo "Workflow was $COMPLETED_CONCLUSION — no action needed."
+    exit 0
+fi
+
 ISSUE=$(get_latest_issue)
 PR=$(get_latest_pr)
 echo "Latest issue: #$ISSUE"
