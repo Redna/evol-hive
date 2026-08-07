@@ -14,27 +14,6 @@ LINES=$(wc -l < events.jsonl)
 SIZE=$(du -h events.jsonl | cut -f1)
 echo "events.jsonl: $LINES events, $SIZE"
 
-# Strip embedding arrays from events before saving.
-# Embeddings are ~90% of the file size and are recomputed from the ONNX
-# model on every run. Only workspace/scratchpad notes need to persist.
-python3 -c "
-import json, sys
-with open('events.jsonl', 'r') as f:
-    for line in f:
-        try:
-            event = json.loads(line)
-            payload = event.get('payload', {})
-            props = payload.get('properties', {})
-            if 'embedding' in props:
-                del props['embedding']
-            print(json.dumps(event))
-        except:
-            print(line, end='')
-" > /tmp/events-stripped.jsonl
-
-STRIPPED_SIZE=$(du -h /tmp/events-stripped.jsonl | cut -f1)
-echo "Stripped embeddings: $SIZE → $STRIPPED_SIZE"
-
 # Create a temporary worktree for the memory branch
 WORKTREE="/tmp/yaam-memory-worktree"
 rm -rf "$WORKTREE"
@@ -52,7 +31,7 @@ else
 fi
 
 # Copy stripped events.jsonl to the worktree
-cp /tmp/events-stripped.jsonl "$WORKTREE/events.jsonl"
+cp events.jsonl "$WORKTREE/events.jsonl"
 
 # Commit and push from the worktree
 cd "$WORKTREE"
