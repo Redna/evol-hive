@@ -162,7 +162,8 @@ case "$COMPLETED_WORKFLOW" in
         QA_STATUS=$(echo "$CHECKS" | grep -i "qa" | head -1 | cut -d'|' -f2)
         if [ "$QA_STATUS" = "success" ]; then
           post_comment "issues/$PR" "## ✅ All checks passed\n\nCI: ✅ | QA: ✅\n\n@$OWNER — PR is ready for your review and merge."
-          echo "Action: notified @$OWNER that PR #$PR is ready"
+          approve_pr "$PR" "All checks passed. CI ✅ | QA ✅ — approved by Controller."
+          echo "Action: approved PR #$PR and notified @$OWNER"
         else
           echo "Action: CI passed, waiting for QA to complete"
         fi
@@ -178,7 +179,8 @@ case "$COMPLETED_WORKFLOW" in
         CI_STATUS=$(echo "$CHECKS" | grep -i "Type Check" | head -1 | cut -d'|' -f2)
         if [ "$CI_STATUS" = "success" ]; then
           post_comment "issues/$PR" "## ✅ All checks passed\n\nCI: ✅ | QA: ✅\n\n@$OWNER — PR is ready for your review and merge."
-          echo "Action: notified @$OWNER that PR #$PR is ready"
+          approve_pr "$PR" "All checks passed. CI ✅ | QA ✅ — approved by Controller."
+          echo "Action: approved PR #$PR and notified @$OWNER"
         else
           echo "Action: QA passed, waiting for CI to complete"
         fi
