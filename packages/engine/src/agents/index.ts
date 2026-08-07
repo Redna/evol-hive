@@ -67,5 +67,6 @@ export interface PlanManager {
 export * from './state/index.js';
 export * from './drives/index.js';
 export * from './plans/index.js';
+export * from './reflect/index.js';
 export * from './feedback/index.js';
 export * from './execute/index.js';
