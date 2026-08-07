@@ -1,6 +1,6 @@
 #!/bin/bash
-# Save YAAM memory to the memory branch
-# Usage: bash scripts/save-memory.sh
+# Save YAAM memory to the memory branch via the GitHub API.
+# No branch switching — just upload the file content via the Contents API.
 set -e
 
 echo "=== Saving YAAM memory ==="
@@ -14,51 +14,93 @@ LINES=$(wc -l < events.jsonl)
 SIZE=$(du -h events.jsonl | cut -f1)
 echo "events.jsonl: $LINES events, $SIZE"
 
-# Save events.jsonl to a temp location, then remove from working tree
-# (events.jsonl is untracked on main, would block branch switch)
-cp events.jsonl /tmp/yaam-events-save.jsonl
-rm -f events.jsonl
+# Base64 encode the file content
+ENCODED=$(base64 -w 0 events.jsonl)
 
-# Fetch or create the memory branch
-git fetch origin memory:memory 2>/dev/null || {
-  echo "Creating new memory branch..."
-  git checkout --orphan memory
-  git reset --hard
-  cp /tmp/yaam-events-save.jsonl events.jsonl
-  git add events.jsonl
-  git commit -m "Initialize YAAM memory"
-  git push origin memory
-  git checkout main
-  rm /tmp/yaam-events-save.jsonl
-  echo "Memory branch created and pushed."
-  exit 0
-}
+# Get the current SHA of events.jsonl on the memory branch (if it exists)
+SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/Redna/evol-hive/contents/events.jsonl?ref=memory" 2>/dev/null | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('sha',''))" 2>/dev/null)
 
-# Update the memory branch (force: discard any local changes, we saved events.jsonl already)
-git checkout -f memory
-cp /tmp/yaam-events-save.jsonl events.jsonl
-git add events.jsonl
-
-# Only commit if there are changes
-if git diff --cached --quiet; then
-  echo "No changes to events.jsonl — skipping commit."
+# Build the request body
+if [ -n "$SHA" ]; then
+  # File exists — update it
+  BODY=$(python3 -c "
+import json, os
+print(json.dumps({
+    'message': 'Update YAAM memory (run #${GITHUB_RUN_ID:-local})',
+    'content': os.environ['ENCODED'],
+    'branch': 'memory',
+    'sha': '${SHA}'
+}))
+" 2>/dev/null)
 else
-  git commit -m "Update YAAM memory (run #${GITHUB_RUN_ID:-local})"
-  
-  # Push with retry (handles concurrent agent pushes)
-  for i in 1 2 3; do
-    if git push origin memory; then
-      echo "Memory pushed successfully."
-      break
-    else
-      echo "Push failed (attempt $i/3) — pulling and retrying..."
-      git pull --rebase origin memory
-    fi
-  done
+  # File doesn't exist — create it (might need to create the branch first)
+  # Try to create on the memory branch, if it fails, create the branch
+  BODY=$(python3 -c "
+import json, os
+print(json.dumps({
+    'message': 'Initialize YAAM memory',
+    'content': os.environ['ENCODED'],
+    'branch': 'memory'
+}))
+" 2>/dev/null)
 fi
 
-git checkout main
-rm -f events.jsonl
-cp /tmp/yaam-events-save.jsonl events.jsonl
-rm /tmp/yaam-events-save.jsonl
+# Upload via the API
+RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+  -H "Authorization: token $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/Redna/evol-hive/contents/events.jsonl" \
+  -d "$BODY" 2>/dev/null)
+
+HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+
+if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+    echo "Memory saved successfully (HTTP $HTTP_CODE)."
+elif [ "$HTTP_CODE" = "409" ] || [ "$HTTP_CODE" = "422" ]; then
+    # Branch doesn't exist — create it from main first, then retry
+    echo "Memory branch may not exist. Creating from main..."
+    MAIN_SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+      "https://api.github.com/repos/Redna/evol-hive/git/refs/heads/main" 2>/dev/null | \
+      python3 -c "import sys,json; print(json.load(sys.stdin).get('object',{}).get('sha',''))" 2>/dev/null)
+
+    if [ -n "$MAIN_SHA" ]; then
+      curl -s -X POST \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/Redna/evol-hive/git/refs" \
+        -d "{\"ref\":\"refs/heads/memory\",\"sha\":\"$MAIN_SHA\"}" > /dev/null 2>/dev/null
+
+      # Remove SHA from body (new branch, no existing file)
+      BODY=$(python3 -c "
+import json, os
+print(json.dumps({
+    'message': 'Initialize YAAM memory',
+    'content': os.environ['ENCODED'],
+    'branch': 'memory'
+}))
+" 2>/dev/null)
+
+      RETRY=$(curl -s -w "\n%{http_code}" -X PUT \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/Redna/evol-hive/contents/events.jsonl" \
+        -d "$BODY" 2>/dev/null)
+
+      RETRY_CODE=$(echo "$RETRY" | tail -1)
+      if [ "$RETRY_CODE" = "200" ] || [ "$RETRY_CODE" = "201" ]; then
+          echo "Memory branch created and memory saved (HTTP $RETRY_CODE)."
+      else
+          echo "Failed to save memory after creating branch (HTTP $RETRY_CODE)."
+      fi
+    else
+      echo "Could not get main SHA to create memory branch."
+    fi
+else
+    echo "Failed to save memory (HTTP $HTTP_CODE)."
+    echo "$RESPONSE" | head -n -1 | python3 -c "import sys,json; print(json.load(sys.stdin).get('message',''))" 2>/dev/null
+fi
+
 echo "Memory save complete."
