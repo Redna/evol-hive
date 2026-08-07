@@ -20,7 +20,8 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@evol-hive/shared": "workspace:*"
+    "@evol-hive/shared": "workspace:*",
+    "@evol-hive/memory": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.3.0",

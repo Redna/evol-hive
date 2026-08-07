@@ -1,0 +1,101 @@
+/**
+ * pper/reflect-builder — LLM context payload construction for the Reflect phase
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Section 6 / §7 / §8 / spec 004: Transforms the agent's current state and the
+ * Execute-phase result into the `LLMContextPayload` sent to the heavy LLM during
+ * reflection. The response schema is `reflectSchema` (NOT `llmActionResponseSchema`).
+ *
+ * The perception context includes: the execution result (success/failure, error
+ * message if any), the agent's current drives, the agent's current goal, and the
+ * plan status (complete or in-progress with remaining steps).
+ */
+
+import type { AgentInternalState, ExecuteResult } from '@evol-hive/shared';
+import { reflectSchema } from '@evol-hive/shared';
+import type { LLMContextPayload, ReflectBuilder } from '../index.js';
+import { defaultCognitiveTools } from '../tools/index.js';
+
+/** Concrete ReflectBuilder producing the LLM context payload for reflection. */
+export class ReflectBuilderImpl implements ReflectBuilder {
+  build(
+    _agentId: string,
+    agentState: AgentInternalState,
+    executeResult: ExecuteResult,
+  ): LLMContextPayload {
+    const systemPrompt = [
+      'You are an autonomous NPC in a deterministic simulation.',
+      'You must reflect on the outcome of your last action.',
+      'Evaluate whether your goal or drives need adjustment based on what happened.',
+      'Decide if a memory entry should be stored for future reference.',
+      'Use the update_internal_state cognitive tool to adjust your goal, drives, or store a memory.',
+    ].join(' ');
+
+    const contextLines: string[] = [];
+
+    // Execution result status.
+    if (executeResult.success) {
+      contextLines.push('Execution result: success');
+    } else {
+      contextLines.push('Execution result: failure');
+    }
+
+    // Error message if any.
+    if (executeResult.error !== undefined) {
+      contextLines.push(`Error: ${executeResult.error}`);
+    }
+
+    // Affordance result summary.
+    if (executeResult.result !== undefined) {
+      const ar = executeResult.result;
+      if (ar.driveChanges !== undefined) {
+        const changes = Object.entries(ar.driveChanges)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(', ');
+        contextLines.push(`Drive changes applied: ${changes}`);
+      }
+      if (ar.failureReason !== undefined) {
+        contextLines.push(`Failure reason: ${ar.failureReason}`);
+      }
+    }
+
+    // Step skipped info.
+    if (executeResult.stepSkipped === true) {
+      contextLines.push('Note: step was skipped (non-physical step, no affordance executed).');
+    }
+
+    // Agent's current drives.
+    const driveSummary = formatDrives(agentState.drives);
+    contextLines.push(`Drives: ${driveSummary}`);
+
+    // Agent's current goal.
+    contextLines.push(`Current goal: ${agentState.currentGoal}`);
+
+    // Plan status.
+    if (executeResult.planComplete) {
+      contextLines.push('Plan status: complete');
+    } else {
+      contextLines.push('Plan status: in-progress');
+    }
+
+    // Select only the update_internal_state tool.
+    const updateInternalStateTool = defaultCognitiveTools.filter(
+      (tool) => tool.name === 'update_internal_state',
+    );
+
+    return {
+      systemPrompt,
+      perceptionContext: contextLines.join('\n'),
+      availableAffordances: [],
+      cognitiveTools: updateInternalStateTool,
+      responseSchema: reflectSchema,
+    };
+  }
+}
+
+function formatDrives(drives: object): string {
+  return Object.entries(drives)
+    .map(([name, value]) => `${name}=${value}`)
+    .join(', ');
+}
+
+export {};
