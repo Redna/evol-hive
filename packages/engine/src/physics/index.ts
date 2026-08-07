@@ -1,3 +1,86 @@
-// physics/ — Deterministic physics execution
-// Implementation TBD: Affordance → engineEffect mapping, preconditions, effects.
+/**
+ * physics/ — Deterministic physics execution
+ * ──────────────────────────────────────────
+ * Section 4 / spec 003: The `PhysicsSystemImpl` executes affordances by
+ * dispatching to registered handlers. It checks preconditions, invokes the
+ * handler, and updates object state on success. All execution is deterministic
+ * (System 1 / engine) — no LLM calls, no random number generation (Req 21, 23).
+ */
+
+import type { Affordance, AffordanceResult, GameTick } from '@evol-hive/shared';
+import type { PhysicsSystem } from '../index.js';
+import type { SmartObjectRegistry } from '../world/index.js';
+import type { AffordanceRegistryImpl } from '../world/affordances/index.js';
+
+/**
+ * Concrete PhysicsSystem. Executes affordances by:
+ * 1. Looking up the SmartObject via `SmartObjectRegistry.get`.
+ * 2. Finding the Affordance on the object.
+ * 3. Checking preconditions via `AffordanceRegistryImpl.checkPreconditions`.
+ * 4. Invoking the registered `AffordanceHandler`.
+ * 5. Updating object state on success.
+ */
+export class PhysicsSystemImpl implements PhysicsSystem {
+  readonly name = 'physics';
+
+  constructor(
+    private readonly smartObjectRegistry: SmartObjectRegistry,
+    private readonly affordanceRegistry: AffordanceRegistryImpl,
+  ) {}
+
+  /** No-op tick update (physics is event-driven, not tick-driven). */
+  update(_tick: GameTick): void {
+    // No-op — affordance execution is on-demand, not per-tick.
+  }
+
+  /**
+   * Execute an affordance's engine effect on the world.
+   * Returns an `AffordanceResult` — never throws.
+   */
+  async executeAffordance(
+    objectId: string,
+    affordanceId: string,
+    agentId: string,
+  ): Promise<AffordanceResult> {
+    // 1. Look up the SmartObject.
+    const object = this.smartObjectRegistry.get(objectId);
+    if (!object) {
+      return { success: false, failureReason: 'Object not found' };
+    }
+
+    // 2. Find the Affordance on the object.
+    const affordance = object.affordances.find((a: Affordance) => a.id === affordanceId);
+    if (!affordance) {
+      return { success: false, failureReason: 'Affordance not available on this object' };
+    }
+
+    // 3. Check preconditions.
+    const preconditionResult = this.affordanceRegistry.checkPreconditions(affordanceId, objectId);
+    if (!preconditionResult.satisfied) {
+      return {
+        success: false,
+        failureReason: `Preconditions not met: ${preconditionResult.failed.join(', ')}`,
+      };
+    }
+
+    // 4. Invoke the registered handler.
+    const handler = this.affordanceRegistry.getHandler(affordanceId);
+    if (!handler) {
+      return {
+        success: false,
+        failureReason: `No handler registered for affordance: ${affordanceId}`,
+      };
+    }
+
+    const result = await handler(objectId, agentId, object.state);
+
+    // 5. On success, update object state if newState is provided.
+    if (result.success && result.newState !== undefined) {
+      this.smartObjectRegistry.updateState(objectId, result.newState);
+    }
+
+    return result;
+  }
+}
+
 export {};

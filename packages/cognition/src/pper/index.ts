@@ -77,4 +77,6 @@ export { PerceptionBuilderImpl } from './perception-builder.js';
 export { PlanBuilderImpl } from './plan-builder.js';
 export { PlanServiceImpl } from './plan-service.js';
 export type { PlanServiceOptions } from './plan-service.js';
+export { ExecuteServiceImpl } from './execute-service.js';
+export type { ExecuteServiceOptions } from './execute-service.js';
 export {};
