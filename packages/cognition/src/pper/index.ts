@@ -79,4 +79,7 @@ export { PlanServiceImpl } from './plan-service.js';
 export type { PlanServiceOptions } from './plan-service.js';
 export { ExecuteServiceImpl } from './execute-service.js';
 export type { ExecuteServiceOptions } from './execute-service.js';
+export { ReflectBuilderImpl } from './reflect-builder.js';
+export { ReflectServiceImpl } from './reflect-service.js';
+export type { ReflectServiceOptions } from './reflect-service.js';
 export {};

@@ -42,6 +42,29 @@ export interface PlanService {
   ): Promise<import('@evol-hive/shared').PlanResult>;
 }
 
+// ── Reflect Service ──────────────────────────────────────────────────────────
+
+/** Orchestrates the Reflect phase of the PPER loop (spec 004). */
+export interface ReflectService {
+  /** Reflect on the execution result and update agent state / store memories. */
+  reflect(
+    agentId: string,
+    executeResult: import('@evol-hive/shared').ExecuteResult,
+  ): Promise<import('@evol-hive/shared').ReflectResult>;
+}
+
+// ── Reflect Builder ──────────────────────────────────────────────────────────
+
+/** Builds the LLM context payload for the Reflect phase (spec 004). */
+export interface ReflectBuilder {
+  /** Construct the reflect context payload from the agent state and execution result. */
+  build(
+    agentId: string,
+    agentState: import('@evol-hive/shared').AgentInternalState,
+    executeResult: import('@evol-hive/shared').ExecuteResult,
+  ): LLMContextPayload;
+}
+
 // ── Execute Service ───────────────────────────────────────────────────────────
 
 /** Orchestrates the Execute phase of the PPER loop (spec 003). */
@@ -78,6 +101,11 @@ export interface LLMClient {
   completePlan(
     payload: LLMContextPayload,
   ): Promise<import('@evol-hive/shared').FormulatePlanResult>;
+
+  /** Send a reflect-phase request with `reflectSchema` as the grammar constraint (spec 004). */
+  completeReflect(
+    payload: LLMContextPayload,
+  ): Promise<import('@evol-hive/shared').ReflectLLMResponse>;
 }
 
 // ── Cognitive Tools (Section 8) ───────────────────────────────────────────────

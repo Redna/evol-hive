@@ -86,3 +86,30 @@ export const updateInternalStateSchema = {
   },
   additionalProperties: false,
 } as const;
+
+/** The reflect phase response schema (spec 004, Req 4). No top-level fields are required. */
+export const reflectSchema = {
+  type: 'object',
+  properties: {
+    newGoal: { type: ['string', 'null'] },
+    driveOverrides: {
+      type: 'object',
+      additionalProperties: { type: 'number' },
+    },
+    memoryEntry: {
+      type: ['object', 'null'],
+      properties: {
+        content: { type: 'string' },
+        importance: { type: 'integer', minimum: 1, maximum: 10 },
+        type: {
+          type: 'string',
+          enum: ['observation', 'reflection', 'action', 'interaction'],
+        },
+        location: { type: ['string', 'null'] },
+      },
+      required: ['content', 'importance', 'type'],
+      additionalProperties: false,
+    },
+  },
+  additionalProperties: false,
+} as const;
