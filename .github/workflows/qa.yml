@@ -3,6 +3,12 @@ name: QA
 on:
   pull_request:
     types: [opened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to verify (fallback if pull_request event didn't fire)"
+        required: true
+        type: string
 
 jobs:
   verify-coverage:
@@ -22,8 +28,14 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          ref: refs/pull/${{ inputs.pr_number }}/head
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
@@ -57,7 +69,7 @@ jobs:
 
       - name: Run QA Agent
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}

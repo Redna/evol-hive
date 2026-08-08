@@ -100,7 +100,8 @@ jobs:
 
       - name: Push agent commits
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}  # PAT for PR creation — triggers pull_request events
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}  # PAT for PR creation — triggers pull_request events
         run: |
           BRANCH=$(git branch --show-current)
           if [ "$BRANCH" != "main" ]; then
