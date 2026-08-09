@@ -18,8 +18,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 |---|---------|-------------|--------|-------|-----|------------|
 | [001](001-perceive-phase.md) | Perceive Phase (PPER) | §3, §4, §5, §6, §11 | 🔍 In Review | [#1](https://github.com/Redna/evol-hive/issues/1) | [#3](https://github.com/Redna/evol-hive/pull/3) | engine, cognition, shared |
 | [002](002-plan-phase.md) | Plan Phase (PPER) | §3, §6, §7, §8, §9, §10 | 🔍 In Review | [#4](https://github.com/Redna/evol-hive/issues/4) | [#7](https://github.com/Redna/evol-hive/pull/7) | engine, cognition, shared |
-| [003](003-execute-phase.md) | Execute Phase (PPER) | §2, §3, §4, §6, §9 | 🔍 In Review | [#8](https://github.com/Redna/evol-hive/issues/8) | [#14](https://github.com/Redna/evol-hive/pull/14) | engine, cognition, shared |
-| [004](004-reflect-phase.md) | Reflect Phase (PPER) | §3, §6, §7, §8, §11 | 🔍 In Review | [#9](https://github.com/Redna/evol-hive/issues/9) | [#16](https://github.com/Redna/evol-hive/pull/16) | shared, cognition, memory, engine |
+| [003](003-execute-phase.md) | Execute Phase (PPER) | §2, §3, §4, §6, §9 | 🔍 In Review | [#8](https://github.com/Redna/evol-hive/issues/8) | [#17](https://github.com/Redna/evol-hive/pull/17) | engine, cognition, shared |
+| [004](004-reflect-phase.md) | Reflect Phase (PPER) | §2, §3, §6, §7, §8, §11 | 🔍 In Review | [#9](https://github.com/Redna/evol-hive/issues/9) | [#17](https://github.com/Redna/evol-hive/pull/17) | shared, cognition, memory, engine |
 
 ## Architecture Coverage
 
@@ -33,9 +33,9 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [§6](../architecture/06-pper-loop.md) | PPER Loop | 001 (Perceive), 002 (Plan), 003 (Execute), 004 (Reflect) | 🔍 Perceive in review; 🔍 Plan in review; 🔍 Execute in review; 🔍 Reflect in review |
 | [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 002 (partial), 004 (reflectSchema) | 📝 Partial — full spec needed |
 | [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002 (formulate_plan), 004 (update_internal_state) | 📝 Partial — full spec needed |
-| [§9](../architecture/09-engine-routing.md) | Engine Routing | 002 (partial — isThinking), 003 (isThinking, feedback) | 📝 Partial — full spec needed |
+| [§9](../architecture/09-engine-routing.md) | Engine Routing | 002 (partial — isThinking), 003 (isThinking, feedback), 004 (isThinking) | 📝 Partial — full spec needed |
 | [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | — | 📝 Needs spec |
-| [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 001 (partial), 004 (storage path) | 📝 Partial — full spec needed |
+| [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 001 (partial), 004 (MemoryStore, EmbeddingProvider) | 📝 Partial — full spec needed |
 
 ## Spec Status Summary
 
@@ -47,6 +47,6 @@ Total specs:      4
 📝 Drafted:       0
 🚫 Blocked:       0
 
-Architecture sections with specs: 7/11 (partial coverage)
-Architecture sections needing specs: 4/11
+Architecture sections with specs: 8/11 (partial coverage)
+Architecture sections needing specs: 3/11
 ```
