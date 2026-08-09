@@ -200,7 +200,8 @@ describe('ReflectDataProviderImpl does not modify plans beyond clearing (AC-33)'
     // The only plan-related calls allowed are isComplete and clearPlan.
     expect(recorder.calls).not.toContain('createPlan');
     expect(recorder.calls).not.toContain('advanceStep');
-    expect(recorder.calls.filter((m) => m === 'isComplete' || m === 'clearPlan').length)
-      .toBeGreaterThan(0);
+    expect(
+      recorder.calls.filter((m) => m === 'isComplete' || m === 'clearPlan').length,
+    ).toBeGreaterThan(0);
   });
 });

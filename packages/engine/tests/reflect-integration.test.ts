@@ -77,7 +77,16 @@ function setup(clockReturn: number = 1000) {
     initialDrives: { energy: 50, hunger: 50 },
   });
 
-  return { agentManager, planManager, driveSystem, vectorStore, embeddingProvider, memoryStore, clock, provider };
+  return {
+    agentManager,
+    planManager,
+    driveSystem,
+    vectorStore,
+    embeddingProvider,
+    memoryStore,
+    clock,
+    provider,
+  };
 }
 
 // ─── Integration Tests ───────────────────────────────────────────────────────
