@@ -16,3 +16,6 @@ Thumbs.db
 *.swo
 *~.yaam/
 events.jsonl
+
+# Pi web attachments (may contain secrets)
+.pi-web/
