@@ -4,9 +4,6 @@ build/
 *.tsbuildinfo
 coverage/
 .vite/
-.env
-.env.local
-*.env
 .DS_Store
 Thumbs.db
 *.log
@@ -14,8 +11,29 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-*~.yaam/
-events.jsonl
+*~
+# --- Security: never commit secrets ---
 
-# Pi web attachments (may contain secrets)
+# Private keys (any format)
+*.pem
+*.key
+*.p12
+*.pfx
+*.ppk
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.secret
+secrets.json
+credentials.json
+
+# Pi web attachments (auto-downloaded by pi tool, may contain secrets)
 .pi-web/
+
+# YAAM memory (contains graph state, not secrets but shouldn't be in repo)
