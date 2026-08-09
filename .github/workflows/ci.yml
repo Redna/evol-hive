@@ -33,6 +33,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build dependencies (for type resolution)
+        run: pnpm build
+
       - name: Type check
         run: pnpm typecheck
 
@@ -63,7 +66,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build all packages
+      - name: Build all packages (cached from quality job)
         run: pnpm build
 
   test:
@@ -87,8 +90,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build shared (required for tests)
-        run: pnpm --filter @evol-hive/shared build
+      - name: Build all packages (required for test resolution)
+        run: pnpm build
 
       - name: Run tests
         run: pnpm test
