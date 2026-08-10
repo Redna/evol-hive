@@ -90,6 +90,33 @@ export interface ReflectionLoop {
   stop(): void;
 }
 
+// ── Embedding Provider (spec 004, Req 6) ─────────────────────────────────────
+
+/** Generates embedding vectors from text for memory storage. */
+export interface EmbeddingProvider {
+  /** Embedding dimensionality (must match the vector store's expected dimension). */
+  readonly dimensions: number;
+  /** Generate an embedding vector for a single text input. */
+  embed(text: string): Promise<number[]>;
+}
+
+// ── Memory Store (spec 004, Req 7) ────────────────────────────────────────────
+
+/**
+ * Wraps `VectorStore` and `EmbeddingProvider` to provide a simplified store API
+ * (spec 004, Req 7). Abstracts embedding generation away from the engine.
+ */
+export interface MemoryStore {
+  /** Store a memory entry — generates embedding, creates full MemoryNode, persists to VectorStore. */
+  store(
+    agentId: string,
+    entry: import('@evol-hive/shared').MemoryEntryInput,
+    timestamp: number,
+  ): Promise<import('@evol-hive/shared').MemoryNode>;
+  /** Retrieve a memory by ID. */
+  get(id: string): Promise<import('@evol-hive/shared').MemoryNode | null>;
+}
+
 // ── Re-exports ────────────────────────────────────────────────────────────────
 
 export * from './store/index.js';
