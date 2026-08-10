@@ -50,3 +50,4 @@ Total specs:      4
 Architecture sections with specs: 8/11 (partial coverage)
 Architecture sections needing specs: 3/11
 ```
+| [005](005-game-loop-integration.md) | Game Loop Integration & Minimal Scene | §2, §3, §4, §6, §9, §11 | 📝 Drafted | [#10](https://github.com/Redna/evol-hive/issues/10) | — | shared, engine, cognition, memory |
