@@ -5,6 +5,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { GameTick, EngineConfig } from '@evol-hive/shared';
 import { GameLoopImpl } from '../src/loop/index.js';
+import { SpatialSystemImpl } from '../src/spatial/index.js';
+import { AgentManagerImpl } from '../src/agents/state/index.js';
+import { SmartObjectRegistryImpl } from '../src/world/objects/index.js';
 import type { EngineSystem } from '../src/index.js';
 
 function makeConfig(fps = 60): EngineConfig {
@@ -170,6 +173,53 @@ describe('GameLoopImpl — GameTick propagation (AC-3)', () => {
     loop.registerSystem(mk('third'));
     loop.injectElapsed(0.02); // 1 tick
     expect(order).toEqual(['first', 'second', 'third']);
+  });
+});
+
+describe('GameLoopImpl — spatial system sync (AC-8)', () => {
+  it('SpatialSystemImpl currentSimTime equals simulationTime after at least one tick (verified via debounce trigger)', () => {
+    const agents = new AgentManagerImpl();
+    agents.spawn({
+      id: 'a1',
+      name: 'a1',
+      description: 'test',
+      traits: [],
+      initialDrives: { energy: 50, hunger: 50, social: 50, comfort: 50, curiosity: 50 },
+    });
+    agents.updateState('a1', { location: 'kitchen', lastPerceptionTick: 0 });
+
+    const registry = new SmartObjectRegistryImpl();
+    const spatial = new SpatialSystemImpl({
+      agentManager: agents,
+      registry,
+      spatialDebounceSeconds: 5,
+    });
+
+    const loop = new GameLoopImpl(makeConfig(60));
+    loop.registerSystem(spatial);
+
+    // Establish baseline — first shouldTriggerPerception call sets lastLocation.
+    expect(spatial.shouldTriggerPerception('a1')).toBe(false);
+    spatial.recordPerceptionTick('a1', 0);
+
+    // Before stepping the loop, idleSeconds = currentSimTime(0) - lastPerceptionTick(0) = 0 < 5.
+    expect(spatial.shouldTriggerPerception('a1')).toBe(false);
+
+    // Step the loop: inject 6 seconds of elapsed time at 60 FPS → 360 ticks.
+    // simulationTime advances to ≈ 6 seconds.
+    loop.injectElapsed(6.0);
+
+    // The game loop's simulationTime should be ≈ 6 seconds.
+    const tick = loop.currentTick();
+    expect(tick.tickNumber).toBeGreaterThan(0);
+    expect(tick.simulationTime).toBeCloseTo(6, 0);
+
+    // If currentSimTime was updated by the game loop (via update(tick)),
+    // idleSeconds = currentSimTime(≈6) - lastPerceptionTick(0) = 6 > 5 → true.
+    // If currentSimTime was NOT updated (stayed at 0), idleSeconds = 0 < 5 → false.
+    // The agent has NOT crossed a room boundary (still 'kitchen'), so the only
+    // reason for true is the debounce timer — proving currentSimTime == simulationTime.
+    expect(spatial.shouldTriggerPerception('a1')).toBe(true);
   });
 });
 
