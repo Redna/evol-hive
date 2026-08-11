@@ -40,14 +40,14 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      4
+Total specs:      5
 ✅ Done:          0
 🔨 In Development: 0
-🔍 In Review:     4
+🔍 In Review:     5
 📝 Drafted:       0
 🚫 Blocked:       0
 
 Architecture sections with specs: 8/11 (partial coverage)
 Architecture sections needing specs: 3/11
 ```
-| [005](005-game-loop-integration.md) | Game Loop Integration & Minimal Scene | §2, §3, §4, §6, §9, §11 | 📝 Drafted | [#10](https://github.com/Redna/evol-hive/issues/10) | — | shared, engine, cognition, memory |
+| [005](005-game-loop-integration.md) | Game Loop Integration & Minimal Scene | §2, §3, §4, §6, §9, §11 | 🔍 In Review | [#10](https://github.com/Redna/evol-hive/issues/10) | — | shared, engine, cognition, memory |

@@ -70,3 +70,4 @@ export * from './plans/index.js';
 export * from './reflect/index.js';
 export * from './feedback/index.js';
 export * from './execute/index.js';
+export * from './perception/index.js';
