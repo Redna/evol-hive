@@ -86,3 +86,10 @@ export * from './world/index.js';
 
 // Agents (state, drives, plans) — Section 3
 export * from './agents/index.js';
+
+// Engine systems (drive decay, PPER scheduler) — spec 005
+export * from './systems/pper-scheduler.js';
+export * from './systems/drive-decay.js';
+
+// Engine assembly factory — spec 005
+export * from './assembly.js';
