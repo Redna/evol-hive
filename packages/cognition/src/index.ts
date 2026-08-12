@@ -145,6 +145,7 @@ export * from './pper/index.js';
 export * from './tools/index.js';
 export * from './guardrails/index.js';
 export * from './schemas/index.js';
+export * from './llm/index.js';
 
 // System 0 Classifier (Section 5) — embedding-based affordance pruning
 export * from './classifier/index.js';
