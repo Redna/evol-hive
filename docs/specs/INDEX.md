@@ -21,7 +21,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [003](003-execute-phase.md) | Execute Phase (PPER) | §2, §3, §4, §6, §9 | 🔍 In Review | [#8](https://github.com/Redna/evol-hive/issues/8) | [#17](https://github.com/Redna/evol-hive/pull/17) | engine, cognition, shared |
 | [004](004-reflect-phase.md) | Reflect Phase (PPER) | §2, §3, §6, §7, §8, §11 | 🔍 In Review | [#9](https://github.com/Redna/evol-hive/issues/9) | [#17](https://github.com/Redna/evol-hive/pull/17) | shared, cognition, memory, engine |
 | [005](005-game-loop-integration.md) | Game Loop Integration & Minimal Scene | §2, §3, §4, §6, §9, §11 | 🔍 In Review | [#10](https://github.com/Redna/evol-hive/issues/10) | — | shared, engine, cognition, memory |
-| [006](006-ollama-llm-client.md) | Real Ollama LLM Client | §5, §6, §7, §9, §11 | 📝 Drafted | [#20](https://github.com/Redna/evol-hive/issues/20) | — | cognition, shared, examples |
+| [006](006-openai-compatible-llm-client.md) | Real OpenAI-Compatible LLM Client | §5, §6, §7, §9, §11 | 📝 Drafted | [#20](https://github.com/Redna/evol-hive/issues/20) | — | cognition, shared, examples |
 
 ## Architecture Coverage
 
@@ -33,7 +33,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001 (partial), 003 (execution) | 📝 Partial — full spec needed |
 | [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) | 001 (partial), 006 (EmbeddingProvider reuse) | 📝 Partial — full spec needed |
 | [§6](../architecture/06-pper-loop.md) | PPER Loop | 001 (Perceive), 002 (Plan), 003 (Execute), 004 (Reflect), 006 (LLM client) | 🔍 Perceive in review; 🔍 Plan in review; 🔍 Execute in review; 🔍 Reflect in review |
-| [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 002 (partial), 004 (reflectSchema), 006 (Ollama format parameter, memoryConsolidationSchema) | 📝 Partial — full spec needed |
+| [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 002 (partial), 004 (reflectSchema), 006 (OpenAI response_format, memoryConsolidationSchema) | 📝 Partial — full spec needed |
 | [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002 (formulate_plan), 004 (update_internal_state) | 📝 Partial — full spec needed |
 | [§9](../architecture/09-engine-routing.md) | Engine Routing | 002 (partial — isThinking), 003 (isThinking, feedback), 004 (isThinking), 006 (LLM error propagation) | 📝 Partial — full spec needed |
 | [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | — | 📝 Needs spec |
