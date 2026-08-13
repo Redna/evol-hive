@@ -23,6 +23,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [005](005-game-loop-integration.md) | Game Loop Integration & Minimal Scene | §2, §3, §4, §6, §9, §11 | 🔍 In Review | [#10](https://github.com/Redna/evol-hive/issues/10) | — | shared, engine, cognition, memory |
 | [006](006-openai-compatible-llm-client.md) | Real OpenAI-Compatible LLM Client | §5, §6, §7, §9, §11 | 🔍 In Review | [#20](https://github.com/Redna/evol-hive/issues/20) | [#25](https://github.com/Redna/evol-hive/pull/25) | cognition, shared, examples |
 | [007](007-onnx-embedding-provider.md) | Real ONNX Embedding Provider | §5, §11 | 📝 Drafted | [#21](https://github.com/Redna/evol-hive/issues/21) | — | cognition, shared, memory, examples |
+| [008](008-pper-error-recovery.md) | PPER Loop Error Recovery & Edge Cases | §6, §9, §10, §3 | 🔍 In Review | [#23](https://github.com/Redna/evol-hive/issues/23) | [#33](https://github.com/Redna/evol-hive/pull/33) | shared, cognition, engine |
 | [008](008-multi-agent-multi-room-integration-tests.md) | Multi-Agent & Multi-Room Integration Tests | §2, §3, §4, §6, §9 | 📝 Drafted | [#22](https://github.com/Redna/evol-hive/issues/22) | — | engine, shared |
 
 ## Architecture Coverage
@@ -44,10 +45,10 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      8
+Total specs:      9
 ✅ Done:          0
 🔨 In Development: 0
-🔍 In Review:     6
+🔍 In Review:     7
 📝 Drafted:       2
 🚫 Blocked:       0
 
