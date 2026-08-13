@@ -29,27 +29,27 @@
 
 ### Multi-Agent
 
-- [ ] **AC-1:** Given two idle agents (`isThinking: false`) and `maxConcurrentCycles >= 2`, calling `PPERScheduler.update(tick)` starts a PPER cycle for both agents (verified via fake orchestrator recording both `agentId` calls).
-- [ ] **AC-2:** Given three idle agents and `maxConcurrentCycles: 2`, calling `PPERScheduler.update(tick)` starts cycles for exactly 2 agents; the third agent's `isThinking` remains `false` and no `runCycle` call is recorded for it.
-- [ ] **AC-3:** After one in-flight cycle resolves (promise settles), the next `update(tick)` call starts a cycle for the previously-waiting third agent.
-- [ ] **AC-4:** Given two agents and a single `SmartObject` with an affordance whose preconditions fail when the object is "in use", simulating concurrent execution on the same object yields one `AffordanceResult` with `success: true` and one with `success: false` and a `failureReason` indicating contention.
-- [ ] **AC-5:** After an agent receives a failed affordance result due to contention, the `SystemFeedbackStore` contains a feedback entry for that agent that will be surfaced in the next perception tick.
-- [ ] **AC-6:** Running two agents through independent PPER cycles does not cause cross-contamination — after cycles complete, each agent's `drives`, `currentPlan`, and `location` reflect only its own actions.
-- [ ] **AC-7:** After N simulation ticks with two agents, each agent's drive values have decayed independently (no agent's drives match the other's unless their initial drives and actions were identical).
+- [x] **AC-1:** Given two idle agents (`isThinking: false`) and `maxConcurrentCycles >= 2`, calling `PPERScheduler.update(tick)` starts a PPER cycle for both agents (verified via fake orchestrator recording both `agentId` calls).
+- [x] **AC-2:** Given three idle agents and `maxConcurrentCycles: 2`, calling `PPERScheduler.update(tick)` starts cycles for exactly 2 agents; the third agent's `isThinking` remains `false` and no `runCycle` call is recorded for it.
+- [x] **AC-3:** After one in-flight cycle resolves (promise settles), the next `update(tick)` call starts a cycle for the previously-waiting third agent.
+- [x] **AC-4:** Given two agents and a single `SmartObject` with an affordance whose preconditions fail when the object is "in use", simulating concurrent execution on the same object yields one `AffordanceResult` with `success: true` and one with `success: false` and a `failureReason` indicating contention.
+- [x] **AC-5:** After an agent receives a failed affordance result due to contention, the `SystemFeedbackStore` contains a feedback entry for that agent that will be surfaced in the next perception tick.
+- [x] **AC-6:** Running two agents through independent PPER cycles does not cause cross-contamination — after cycles complete, each agent's `drives`, `currentPlan`, and `location` reflect only its own actions.
+- [x] **AC-7:** After N simulation ticks with two agents, each agent's drive values have decayed independently (no agent's drives match the other's unless their initial drives and actions were identical).
 
 ### Multi-Room
 
-- [ ] **AC-8:** Given two connected rooms (kitchen ↔ lounge) and an agent in kitchen, calling `sceneManager.moveAgent(agentId, 'lounge')` causes `sceneManager.getAgentRoom(agentId)` to return the lounge `Room` object.
-- [ ] **AC-9:** After moving an agent from kitchen to lounge, `SmartObjectRegistry.getObjectsInRoom('lounge')` returns only objects registered with `roomId: 'lounge'`, and objects from kitchen do not appear.
-- [ ] **AC-10:** After moving an agent from kitchen to lounge, `SmartObjectRegistry.getAffordancesInRoom('lounge')` returns only affordances from objects in lounge — no affordances from kitchen objects.
-- [ ] **AC-11:** Moving an agent between rooms triggers spatial debouncing: after `sceneManager.moveAgent`, the next `SpatialSystem.update(tick)` causes `shouldTriggerPerception(agentId)` to return `true`.
-- [ ] **AC-12:** Loading a `SceneDefinition` with 3 connected rooms, 5 objects (scoped to different rooms), and 2 agents (in different starting rooms) results in correct initial state: each agent's `location` matches its designated room, each room's `objectIds` match registered objects, and `sceneManager.getConnectedRooms` returns the expected graph.
-- [ ] **AC-13:** An agent in room A cannot access affordances from room B — `SmartObjectRegistry.getAffordancesInRoom('room-a')` excludes all affordances from objects in room B.
+- [x] **AC-8:** Given two connected rooms (kitchen ↔ lounge) and an agent in kitchen, calling `sceneManager.moveAgent(agentId, 'lounge')` causes `sceneManager.getAgentRoom(agentId)` to return the lounge `Room` object.
+- [x] **AC-9:** After moving an agent from kitchen to lounge, `SmartObjectRegistry.getObjectsInRoom('lounge')` returns only objects registered with `roomId: 'lounge'`, and objects from kitchen do not appear.
+- [x] **AC-10:** After moving an agent from kitchen to lounge, `SmartObjectRegistry.getAffordancesInRoom('lounge')` returns only affordances from objects in lounge — no affordances from kitchen objects.
+- [x] **AC-11:** Moving an agent between rooms triggers spatial debouncing: after `sceneManager.moveAgent`, the next `SpatialSystem.update(tick)` causes `shouldTriggerPerception(agentId)` to return `true`.
+- [x] **AC-12:** Loading a `SceneDefinition` with 3 connected rooms, 5 objects (scoped to different rooms), and 2 agents (in different starting rooms) results in correct initial state: each agent's `location` matches its designated room, each room's `objectIds` match registered objects, and `sceneManager.getConnectedRooms` returns the expected graph.
+- [x] **AC-13:** An agent in room A cannot access affordances from room B — `SmartObjectRegistry.getAffordancesInRoom('room-a')` excludes all affordances from objects in room B.
 
 ### Cross-Cutting Integration
 
-- [ ] **AC-14:** Running a full game loop with 2 agents in 2 connected rooms for N ticks produces per-agent perception data scoped to each agent's current room, with no cross-room leakage.
-- [ ] **AC-15:** When one agent moves to a new room while the other stays, only the moving agent's perception is debounced/triggered — the stationary agent's perception is not affected by the other agent's movement.
+- [x] **AC-14:** Running a full game loop with 2 agents in 2 connected rooms for N ticks produces per-agent perception data scoped to each agent's current room, with no cross-room leakage.
+- [x] **AC-15:** When one agent moves to a new room while the other stays, only the moving agent's perception is debounced/triggered — the stationary agent's perception is not affected by the other agent's movement.
 
 ## Constraints
 
