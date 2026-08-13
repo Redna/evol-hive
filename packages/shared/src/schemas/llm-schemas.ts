@@ -87,6 +87,41 @@ export const updateInternalStateSchema = {
   additionalProperties: false,
 } as const;
 
+/**
+ * The memory consolidation schema (spec 006, Req 1).
+ *
+ * Used by `completeReflection` for the LLM's raw response during background
+ * memory consolidation (§11.3). The LLM returns higher-level consolidated
+ * memory descriptions and the IDs of the low-level nodes that were
+ * consolidated (to be deprioritized).
+ */
+export const memoryConsolidationSchema = {
+  type: 'object',
+  properties: {
+    consolidatedMemories: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          content: { type: 'string' },
+          importance: { type: 'integer', minimum: 1, maximum: 10 },
+          type: {
+            type: 'string',
+            enum: ['observation', 'reflection', 'action', 'interaction'],
+          },
+        },
+        required: ['content', 'importance', 'type'],
+        additionalProperties: false,
+      },
+    },
+    consolidatedNodeIds: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+  },
+  additionalProperties: false,
+} as const;
+
 /** The reflect phase response schema (spec 004, Req 4). No top-level fields are required. */
 export const reflectSchema = {
   type: 'object',

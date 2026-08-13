@@ -24,7 +24,7 @@ import type {
   EngineConfig,
 } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
-import { createPPEROrchestrator } from '@evol-hive/cognition';
+import { createPPEROrchestrator, OpenAICompatibleLLMClient } from '@evol-hive/cognition';
 import type { AffordanceClassifier } from '@evol-hive/cognition';
 import type {
   EmbeddingProvider as MemEmbeddingProvider,
@@ -236,14 +236,23 @@ export function buildMinimalEngine(): AssembledEngine {
     return { success: true, newState: state };
   });
 
-  // PPER orchestrator (cognition) wired from the engine bridges + mock LLM.
+  // PPER orchestrator (cognition) wired from the engine bridges + LLM.
+  const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
+  const llmClient: LLMClient = useRealLLM
+    ? new OpenAICompatibleLLMClient({
+        baseUrl: process.env['LLM_BASE_URL'] ?? 'http://localhost:11434/v1',
+        model: process.env['LLM_MODEL'] ?? 'llama3.1',
+        ...(process.env['LLM_API_KEY'] !== undefined ? { apiKey: process.env['LLM_API_KEY'] } : {}),
+      })
+    : new MockLLMClient();
+
   const orchestrator = createPPEROrchestrator({
     perceptionProvider: core.bridges.perception,
     planProvider: core.bridges.plan,
     executeProvider: core.bridges.execute,
     reflectProvider: core.bridges.reflect,
     classifier: makeMockClassifier(),
-    llmClient: new MockLLMClient(),
+    llmClient,
   });
 
   const loggingOrchestrator = new LoggingOrchestrator(orchestrator);
@@ -270,8 +279,11 @@ async function main(): Promise<void> {
   engine.gameLoop.start();
 
   // Let the simulation run for a short wall-clock window so the fired-and-forgotten
-  // PPER cycle can complete (the mock LLM resolves immediately).
-  await new Promise((resolve) => setTimeout(resolve, 200));
+  // PPER cycle can complete. A real LLM may take 1–5 seconds per request, so the
+  // wait is configurable via SCENE_DURATION_MS (default 5000) when USE_REAL_LLM.
+  const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
+  const waitMs = useRealLLM ? Number(process.env['SCENE_DURATION_MS'] ?? '5000') : 200;
+  await new Promise((resolve) => setTimeout(resolve, waitMs));
 
   engine.gameLoop.stop();
   const state = engine.agentManager.getState('agent-1');
