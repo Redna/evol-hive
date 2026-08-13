@@ -22,7 +22,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [004](004-reflect-phase.md) | Reflect Phase (PPER) | §2, §3, §6, §7, §8, §11 | 🔍 In Review | [#9](https://github.com/Redna/evol-hive/issues/9) | [#17](https://github.com/Redna/evol-hive/pull/17) | shared, cognition, memory, engine |
 | [005](005-game-loop-integration.md) | Game Loop Integration & Minimal Scene | §2, §3, §4, §6, §9, §11 | 🔍 In Review | [#10](https://github.com/Redna/evol-hive/issues/10) | — | shared, engine, cognition, memory |
 | [006](006-openai-compatible-llm-client.md) | Real OpenAI-Compatible LLM Client | §5, §6, §7, §9, §11 | 🔍 In Review | [#20](https://github.com/Redna/evol-hive/issues/20) | [#25](https://github.com/Redna/evol-hive/pull/25) | cognition, shared, examples |
-| [007](007-onnx-embedding-provider.md) | Real ONNX Embedding Provider | §5, §11 | 📝 Drafted | [#21](https://github.com/Redna/evol-hive/issues/21) | — | cognition, shared, memory, examples |
+| [007](007-onnx-embedding-provider.md) | Real ONNX Embedding Provider | §5, §11 | 🔍 In Review | [#21](https://github.com/Redna/evol-hive/issues/21) | [#31](https://github.com/Redna/evol-hive/pull/31) | cognition, shared, memory, examples |
 
 ## Architecture Coverage
 
@@ -46,8 +46,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      7
 ✅ Done:          0
 🔨 In Development: 0
-🔍 In Review:     6
-📝 Drafted:       1
+🔍 In Review:     7
 📝 Drafted:       0
 🚫 Blocked:       0
 
