@@ -30,6 +30,13 @@ class FakeEmbeddingProvider implements EmbeddingProvider {
     // Return a deterministic embedding based on text length.
     return [text.length, 0.5, 0.3, 0.8];
   }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    return texts.map((t) => {
+      this.embedCalls.push(t);
+      return [t.length, 0.5, 0.3, 0.8];
+    });
+  }
 }
 
 class FakeVectorStore implements VectorStore {
