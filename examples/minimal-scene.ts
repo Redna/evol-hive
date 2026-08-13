@@ -26,6 +26,7 @@ import type {
 import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
 import { createPPEROrchestrator, OpenAICompatibleLLMClient } from '@evol-hive/cognition';
 import type { AffordanceClassifier } from '@evol-hive/cognition';
+import { OnnxEmbeddingProvider, AffordanceClassifierImpl, defaultClassifierConfig } from '@evol-hive/cognition';
 import type {
   EmbeddingProvider as MemEmbeddingProvider,
   VectorStore,
@@ -214,9 +215,15 @@ function makeConfig(): EngineConfig {
 export function buildMinimalEngine(): AssembledEngine {
   const config = makeConfig();
 
-  // Memory subsystem (mock-backed).
+  // Memory subsystem — use real ONNX embeddings when USE_REAL_EMBEDDINGS=true.
+  const useRealEmbeddings = process.env['USE_REAL_EMBEDDINGS'] === 'true';
   const vectorStore = new InMemoryVectorStore();
-  const embeddingProvider = new MockEmbeddingProvider();
+  const embeddingProvider: MemEmbeddingProvider = useRealEmbeddings
+    ? new OnnxEmbeddingProvider({
+        modelPath: process.env['EMBEDDING_MODEL_PATH']!,
+        tokenizerPath: process.env['EMBEDDING_TOKENIZER_PATH'] ?? undefined,
+      })
+    : new MockEmbeddingProvider();
   const memoryStore: MemoryStore = new MemoryStoreImpl({ vectorStore, embeddingProvider });
 
   // Engine core + scene.
@@ -246,12 +253,17 @@ export function buildMinimalEngine(): AssembledEngine {
       })
     : new MockLLMClient();
 
+  // Classifier — use real AffordanceClassifierImpl when USE_REAL_EMBEDDINGS=true.
+  const classifier: AffordanceClassifier = useRealEmbeddings
+    ? new AffordanceClassifierImpl(embeddingProvider, defaultClassifierConfig())
+    : makeMockClassifier();
+
   const orchestrator = createPPEROrchestrator({
     perceptionProvider: core.bridges.perception,
     planProvider: core.bridges.plan,
     executeProvider: core.bridges.execute,
     reflectProvider: core.bridges.reflect,
-    classifier: makeMockClassifier(),
+    classifier,
     llmClient,
   });
 

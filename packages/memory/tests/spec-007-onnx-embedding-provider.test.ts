@@ -48,6 +48,13 @@ class FakeEmbeddingProvider implements MemEmbeddingProvider {
     vec[0] = text.length;
     return vec;
   }
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    return texts.map((t) => {
+      const vec = new Array<number>(this.dimensions).fill(0);
+      vec[0] = t.length;
+      return vec;
+    });
+  }
 }
 
 // ─── AC-1: Unified EmbeddingProvider Interface ───────────────────────────────

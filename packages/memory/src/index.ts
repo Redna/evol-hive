@@ -98,6 +98,8 @@ export interface EmbeddingProvider {
   readonly dimensions: number;
   /** Generate an embedding vector for a single text input. */
   embed(text: string): Promise<number[]>;
+  /** Batch embed multiple strings. Returns one vector per input, in order. */
+  embedBatch(texts: string[]): Promise<number[][]>;
 }
 
 // ── Memory Store (spec 004, Req 7) ────────────────────────────────────────────

@@ -9,6 +9,7 @@ export * from './types/cognition.js';
 export * from './types/engine.js';
 export * from './types/memory.js';
 export * from './types/world.js';
+export * from './types/embedding.js';
 
 // Schemas
 export * from './schemas/llm-schemas.js';
