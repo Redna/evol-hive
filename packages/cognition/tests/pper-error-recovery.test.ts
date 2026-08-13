@@ -1,7 +1,7 @@
 /**
  * Tests for PPER Error Recovery — cognition layer (spec 008, issue #23).
  * Covers AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7, AC-8, AC-10, AC-11,
- * AC-13, AC-14, AC-16, AC-17, AC-25, AC-26, AC-27.
+ * AC-12, AC-13, AC-14, AC-16, AC-17, AC-25, AC-26, AC-27.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
@@ -970,5 +970,64 @@ describe('Integration: agent recovers after cooldown (AC-27)', () => {
     await orch.runCycle('a1');
     expect(orch.getCycleStatus('a1').consecutiveFailures).toBe(0);
     expect(orch.getCycleStatus('a1').coolingDown).toBe(false);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Section 7: System Feedback After Missing Affordance (AC-12)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('Execute → Perceive system feedback flow (AC-12)', () => {
+  it('when execute fails due to missing affordance, the next PerceptionResult.passive.systemFeedback contains the failure message', async () => {
+    const state = makeState();
+    // Give the agent a plan that references an affordance not available in the room.
+    state.currentPlan = {
+      id: 'plan-1',
+      description: 'Brew coffee',
+      steps: [{ description: 'Brew coffee', completed: false, targetAffordance: 'nonexistent_action' }],
+      currentStepIndex: 0,
+      createdAt: 0,
+    } as AgentPlan;
+
+    // Shared feedback store between execute and perception providers.
+    let feedbackStore: string | undefined = undefined;
+
+    // Execute provider that cannot resolve the affordance.
+    const executeProvider: ExecuteDataProvider = {
+      ...makeExecuteProvider(state),
+      getCurrentStep: () => ({
+        description: 'Do nonexistent action',
+        completed: false,
+        targetAffordance: 'nonexistent_action',
+      }),
+      resolveAffordance: () => null, // affordance not found in room
+      setSystemFeedback: (_id, msg) => {
+        feedbackStore = msg;
+      },
+    };
+
+    // Perception provider that reads the stored feedback.
+    const perceptionProvider: PerceptionDataProvider = {
+      ...makePerceptionProvider(state),
+      getSystemFeedback: () => feedbackStore,
+    };
+
+    // Run execute → should fail and set systemFeedback.
+    const { ExecuteServiceImpl } = await import('../src/pper/execute-service.js');
+    const execService = new ExecuteServiceImpl({ dataProvider: executeProvider });
+    const execResult = await execService.execute('a1');
+    expect(execResult.success).toBe(false);
+    expect(execResult.error).toContain('nonexistent_action');
+    // Verify feedback was set.
+    expect(feedbackStore).toContain("Cannot find object with affordance 'nonexistent_action'");
+
+    // Run perceive → passive.systemFeedback should contain the failure message.
+    const service = new PerceptionServiceImpl({
+      provider: perceptionProvider,
+      classifier: makeClassifier(),
+    });
+    const perception = await service.perceive('a1');
+    expect(perception.passive.systemFeedback).toBeDefined();
+    expect(perception.passive.systemFeedback).toContain('nonexistent_action');
   });
 });

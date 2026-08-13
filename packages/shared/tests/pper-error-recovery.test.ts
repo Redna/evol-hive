@@ -3,13 +3,13 @@
  * Covers AC-9, AC-15, AC-18, AC-23, AC-24.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { AgentDrives } from '@evol-hive/shared';
+import type { AgentDrives } from '../src/index.js';
 import {
   detectDriveEdgeState,
   type PPERCycleStatus,
   type PPERErrorConfig,
   defaultPPERErrorConfig,
-} from '@evol-hive/shared';
+} from '../src/index.js';
 
 // ─── AC-9: PPERCycleStatus type ──────────────────────────────────────────────
 
