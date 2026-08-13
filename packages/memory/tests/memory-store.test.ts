@@ -86,6 +86,13 @@ class FakeEmbeddingProvider implements EmbeddingProvider {
     this.embedCalls.push(text);
     return [0.1, 0.2, 0.3, 0.4];
   }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    return texts.map((t) => {
+      this.embedCalls.push(t);
+      return [0.1, 0.2, 0.3, 0.4];
+    });
+  }
 }
 
 describe('MemoryStoreImpl (AC-8, AC-39)', () => {
