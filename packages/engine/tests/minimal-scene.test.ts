@@ -78,7 +78,7 @@ describe('Mock LLM client (AC-21)', () => {
   });
 });
 
-describe('Mock embedding provider (AC-22)', () => {
+describe('Mock embedding provider (AC-22, spec-007 AC-17)', () => {
   it('embed returns a number[] of the correct dimensionality without network calls', async () => {
     const embedder = new MockEmbeddingProvider();
     const vec = await embedder.embed('hello world');
@@ -87,6 +87,24 @@ describe('Mock embedding provider (AC-22)', () => {
     // Deterministic: same input → same output.
     const vec2 = await embedder.embed('hello world');
     expect(vec).toEqual(vec2);
+  });
+
+  it('embedBatch returns number[][] with one vector per input, each of correct dimensionality (spec-007 AC-17)', async () => {
+    const embedder = new MockEmbeddingProvider();
+    const batch = await embedder.embedBatch(['hello', 'world', 'test']);
+    expect(batch).toHaveLength(3);
+    for (const vec of batch) {
+      expect(vec).toHaveLength(embedder.dimensions);
+    }
+    // Deterministic: same input → same output.
+    const batch2 = await embedder.embedBatch(['hello', 'world', 'test']);
+    expect(batch).toEqual(batch2);
+  });
+
+  it('embedBatch([]) returns [] without error (spec-007 AC-17)', async () => {
+    const embedder = new MockEmbeddingProvider();
+    const result = await embedder.embedBatch([]);
+    expect(result).toEqual([]);
   });
 });
 
