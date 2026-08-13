@@ -984,7 +984,9 @@ describe('Execute → Perceive system feedback flow (AC-12)', () => {
     state.currentPlan = {
       id: 'plan-1',
       description: 'Brew coffee',
-      steps: [{ description: 'Brew coffee', completed: false, targetAffordance: 'nonexistent_action' }],
+      steps: [
+        { description: 'Brew coffee', completed: false, targetAffordance: 'nonexistent_action' },
+      ],
       currentStepIndex: 0,
       createdAt: 0,
     } as AgentPlan;
