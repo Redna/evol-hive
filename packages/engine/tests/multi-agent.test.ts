@@ -252,7 +252,10 @@ describe('Multi-Agent — system feedback on contention failure (AC-5)', () => {
       roomId: 'kitchen',
     };
     registry.register(obj);
-    affordanceRegistry.registerPreconditionChecker('not_in_use', (state) => state['in_use'] !== true);
+    affordanceRegistry.registerPreconditionChecker(
+      'not_in_use',
+      (state) => state['in_use'] !== true,
+    );
 
     // Execute → fails because object is in use.
     const result = await executeProvider.executeAffordance('coffee-1', 'brew_coffee', 'a1');
