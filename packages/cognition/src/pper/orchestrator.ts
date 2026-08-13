@@ -10,6 +10,11 @@
  *
  * The orchestrator tracks the current phase per agent via `getPhase(agentId)`.
  * When no cycle is in progress, the phase is `'perceive'` (idle / ready).
+ *
+ * Error recovery (spec 008): The orchestrator tracks consecutive cycle failures
+ * per agent. After `maxConsecutiveFailures`, it enters a cooldown period
+ * during which `runCycle()` returns early. A successful cycle resets the
+ * counter. "No active plan" and "stuck" states are not counted as failures.
  */
 
 import type {
@@ -22,7 +27,10 @@ import type {
   PlanResult,
   ExecuteResult,
   ReflectResult,
+  PPERErrorConfig,
+  PPERCycleStatus,
 } from '@evol-hive/shared';
+import { defaultPPERErrorConfig } from '@evol-hive/shared';
 import type { LLMClient } from '../index.js';
 import type { AffordanceClassifier } from '../classifier/index.js';
 import {
@@ -42,6 +50,8 @@ export interface PPEROrchestratorOptions {
   reflectProvider: ReflectDataProvider;
   classifier: AffordanceClassifier;
   llmClient: LLMClient;
+  /** Optional error recovery config (spec 008, Req 8.3, AC-25). When omitted, defaults are used. */
+  errorConfig?: PPERErrorConfig;
 }
 
 /** Concrete PPEROrchestrator wiring the four phase services in sequence. */
@@ -50,9 +60,17 @@ export class PPEROrchestratorImpl {
   private readonly planService: PlanServiceImpl;
   private readonly executeService: ExecuteServiceImpl;
   private readonly reflectService: ReflectServiceImpl;
+  private readonly errorConfig: PPERErrorConfig;
 
   /** Current phase per agent (defaults to 'perceive' = idle). */
   private readonly phases = new Map<string, PPERPhase>();
+
+  /** Consecutive failure counter per agent (spec 008, Req 2.1). */
+  private readonly consecutiveFailures = new Map<string, number>();
+  /** Last error message per agent. */
+  private readonly lastErrors = new Map<string, string>();
+  /** Timestamp when cooldown started per agent (0 = not in cooldown). */
+  private readonly cooldownStartedAt = new Map<string, number>();
 
   constructor(options: PPEROrchestratorOptions) {
     this.perceptionService = new PerceptionServiceImpl({
@@ -72,10 +90,27 @@ export class PPEROrchestratorImpl {
       llmClient: options.llmClient,
       dataProvider: options.reflectProvider,
     });
+    this.errorConfig = options.errorConfig ?? defaultPPERErrorConfig();
   }
 
   /** Run a single PPER cycle for the given agent. */
   async runCycle(agentId: string): Promise<void> {
+    const failures = this.consecutiveFailures.get(agentId) ?? 0;
+    const cooldownStart = this.cooldownStartedAt.get(agentId) ?? 0;
+
+    // Check cooldown (spec 008, Req 2.3).
+    if (failures >= this.errorConfig.maxConsecutiveFailures) {
+      const elapsed = Date.now() - cooldownStart;
+      if (elapsed < this.errorConfig.failureCooldownMs) {
+        // Still in cooldown — skip the cycle.
+        return;
+      }
+      // Cooldown expired — reset and proceed (Req 2.3).
+      this.consecutiveFailures.set(agentId, 0);
+      this.cooldownStartedAt.delete(agentId);
+      this.lastErrors.delete(agentId);
+    }
+
     // (1) Perceive — passive (System 1), no LLM.
     this.setPhase(agentId, 'perceive');
     let perception: PerceptionResult;
@@ -89,6 +124,7 @@ export class PPEROrchestratorImpl {
     this.setPhase(agentId, 'plan');
     const plan: PlanResult = await this.planService.plan(agentId, perception);
     if (!plan.success) {
+      this.recordFailure(agentId, plan.error);
       this.setPhase(agentId, 'perceive');
       return;
     }
@@ -97,6 +133,13 @@ export class PPEROrchestratorImpl {
     this.setPhase(agentId, 'execute');
     const execute: ExecuteResult = await this.executeService.execute(agentId);
     if (!execute.success) {
+      // "No active plan" is not a failure (spec 008, Req 4.1, AC-11).
+      if (execute.error === 'No active plan' && execute.planComplete) {
+        // Expected state — cycle completes normally.
+        this.setPhase(agentId, 'perceive');
+        return;
+      }
+      this.recordFailure(agentId, execute.error);
       this.setPhase(agentId, 'perceive');
       return;
     }
@@ -104,9 +147,16 @@ export class PPEROrchestratorImpl {
     // (4) Reflect — LLM reflects, updates state/memory.
     this.setPhase(agentId, 'reflect');
     const reflect: ReflectResult = await this.reflectService.reflect(agentId, execute);
-    void reflect;
+    if (!reflect.success) {
+      this.recordFailure(agentId, reflect.error);
+      this.setPhase(agentId, 'perceive');
+      return;
+    }
 
-    // Cycle complete — back to idle.
+    // Cycle complete — reset failure counter on success (spec 008, Req 2.1).
+    this.consecutiveFailures.set(agentId, 0);
+    this.cooldownStartedAt.delete(agentId);
+    this.lastErrors.delete(agentId);
     this.setPhase(agentId, 'perceive');
   }
 
@@ -115,8 +165,37 @@ export class PPEROrchestratorImpl {
     return this.phases.get(agentId) ?? 'perceive';
   }
 
+  /** Get the cycle status for an agent (spec 008, Req 2.4, AC-8). */
+  getCycleStatus(agentId: string): PPERCycleStatus {
+    const failures = this.consecutiveFailures.get(agentId) ?? 0;
+    const cooldownStart = this.cooldownStartedAt.get(agentId) ?? 0;
+    const coolingDown =
+      failures >= this.errorConfig.maxConsecutiveFailures &&
+      Date.now() - cooldownStart < this.errorConfig.failureCooldownMs;
+    const lastError = this.lastErrors.get(agentId);
+    return {
+      consecutiveFailures: failures,
+      coolingDown,
+      ...(lastError !== undefined ? { lastError } : {}),
+    };
+  }
+
   private setPhase(agentId: string, phase: PPERPhase): void {
     this.phases.set(agentId, phase);
+  }
+
+  /** Record a cycle failure — increment counter, store error, enter cooldown if threshold reached. */
+  private recordFailure(agentId: string, error?: string): void {
+    const current = this.consecutiveFailures.get(agentId) ?? 0;
+    const newCount = current + 1;
+    this.consecutiveFailures.set(agentId, newCount);
+    if (error !== undefined) {
+      this.lastErrors.set(agentId, error);
+    }
+    // Enter cooldown when threshold is reached (spec 008, Req 2.2).
+    if (newCount >= this.errorConfig.maxConsecutiveFailures) {
+      this.cooldownStartedAt.set(agentId, Date.now());
+    }
   }
 }
 

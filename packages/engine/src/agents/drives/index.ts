@@ -6,6 +6,7 @@
  */
 
 import type { AgentInternalState } from '@evol-hive/shared';
+import { detectDriveEdgeState } from '@evol-hive/shared';
 import type { AgentManager, DriveSystem } from '../index.js';
 
 /** The five primary drives, in canonical order. */
@@ -49,6 +50,14 @@ export class DriveSystemImpl implements DriveSystem {
 
   /** Semantic label for the primary drive, e.g. "low energy, need to restore energy". */
   getPrimaryDriveLabel(state: AgentInternalState): string {
+    // Check drive edge states first (spec 008, Req 6.2, 6.3, AC-19, AC-20).
+    const edgeState = detectDriveEdgeState(state.drives);
+    if (edgeState === 'all-zero') {
+      return 'All drives critically low — agent is in crisis state';
+    }
+    if (edgeState === 'all-full') {
+      return 'All drives satisfied — agent is content';
+    }
     const { name } = this.getPrimaryDrive(state);
     return `low ${name}, need to restore ${name}`;
   }

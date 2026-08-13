@@ -28,6 +28,7 @@ import type {
   ReflectResult,
 } from '@evol-hive/shared';
 import type { LLMClient, ReflectBuilder } from '../index.js';
+import { LLMResponseError } from '../llm/index.js';
 
 /** Constructor options for {@link ReflectServiceImpl}. */
 export interface ReflectServiceOptions {
@@ -142,7 +143,11 @@ export class ReflectServiceImpl {
         drivesUpdated,
       };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      let message = err instanceof Error ? err.message : String(err);
+      // Distinguish LLM response (parse) errors from transient errors (spec 008, Req 3.2, AC-10).
+      if (err instanceof LLMResponseError) {
+        message = `LLM response error: ${message}`;
+      }
       return {
         success: false,
         error: message,

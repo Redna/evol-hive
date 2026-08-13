@@ -38,6 +38,8 @@ export interface PerceptionResult {
   prunedAffordances: Affordance[];
   /** Semantic label of the agent's primary drive (e.g. "low energy, need to restore energy"). */
   primaryDriveLabel: string;
+  /** True when no actionable affordances are available in the room (spec 008, Req 5.2). */
+  stuck?: boolean;
 }
 
 /** Active observation result (Section 6.2) — deep JSON state of a target object. */
@@ -342,4 +344,33 @@ export interface ReflectDataProvider {
   clearPlanIfComplete(agentId: string): boolean;
   /** Set the agent's `isThinking` flag (Section 9.1). */
   setThinking(agentId: string, isThinking: boolean): void;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PPER Error Recovery (spec 008)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Status of a PPER cycle for an agent (spec 008, Req 2.4, AC-9). */
+export interface PPERCycleStatus {
+  /** Number of consecutive cycle failures (resets to 0 on a successful cycle). */
+  consecutiveFailures: number;
+  /** `true` when the orchestrator is in cooldown (failures reached threshold). */
+  coolingDown: boolean;
+  /** The last error message, if any. */
+  lastError?: string;
+}
+
+/** Configuration for PPER cycle error recovery (spec 008, Req 8.1, AC-23). */
+export interface PPERErrorConfig {
+  /** Max consecutive failures before the orchestrator enters cooldown (default 3). */
+  maxConsecutiveFailures: number;
+  /** Cooldown period in milliseconds before retrying (default 5000). */
+  failureCooldownMs: number;
+}
+
+/** Default PPER error config — overridable via env vars (spec 008, Req 8.2, AC-24). */
+export function defaultPPERErrorConfig(): PPERErrorConfig {
+  const maxConsecutiveFailures = Number(process.env['PPER_MAX_CONSECUTIVE_FAILURES'] ?? 3);
+  const failureCooldownMs = Number(process.env['PPER_FAILURE_COOLDOWN_MS'] ?? 5000);
+  return { maxConsecutiveFailures, failureCooldownMs };
 }

@@ -56,3 +56,23 @@ export interface AgentProfile {
   /** Initial drive values at spawn. */
   initialDrives: Partial<AgentDrives>;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drive Edge State Detection (spec 008, Req 6.1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The five primary drives, in canonical order. */
+const DRIVE_KEYS = ['energy', 'hunger', 'social', 'comfort', 'curiosity'] as const;
+
+/**
+ * Detects whether all drives are at an extreme (0 or 100). Returns `'all-zero'`
+ * when all five drives are 0, `'all-full'` when all are 100, and `null` otherwise
+ * (spec 008, Req 6.1, AC-18).
+ */
+export function detectDriveEdgeState(drives: AgentDrives): 'all-zero' | 'all-full' | null {
+  const allZero = DRIVE_KEYS.every((key) => drives[key] === 0);
+  if (allZero) return 'all-zero';
+  const allFull = DRIVE_KEYS.every((key) => drives[key] === 100);
+  if (allFull) return 'all-full';
+  return null;
+}
