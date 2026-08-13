@@ -69,7 +69,9 @@ export class PerceptionServiceImpl {
       primaryDriveLabel,
       allAffordances,
     );
-    return { passive, prunedAffordances, primaryDriveLabel };
+    // Stuck detection (spec 008, Req 5.1, AC-14): no actionable affordances.
+    const stuck = prunedAffordances.length === 0;
+    return { passive, prunedAffordances, primaryDriveLabel, ...(stuck ? { stuck } : {}) };
   }
 }
 

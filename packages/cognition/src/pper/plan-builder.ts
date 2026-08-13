@@ -43,6 +43,13 @@ export class PlanBuilderImpl implements PlanBuilder {
       contextLines.push(`System feedback: ${passive.systemFeedback}`);
     }
 
+    // Append stuck directive when no physical actions are available (spec 008, Req 5.3, AC-16).
+    if (perceptionResult.stuck === true) {
+      contextLines.push(
+        '\n\nWARNING: No physical actions are available in this room. You may need to move or use a cognitive tool.',
+      );
+    }
+
     return {
       systemPrompt,
       perceptionContext: contextLines.join('\n'),

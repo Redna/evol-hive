@@ -443,6 +443,7 @@ describe('OpenAICompatibleLLMClient', () => {
         baseUrl: BASE_URL,
         model: MODEL,
         timeoutMs: 50,
+        retryOnTimeout: false,
       });
       const promise = client.completeStructured(makePayload());
       await expect(promise).rejects.toThrow(LLMTimeoutError);
@@ -467,6 +468,7 @@ describe('OpenAICompatibleLLMClient', () => {
         baseUrl: BASE_URL,
         model: MODEL,
         timeoutMs: 50,
+        retryOnTimeout: false,
       });
       try {
         await client.completeStructured(makePayload());

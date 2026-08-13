@@ -19,6 +19,7 @@ import type {
   FormulatePlanResult,
 } from '@evol-hive/shared';
 import type { LLMClient, PlanBuilder } from '../index.js';
+import { LLMResponseError } from '../llm/index.js';
 
 /** Constructor options for {@link PlanServiceImpl}. */
 export interface PlanServiceOptions {
@@ -58,7 +59,11 @@ export class PlanServiceImpl {
       const plan = dataProvider.storePlan(agentId, result);
       return { success: true, plan };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      let message = err instanceof Error ? err.message : String(err);
+      // Distinguish LLM response (parse) errors from transient errors (spec 008, Req 3.2, AC-10).
+      if (err instanceof LLMResponseError) {
+        message = `LLM response error: ${message}`;
+      }
       return { success: false, error: message };
     } finally {
       // Always reset isThinking — on success, failure, and exception paths (§9.1).

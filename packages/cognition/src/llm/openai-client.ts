@@ -106,6 +106,8 @@ export interface OpenAICompatibleLLMClientConfig {
   embeddingProvider?: EmbeddingProvider;
   /** Optional agent ID for the ReflectionResult returned by completeReflection. */
   agentId?: string;
+  /** Whether to retry on timeout errors (default: true). When false, timeout errors are thrown immediately (spec 008, Req 1.2). */
+  retryOnTimeout?: boolean;
 }
 
 // ─── Internal types ──────────────────────────────────────────────────────────
@@ -142,6 +144,7 @@ export class OpenAICompatibleLLMClient {
   private readonly retryDelayMs: number;
   private readonly embeddingProvider: EmbeddingProvider | undefined;
   private readonly agentId: string;
+  private readonly retryOnTimeout: boolean;
 
   constructor(config: OpenAICompatibleLLMClientConfig) {
     this.baseUrl = config.baseUrl;
@@ -152,6 +155,7 @@ export class OpenAICompatibleLLMClient {
     this.retryDelayMs = config.retryDelayMs ?? 1000;
     this.embeddingProvider = config.embeddingProvider;
     this.agentId = config.agentId ?? '';
+    this.retryOnTimeout = config.retryOnTimeout ?? true;
   }
 
   // ── LLMClient: completeStructured (Req 7) ──────────────────────────────────
@@ -349,13 +353,33 @@ export class OpenAICompatibleLLMClient {
       } catch (err) {
         clearTimeout(timeoutId);
         if (this.isAbortError(err)) {
+          // Timeout error (spec 008, Req 1.1) — retry if enabled and attempts remain.
+          if (!this.retryOnTimeout) {
+            throw new LLMTimeoutError(
+              `LLM request to ${url} timed out after ${this.timeoutMs}ms.`,
+              this.timeoutMs,
+              url,
+            );
+          }
+          if (attempt < this.maxRetries) {
+            lastError = new LLMTimeoutError(
+              `LLM request to ${url} timed out after ${this.timeoutMs}ms.`,
+              this.timeoutMs,
+              url,
+            );
+            continue;
+          }
           throw new LLMTimeoutError(
             `LLM request to ${url} timed out after ${this.timeoutMs}ms.`,
             this.timeoutMs,
             url,
           );
         }
-        // Non-abort fetch error — throw immediately.
+        // Non-abort fetch error (connection refused, DNS failure) — retry if attempts remain (spec 008, Req 1.1).
+        if (attempt < this.maxRetries) {
+          lastError = new LLMError(`LLM request to ${url} failed: ${(err as Error).message}`);
+          continue;
+        }
         throw new LLMError(`LLM request to ${url} failed: ${(err as Error).message}`);
       }
       clearTimeout(timeoutId);
