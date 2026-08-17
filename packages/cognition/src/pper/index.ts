@@ -71,7 +71,27 @@ export class PerceptionServiceImpl {
     );
     // Stuck detection (spec 008, Req 5.1, AC-14): no actionable affordances.
     const stuck = prunedAffordances.length === 0;
-    return { passive, prunedAffordances, primaryDriveLabel, ...(stuck ? { stuck } : {}) };
+
+    // Persona population (spec 012, Req 11): call getAgentProfile gracefully.
+    let persona: import('@evol-hive/shared').AgentProfile | null | undefined;
+    try {
+      const provider = this.options.provider;
+      if (typeof provider.getAgentProfile === 'function') {
+        persona = provider.getAgentProfile(agentId);
+      } else {
+        persona = undefined;
+      }
+    } catch {
+      persona = undefined;
+    }
+
+    return {
+      passive,
+      prunedAffordances,
+      primaryDriveLabel,
+      ...(stuck ? { stuck } : {}),
+      ...(persona !== undefined ? { persona } : {}),
+    };
   }
 }
 

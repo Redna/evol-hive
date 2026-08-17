@@ -4,10 +4,15 @@
  * Section 6 / §7 / §8 / spec 004: Transforms the agent's current state and the
  * Execute-phase result into the `LLMContextPayload` sent to the heavy LLM during
  * reflection. Uses tool calling (spec 011) — sends `reflectTool`.
+ *
+ * Persona injection (spec 012, Req 9): When `profile` is present and non-null,
+ * the system prompt starts with the persona text and includes a persona-weighted
+ * memory importance instruction. The context includes the agent's long-term
+ * goals (aspirations) when present.
  */
 
-import type { AgentInternalState, ExecuteResult } from '@evol-hive/shared';
-import { reflectTool } from '@evol-hive/shared';
+import type { AgentInternalState, AgentProfile, ExecuteResult } from '@evol-hive/shared';
+import { reflectTool, formatPersona } from '@evol-hive/shared';
 import type { LLMContextPayload, ReflectBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
@@ -17,16 +22,16 @@ export class ReflectBuilderImpl implements ReflectBuilder {
     _agentId: string,
     agentState: AgentInternalState,
     executeResult: ExecuteResult,
+    profile?: AgentProfile | null,
   ): LLMContextPayload {
-    const systemPrompt = [
-      'You are an autonomous NPC in a deterministic simulation.',
-      'You must reflect on the outcome of your last action.',
-      'Evaluate whether your goal or drives need adjustment based on what happened.',
-      'Decide if a memory entry should be stored for future reference.',
-      'Use the update_internal_state cognitive tool to adjust your goal, drives, or store a memory.',
-    ].join(' ');
+    const systemPrompt = buildSystemPrompt(profile);
 
     const contextLines: string[] = [];
+
+    // Persona context: long-term goals / aspirations (spec 012, Req 18).
+    if (profile && profile.longTermGoals !== undefined && profile.longTermGoals.length > 0) {
+      contextLines.push(`Aspirations: ${profile.longTermGoals.join('; ')}`);
+    }
 
     // Execution result status.
     if (executeResult.success) {
@@ -86,6 +91,27 @@ export class ReflectBuilderImpl implements ReflectBuilder {
       tools: [reflectTool],
     };
   }
+}
+
+function buildSystemPrompt(profile: AgentProfile | null | undefined): string {
+  if (profile) {
+    const personaText = formatPersona(profile);
+    return [
+      `You are ${profile.name}, ${personaText}.`,
+      'You must reflect on the outcome of your last action.',
+      'Evaluate whether your goal or drives need adjustment based on what happened.',
+      'Decide if a memory entry should be stored for future reference.',
+      'Consider your personality when deciding what is worth remembering.',
+      'Use the update_internal_state cognitive tool to adjust your goal, drives, or store a memory.',
+    ].join(' ');
+  }
+  return [
+    'You are an autonomous NPC in a deterministic simulation.',
+    'You must reflect on the outcome of your last action.',
+    'Evaluate whether your goal or drives need adjustment based on what happened.',
+    'Decide if a memory entry should be stored for future reference.',
+    'Use the update_internal_state cognitive tool to adjust your goal, drives, or store a memory.',
+  ].join(' ');
 }
 
 function formatDrives(drives: object): string {

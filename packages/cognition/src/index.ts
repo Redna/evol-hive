@@ -62,6 +62,7 @@ export interface ReflectBuilder {
     agentId: string,
     agentState: import('@evol-hive/shared').AgentInternalState,
     executeResult: import('@evol-hive/shared').ExecuteResult,
+    profile?: import('@evol-hive/shared').AgentProfile | null,
   ): LLMContextPayload;
 }
 

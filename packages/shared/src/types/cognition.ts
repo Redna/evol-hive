@@ -13,7 +13,7 @@
 export type PPERPhase = 'perceive' | 'plan' | 'execute' | 'reflect';
 
 import type { Affordance, AffordanceResult } from './affordance.js';
-import type { AgentInternalState, AgentPlan, PlanStep } from './agent.js';
+import type { AgentInternalState, AgentPlan, PlanStep, AgentProfile } from './agent.js';
 import type { MemoryType } from './memory.js';
 
 /** Passive perception data (Section 6.1) — high-level object presence. */
@@ -40,6 +40,8 @@ export interface PerceptionResult {
   primaryDriveLabel: string;
   /** True when no actionable affordances are available in the room (spec 008, Req 5.2). */
   stuck?: boolean;
+  /** The agent's profile (including persona fields), populated by PerceptionServiceImpl (spec 012, Req 6). */
+  persona?: AgentProfile | null;
 }
 
 /** Active observation result (Section 6.2) — deep JSON state of a target object. */
@@ -197,6 +199,8 @@ export interface PerceptionDataProvider {
   getSystemFeedback(agentId: string): string | undefined;
   /** Associative memories from Track 1 (Section 11.1), if a memory subsystem is wired. */
   getAssociativeMemories?(agentId: string): MemorySnippet[] | undefined;
+  /** The agent's full profile (including persona fields), or `null` if the agent does not exist (spec 012, Req 4). */
+  getAgentProfile(agentId: string): AgentProfile | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -359,6 +363,8 @@ export interface ReflectDataProvider {
   clearPlanIfComplete(agentId: string): boolean;
   /** Set the agent's `isThinking` flag (Section 9.1). */
   setThinking(agentId: string, isThinking: boolean): void;
+  /** The agent's full profile (including persona fields), or `null` if the agent does not exist (spec 012, Req 5). */
+  getAgentProfile(agentId: string): AgentProfile | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

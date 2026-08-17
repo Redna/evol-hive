@@ -68,8 +68,20 @@ export class ReflectServiceImpl {
     dataProvider.setThinking(agentId, true);
 
     try {
+      // Retrieve the agent's persona profile (spec 012, Req 12).
+      let profile: import('@evol-hive/shared').AgentProfile | null | undefined;
+      try {
+        if (typeof dataProvider.getAgentProfile === 'function') {
+          profile = dataProvider.getAgentProfile(agentId);
+        } else {
+          profile = undefined;
+        }
+      } catch {
+        profile = undefined;
+      }
+
       // Build the context payload.
-      const payload = reflectBuilder.build(agentId, agentState, executeResult);
+      const payload = reflectBuilder.build(agentId, agentState, executeResult, profile);
 
       // Call the LLM and await the ReflectLLMResponse.
       const response = await llmClient.completeReflect(payload);
