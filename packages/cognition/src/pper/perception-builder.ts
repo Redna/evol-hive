@@ -12,7 +12,7 @@
  */
 
 import type { AgentProfile, PerceptionResult } from '@evol-hive/shared';
-import { chooseActionTool, formatPersona } from '@evol-hive/shared';
+import { chooseActionTool, formatPersona, GUARDRAIL_FORCING_DIRECTIVE } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
 
@@ -22,9 +22,22 @@ const GENERIC_SYSTEM_PROMPT = [
   'Choose an affordance or a cognitive tool. Reason briefly before acting.',
 ].join(' ');
 
+/** Options for contextual forcing and affordance masking in the Perception builder (spec 016, Req 10). */
+export interface PerceptionBuilderGuardrailOptions {
+  /** Whether the agent has an active plan. */
+  hasPlan?: boolean;
+  /** Whether contextual forcing is enabled. */
+  forcingEnabled?: boolean;
+  /** Whether affordance masking is enabled. */
+  maskingEnabled?: boolean;
+}
+
 /** Concrete PerceptionBuilder producing the LLM context payload. */
 export class PerceptionBuilderImpl implements PerceptionBuilder {
-  build(perceptionResult: PerceptionResult): LLMContextPayload {
+  build(
+    perceptionResult: PerceptionResult,
+    guardrailOptions?: PerceptionBuilderGuardrailOptions,
+  ): LLMContextPayload {
     const { passive, prunedAffordances, primaryDriveLabel, persona } = perceptionResult;
     const objectNames = passive.objectsPresent.map((o) => o.name);
     const driveSummary = formatDrives(passive.drives);
@@ -46,17 +59,39 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       `Drives: ${driveSummary}`,
     );
 
+    // Guardrail options (spec 016, Req 10).
+    const hasPlan = guardrailOptions?.hasPlan ?? true;
+    const forcingEnabled = guardrailOptions?.forcingEnabled ?? false;
+    const maskingEnabled = guardrailOptions?.maskingEnabled ?? false;
+    const noPlan = !hasPlan;
+
     // Build tool definitions: chooseActionTool + cognitive tools (excluding formulate_plan).
-    const cognitiveTools = defaultCognitiveTools.filter((t) => t.name !== 'formulate_plan');
-    const tools = [chooseActionTool, ...cognitiveToolsToToolDefinitions(cognitiveTools)];
+    // When no plan and masking enabled, hide chooseActionTool — only cognitive tools
+    // remain, and ALL cognitive tools (including formulate_plan) are available so the
+    // agent can create a plan (spec 016, Req 10: cognitive tools are never masked).
+    let tools;
+    if (noPlan && maskingEnabled) {
+      tools = cognitiveToolsToToolDefinitions(defaultCognitiveTools);
+    } else {
+      const actionCognitiveTools = defaultCognitiveTools.filter((t) => t.name !== 'formulate_plan');
+      tools = [chooseActionTool, ...cognitiveToolsToToolDefinitions(actionCognitiveTools)];
+    }
 
     // System prompt: persona-prefixed or generic (spec 012, Req 7).
-    const systemPrompt = buildSystemPrompt(persona);
+    let systemPrompt = buildSystemPrompt(persona);
+
+    // Contextual forcing directive (spec 016, Req 10).
+    if (noPlan && forcingEnabled) {
+      systemPrompt = `${systemPrompt} ${GUARDRAIL_FORCING_DIRECTIVE}`;
+    }
+
+    // Affordance masking: set availableAffordances to [] when no plan and masking enabled (Req 10).
+    const availableAffordances = noPlan && maskingEnabled ? [] : prunedAffordances;
 
     return {
       systemPrompt,
       perceptionContext: contextLines.join('\n'),
-      availableAffordances: prunedAffordances,
+      availableAffordances,
       cognitiveTools: defaultCognitiveTools,
       tools,
     };
