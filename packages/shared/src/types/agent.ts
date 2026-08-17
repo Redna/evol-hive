@@ -55,6 +55,8 @@ export interface AgentProfile {
   traits: string[];
   /** Initial drive values at spawn. */
   initialDrives: Partial<AgentDrives>;
+  /** Optional room ID where the agent spawns. When absent, `loadScene` uses the first room. (spec 013, Req 1) */
+  startRoomId?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

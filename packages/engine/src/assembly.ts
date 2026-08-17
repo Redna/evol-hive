@@ -209,10 +209,11 @@ export function loadScene(core: EngineCore, scene: SceneDefinition): void {
     core.smartObjectRegistry.register(object);
   }
 
-  // Agents — spawn at the first room.
-  const startRoom = scene.rooms[0]?.id ?? '';
+  // Agents — spawn at their startRoomId when present, else the first room (spec 013, Req 2).
+  const defaultStartRoom = scene.rooms[0]?.id ?? '';
   for (const profile of scene.agents) {
     core.agentManager.spawn(profile);
+    const startRoom = profile.startRoomId ?? defaultStartRoom;
     core.agentManager.updateState(profile.id, {
       location: startRoom,
       lastPerceptionTick: 0,
