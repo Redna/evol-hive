@@ -32,7 +32,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [012](012-agent-persona-system.md) | Agent Persona System | §3, §6, §8, §11, §2 | 🔍 In Review | [#44](https://github.com/Redna/evol-hive/issues/44) | [#48](https://github.com/Redna/evol-hive/pull/48) | shared, cognition, engine |
 | [013](013-richer-prototype-scenes.md) | Richer Prototype Scenes — Multi-Room, Multi-Object, Multi-Agent | §2, §3, §4, §6, §8 | 🔍 In Review | [#45](https://github.com/Redna/evol-hive/issues/45) | [#49](https://github.com/Redna/evol-hive/pull/49), [#52](https://github.com/Redna/evol-hive/pull/52) | shared, engine, examples |
 | [014](014-memory-consolidation-decay-retrieval.md) | Memory Consolidation — Background Reflection, Importance Scoring, Memory Decay, Weighted Retrieval | §11, §6, §9, §2 | 🔍 In Review | [#50](https://github.com/Redna/evol-hive/issues/50) | [#53](https://github.com/Redna/evol-hive/pull/53) | shared, memory, cognition, engine |
-| [015](015-full-cognitive-tools.md) | Full Cognitive Tools — query_memory and update_internal_state as Real Tool Calls | §8, §6, §11 | 📝 Drafted | [#55](https://github.com/Redna/evol-hive/issues/55) | — | cognition, shared, examples |
+| [015](015-full-cognitive-tools.md) | Full Cognitive Tools — query_memory and update_internal_state as Real Tool Calls | §8, §6, §11 | 🔍 In Review | [#55](https://github.com/Redna/evol-hive/issues/55) | [#58](https://github.com/Redna/evol-hive/pull/58) | cognition, shared, examples |
 
 ## Architecture Coverage
 
@@ -56,8 +56,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      16
 ✅ Done:          0
 🔨 In Development: 0
-🔍 In Review:     11
-📝 Drafted:       3
+🔍 In Review:     12
+📝 Drafted:       2
 🚫 Blocked:       0
 ⛔ Superseded:    2
 
