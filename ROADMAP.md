@@ -4,96 +4,59 @@
 
 ## Current State
 
-**973 lines of TypeScript, 46 tests, all passing. Build + typecheck green.**
+**Full PPER loop implemented and tested with real LLM (Ollama + tool calling).**
 
-The agent team has autonomously implemented two PPER phases:
-
-| Phase | Spec | Status | Tests | PR |
-|---|---|---|---|---|
-| Perceive | [001](docs/specs/001-perceive-phase.md) | ✅ Merged | 46 tests | #3, #7 |
-| Plan | [002](docs/specs/002-plan-phase.md) | ✅ Merged | 27 ACs verified | #7 |
-| Execute | — | ❌ Not started | — | — |
-| Reflect | — | ❌ Not started | — | — |
-
-## Path to First Prototype
-
-A minimal playable prototype needs the full PPER loop wired into a game loop:
-
-```
-✅ Perceive → ✅ Plan → ❌ Execute → ❌ Reflect → ❌ Game Loop
-```
-
-**3 specs needed for prototype:**
-
-| # | What | Why | Estimated effort |
+| Phase | Spec | Status | PRs |
 |---|---|---|---|
-| 1 | **Execute Phase** spec + implementation | Agent actually does things (runs affordances, checks preconditions) | 1 Architect + 1 Developer run |
-| 2 | **Reflect Phase** spec + implementation | Agent updates its state and memory after acting | 1 Architect + 1 Developer run |
-| 3 | **Game Loop Integration** spec + implementation | Wire PPER into the fixed-timestep loop, create a minimal scene | 1 Architect + 1 Developer run |
+| Perceive | [001](docs/specs/001-perceive-phase.md) | ✅ Merged | #3, #7 |
+| Plan | [002](docs/specs/002-plan-phase.md) | ✅ Merged | #7 |
+| Execute | [003](docs/specs/003-execute-phase.md) | ✅ Merged | #17 |
+| Reflect | [004](docs/specs/004-reflect-phase.md) | ✅ Merged | #17 |
+| Game Loop | [005](docs/specs/005-game-loop-integration.md) | ✅ Merged | #19 |
+| Ollama LLM Client | [006](docs/specs/006-openai-compatible-llm-client.md) | ✅ Merged | #25 |
+| ONNX Embeddings | [007](docs/specs/007-onnx-embedding-provider.md) | ✅ Merged | #31 |
+| Multi-Agent Tests | [008](docs/specs/008-multi-agent-multi-room-tests.md) | ✅ Merged | #32 |
+| Error Recovery | [008](docs/specs/008-pper-error-recovery.md) | ✅ Merged | #33 |
+| Tool Calling | [011](docs/specs/011-structured-output-to-tool-calling.md) | ✅ Merged | #42 |
 
-After these 3 specs, you'd have: **one room, one object, one agent that perceives, plans, acts, and reflects in a loop.**
+**Prototype works end-to-end:** one room, one Coffee Machine, one agent (Alice) that perceives, plans, brews coffee, and reflects — with a real LLM.
 
-To trigger them: create 3 issues, label each "Status: Needs Architecture", dispatch the Architect for each. The pipeline handles the rest.
+## What's Missing (Prioritized)
 
-## Phases
+### Immediate — Quality of Life
+- [ ] **Agent Persona System** — agents need personality, backstory, goals that influence LLM prompts (not just "you are an NPC")
+- [ ] **Richer Prototype Scene** — more rooms, objects, agents, inter-object relationships
+- [ ] **Visual Output** — headless simulation → canvas/WebGL renderer
 
-### Phase 1: PPER Loop Foundation ✅ In Progress
-> Build the core cognitive cycle: Perceive → Plan → Execute → Reflect
+### Near Term — Cognition
+- [ ] **Cognitive Guardrails** — affordance masking, contextual forcing, plan validation (§10)
+- [ ] **Full Cognitive Tools** — `query_memory` and `update_internal_state` as real tool calls (§8)
+- [ ] **Engine Routing** — `is_thinking` state management, async LLM concurrency (§9)
 
-- [x] Architecture specification (§1–§11)
-- [x] Package structure (ADR-0001)
-- [x] Shared types & JSON schemas
-- [x] CI pipeline (typecheck, lint, test, build)
-- [x] **Perceive Phase** — passive awareness, spatial debouncing, System 0 classifier pruning → [spec 001](docs/specs/001-perceive-phase.md) ✅
-- [x] **Plan Phase** — LLM formulates plan via `formulate_plan` cognitive tool, structured output → [spec 002](docs/specs/002-plan-phase.md) ✅
-- [ ] **Execute Phase** — engine runs affordance, preconditions, action feedback → needs spec
-- [ ] **Reflect Phase** — LLM updates agent state & memory, self-correction → needs spec
-- [ ] **Game Loop Integration** — PPER wired into fixed-timestep loop, minimal scene
+### Medium Term — World
+- [ ] **Scene Authoring** — tools for defining rooms, objects, agents, connections
+- [ ] **Object Interactions** — objects that change state, multi-step affordances
+- [ ] **Multi-Agent Social** — agents that perceive each other, communicate, form relationships
 
-### Phase 2: Smart Objects & World
-> Populate the simulation with interactive objects and spatial structure
-
-- [ ] Smart Object Registry — objects expose affordances, LLM sees semantics → needs spec (§4)
-- [ ] Affordance System — discrete actions with preconditions and effects → needs spec (§4)
-- [ ] Scene Management — rooms, transitions, spatial queries → needs spec
-- [ ] Agent State — drives, plans, goals, memory references → needs spec (§3)
-
-### Phase 3: Cognition Deep Dive
-> Full cognitive toolset and guardrails
-
-- [ ] Cognitive Tools — `formulate_plan`, `query_memory`, `update_state` → needs spec (§8)
-- [ ] Structured Outputs — JSON schema enforcement for all LLM responses → needs spec (§7)
-- [ ] Engine Routing — `is_thinking` state, async LLM concurrency → needs spec (§9)
-- [ ] Cognitive Guardrails — affordance masking, contextual forcing, plan validation → needs spec (§10)
-
-### Phase 4: Memory & Reflection
-> Dual-track memory with background consolidation
-
-- [ ] Vector Store — in-memory, LanceDB, or ChromaDB backend → needs spec (§11)
-- [ ] Weighted Retrieval — recency × importance × relevance scoring → needs spec (§11)
-- [ ] Background Reflection — consolidation, memory updates → needs spec (§11)
-
-### Phase 5: Integration & Polish
-> End-to-end simulation with multiple agents
-
-- [ ] Multi-Agent Simulation — multiple NPCs with independent cognition
-- [ ] Scene Authoring — tools for defining rooms, objects, agents
-- [ ] Performance Tuning — latency profiling, LLM call optimization
+### Long Term — Polish
+- [ ] **Memory Consolidation** — background reflection, memory decay, importance scoring (§11)
+- [ ] **Performance Tuning** — LLM call batching, context window optimization
+- [ ] **Persistence** — save/load game state, agent memory across sessions
 
 ## Architecture Coverage Map
 
 ```
 §1  Vision              ████████████✅  Documented
 §2  System Overview     ████████████✅  Documented
-§3  Agent State         ████████░░░░📝  Partial (specs 001, 002)
-§4  Smart Objects       ██████░░░░░░📝  Partial (spec 001)
-§5  Fast-Path Classifier████████░░░░📝  Partial (spec 001)
-§6  PPER Loop           ████████░░░░🔨  Perceive ✅, Plan ✅, Execute ❌, Reflect ❌
-§7  Structured Outputs  ████░░░░░░░░📝  Partial (spec 002)
-§8  Cognitive Tools     ██░░░░░░░░░░📝  Partial (spec 002)
-§9  Engine Routing      ░░░░░░░░░░░░📝  Needs spec
-§10 Guardrails          ░░░░░░░░░░░░📝  Needs spec
-§11 Memory              ████░░░░░░░░📝  Partial (spec 001)
+§3  Agent State         ████████████✅  Implemented (specs 001-005)
+§4  Smart Objects       ████████████✅  Implemented (specs 001, 003)
+§5  Fast-Path Classifier████████████✅  Implemented (specs 001, 007)
+§6  PPER Loop           ████████████✅  All 4 phases implemented
+§7  Structured Outputs  ████████████✅  Tool calling (spec 011)
+§8  Cognitive Tools     █████████░░░📝  Partial (formulate_plan ✅, query_memory/update_state ❌)
+§9  Engine Routing      ████████████✅  Implemented (spec 005)
+§10 Guardrails          ████░░░░░░░░📝  Needs spec
+§11 Memory              ████████░░░░📝  Partial (store ✅, consolidation ❌)
 ```
 
 ## Decision Log
@@ -107,5 +70,6 @@ To trigger them: create 3 issues, label each "Status: Needs Architecture", dispa
 | 2026-08-04 | pi -p (print mode) for agents | Multi-turn tool use without interactive mode |
 | 2026-08-06 | GitHub App for bot identity | `evol-hive-agent[bot]` distinct from human |
 | 2026-08-06 | PAT for PR creation, App for everything else | Triggers pull_request events automatically |
-| 2026-08-06 | Controller as circuit breaker | Auto-dispatches, retries, escalates to human |
-| 2026-08-07 | GitHub Contents API for memory persistence | Replaces fragile branch-switching approach |
+| 2026-08-07 | Controller → Pipeline Orchestrator | Single workflow, no event storms |
+| 2026-08-17 | Tool calling replaces structured output | 3x faster, reliable field names, simpler code |
+| 2026-08-17 | Configurable decay rate (0.1/sec) | Real LLM too slow for 1.0/sec decay |
