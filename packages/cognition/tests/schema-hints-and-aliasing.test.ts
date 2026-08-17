@@ -742,9 +742,51 @@ describe('Schema-in-prompt & field aliasing (spec 010)', () => {
     });
   });
 
+  // ─── AC-27: No PPER service files modified ──────────────────────────────────
+
+  describe('PPER services unmodified (AC-27)', () => {
+    // Static guard tests: verify that PPER service source files do not import
+    // resolveField, schemaHint, or any *_SCHEMA_HINT constant. These are the
+    // spec 010 additions; their absence in PPER services confirms AC-27.
+    const PPER_SERVICE_FILES = [
+      'src/pper/plan-service.ts',
+      'src/pper/reflect-service.ts',
+      'src/pper/execute-service.ts',
+      'src/pper/orchestrator.ts',
+      // PerceptionServiceImpl lives in pper/index.ts (no separate file).
+      'src/pper/index.ts',
+    ];
+    const FORBIDDEN_IMPORTS = [
+      'resolveField',
+      'schemaHint',
+      'PLAN_SCHEMA_HINT',
+      'ACTION_RESPONSE_SCHEMA_HINT',
+      'REFLECT_SCHEMA_HINT',
+      'MEMORY_CONSOLIDATION_SCHEMA_HINT',
+    ];
+
+    for (const file of PPER_SERVICE_FILES) {
+      it(`${file} does not import resolveField or schema hint constants (AC-27)`, async () => {
+        const fs = await import('fs');
+        const src = fs.readFileSync(file, 'utf-8');
+        for (const forbidden of FORBIDDEN_IMPORTS) {
+          expect(src).not.toContain(forbidden);
+        }
+      });
+    }
+
+    it('PPER service files do not import from json-recovery.ts (AC-27)', async () => {
+      const fs = await import('fs');
+      for (const file of PPER_SERVICE_FILES) {
+        const src = fs.readFileSync(file, 'utf-8');
+        expect(src).not.toContain('json-recovery');
+      }
+    });
+  });
+
   // ─── AC-28: No engine import, no new deps ──────────────────────────────────
 
-  describe('Package boundaries (AC-28, AC-27)', () => {
+  describe('Package boundaries (AC-28)', () => {
     it('OpenAICompatibleLLMClient does not import from @evol-hive/engine (AC-28)', async () => {
       const fs = await import('fs');
       const src = fs.readFileSync('src/llm/openai-client.ts', 'utf-8');
