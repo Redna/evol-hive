@@ -31,6 +31,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [011](011-structured-output-to-tool-calling.md) | Replace Structured Output with Tool Calling | §6, §7, §8, §9 | 🔍 In Review | [#40](https://github.com/Redna/evol-hive/issues/40) | — | cognition, shared, examples |
 | [012](012-agent-persona-system.md) | Agent Persona System | §3, §6, §8, §11, §2 | 📝 Drafted | [#44](https://github.com/Redna/evol-hive/issues/44) | — | shared, cognition, engine |
 | [013](013-richer-prototype-scenes.md) | Richer Prototype Scenes — Multi-Room, Multi-Object, Multi-Agent | §2, §3, §4, §6, §8 | 🔍 In Review | [#45](https://github.com/Redna/evol-hive/issues/45) | [#49](https://github.com/Redna/evol-hive/pull/49) | shared, engine, examples |
+| [014](014-memory-consolidation-decay-retrieval.md) | Memory Consolidation — Background Reflection, Importance Scoring, Memory Decay, Weighted Retrieval | §2, §6, §9, §11 | 📝 Drafted | [#50](https://github.com/Redna/evol-hive/issues/50) | — | shared, memory, cognition, engine |
 
 ## Architecture Coverage
 
@@ -46,16 +47,16 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002 (formulate_plan), 004 (update_internal_state), 011 (cognitive tools as native tool definitions) | 📝 Partial — spec 011 adds native tool def support |
 | [§9](../architecture/09-engine-routing.md) | Engine Routing | 002 (partial — isThinking), 003 (isThinking, feedback), 004 (isThinking), 006 (LLM error propagation), 008 (contention feedback), 009 (LLM JSON recovery error path) | 📝 Partial — full spec needed |
 | [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | — | 📝 Needs spec |
-| [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 001 (partial), 004 (MemoryStore, EmbeddingProvider), 006 (completeReflection, memoryConsolidationSchema), 007 (real embeddings) | 📝 Partial — full spec needed |
+| [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 001 (partial), 004 (MemoryStore, EmbeddingProvider), 006 (completeReflection, memoryConsolidationSchema), 007 (real embeddings), 014 (consolidation, decay, weighted retrieval) | 🔍 Spec 014 drafted |
 
 ## Spec Status Summary
 
 ```
-Total specs:      14
+Total specs:      15
 ✅ Done:          0
 🔨 In Development: 0
 🔍 In Review:     7
-📝 Drafted:       5
+📝 Drafted:       6
 🚫 Blocked:       0
 ⛔ Superseded:    2
 
