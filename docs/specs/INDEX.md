@@ -25,6 +25,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [007](007-onnx-embedding-provider.md) | Real ONNX Embedding Provider | §5, §11 | 📝 Drafted | [#21](https://github.com/Redna/evol-hive/issues/21) | — | cognition, shared, memory, examples |
 | [008](008-pper-error-recovery.md) | PPER Loop Error Recovery & Edge Cases | §6, §9, §10, §3 | 🔍 In Review | [#23](https://github.com/Redna/evol-hive/issues/23) | [#33](https://github.com/Redna/evol-hive/pull/33) | shared, cognition, engine |
 | [008](008-multi-agent-multi-room-integration-tests.md) | Multi-Agent & Multi-Room Integration Tests | §2, §3, §4, §6, §9 | 📝 Drafted | [#22](https://github.com/Redna/evol-hive/issues/22) | — | engine, shared |
+| [009](009-llm-json-recovery.md) | LLM JSON Response Recovery & Provider-Aware Structured Output | §6, §7, §9 | 📝 Drafted | [#34](https://github.com/Redna/evol-hive/issues/34) | — | cognition, shared, examples |
 
 ## Architecture Coverage
 
@@ -36,20 +37,20 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001 (partial), 003 (execution), 008 (room scoping) | 📝 Partial — full spec needed |
 | [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) | 001 (partial), 006 (EmbeddingProvider reuse), 007 (ONNX provider) | 📝 Partial — full spec needed |
 | [§6](../architecture/06-pper-loop.md) | PPER Loop | 001 (Perceive), 002 (Plan), 003 (Execute), 004 (Reflect), 006 (LLM client), 008 (concurrent cycles) | 🔍 Perceive in review; 🔍 Plan in review; 🔍 Execute in review; 🔍 Reflect in review |
-| [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 002 (partial), 004 (reflectSchema), 006 (OpenAI response_format, memoryConsolidationSchema) | 📝 Partial — full spec needed |
+| [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 002 (partial), 004 (reflectSchema), 006 (OpenAI response_format, memoryConsolidationSchema), 009 (JSON recovery, json_object fallback) | 📝 Partial — full spec needed |
 | [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002 (formulate_plan), 004 (update_internal_state) | 📝 Partial — full spec needed |
-| [§9](../architecture/09-engine-routing.md) | Engine Routing | 002 (partial — isThinking), 003 (isThinking, feedback), 004 (isThinking), 006 (LLM error propagation), 008 (contention feedback) | 📝 Partial — full spec needed |
+| [§9](../architecture/09-engine-routing.md) | Engine Routing | 002 (partial — isThinking), 003 (isThinking, feedback), 004 (isThinking), 006 (LLM error propagation), 008 (contention feedback), 009 (LLM JSON recovery error path) | 📝 Partial — full spec needed |
 | [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | — | 📝 Needs spec |
 | [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 001 (partial), 004 (MemoryStore, EmbeddingProvider), 006 (completeReflection, memoryConsolidationSchema), 007 (real embeddings) | 📝 Partial — full spec needed |
 
 ## Spec Status Summary
 
 ```
-Total specs:      9
+Total specs:      10
 ✅ Done:          0
 🔨 In Development: 0
 🔍 In Review:     7
-📝 Drafted:       2
+📝 Drafted:       3
 🚫 Blocked:       0
 
 Architecture sections with specs: 8/11 (partial coverage)
