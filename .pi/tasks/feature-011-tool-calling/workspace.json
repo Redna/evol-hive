@@ -1,0 +1,7 @@
+{
+  "name": "feature-011-tool-calling",
+  "description": "Replace structured output (response_format) with native tool calling (tools parameter). Supersedes specs 009 and 010. Removes JSON recovery, schema hints, field aliasing. Adds tool definitions per PPER phase.",
+  "createdAt": "2026-08-17T06:56:48Z",
+  "specIssue": 40,
+  "specFile": "docs/specs/011-structured-output-to-tool-calling.md"
+}
