@@ -7,7 +7,12 @@
  * `SmartObjectRegistry`, `DriveSystem`, and the shared `SystemFeedbackStore`.
  */
 
-import type { Affordance, SmartObjectSummary, PerceptionDataProvider } from '@evol-hive/shared';
+import type {
+  Affordance,
+  AgentProfile,
+  SmartObjectSummary,
+  PerceptionDataProvider,
+} from '@evol-hive/shared';
 import type { AgentManager, DriveSystem } from '../index.js';
 import type { SmartObjectRegistry } from '../../world/index.js';
 import type { SystemFeedbackStore } from '../feedback/index.js';
@@ -69,6 +74,10 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
 
   getSystemFeedback(agentId: string): string | undefined {
     return this.feedbackStore.getSystemFeedback(agentId);
+  }
+
+  getAgentProfile(agentId: string): AgentProfile | null {
+    return this.agentManager.getProfile(agentId);
   }
 }
 

@@ -7,7 +7,12 @@
  * `PlanManager`, and `MemoryStore`.
  */
 
-import type { AgentInternalState, MemoryEntryInput, ReflectDataProvider } from '@evol-hive/shared';
+import type {
+  AgentInternalState,
+  AgentProfile,
+  MemoryEntryInput,
+  ReflectDataProvider,
+} from '@evol-hive/shared';
 import type { MemoryStore } from '@evol-hive/memory';
 import type { AgentManager, DriveSystem, PlanManager } from '../index.js';
 import type { SimulationClock } from '../plans/index.js';
@@ -52,6 +57,10 @@ export class ReflectDataProviderImpl implements ReflectDataProvider {
 
   setThinking(agentId: string, isThinking: boolean): void {
     this.agentManager.updateState(agentId, { isThinking });
+  }
+
+  getAgentProfile(agentId: string): AgentProfile | null {
+    return this.agentManager.getProfile(agentId);
   }
 }
 

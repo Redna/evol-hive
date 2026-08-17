@@ -19,6 +19,8 @@ const DEFAULT_DRIVES = {
 /** Concrete AgentManager backed by an in-memory map. */
 export class AgentManagerImpl implements AgentManager {
   private readonly agents = new Map<string, AgentInternalState>();
+  /** Stored agent profiles (spec 012, Req 13) — immutable after spawn. */
+  private readonly profiles = new Map<string, AgentProfile>();
 
   spawn(profile: AgentProfile): AgentInternalState {
     const state: AgentInternalState = {
@@ -31,6 +33,7 @@ export class AgentManagerImpl implements AgentManager {
       lastPerceptionTick: 0,
     };
     this.agents.set(profile.id, state);
+    this.profiles.set(profile.id, profile);
     return state;
   }
 
@@ -51,6 +54,11 @@ export class AgentManagerImpl implements AgentManager {
 
   despawn(agentId: string): void {
     this.agents.delete(agentId);
+    this.profiles.delete(agentId);
+  }
+
+  getProfile(agentId: string): AgentProfile | null {
+    return this.profiles.get(agentId) ?? null;
   }
 }
 
