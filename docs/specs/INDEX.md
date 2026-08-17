@@ -29,17 +29,16 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [009](009-llm-json-recovery.md) | LLM JSON Response Recovery & Provider-Aware Structured Output | §6, §7, §9 | ⛔ Superseded by 011 | [#34](https://github.com/Redna/evol-hive/issues/34) | [#36](https://github.com/Redna/evol-hive/pull/36) | cognition, shared, examples |
 | [010](010-llm-schema-in-prompt-and-field-aliasing.md) | LLM Schema-in-Prompt & Field Name Aliasing | §6, §7, §9 | ⛔ Superseded by 011 | [#37](https://github.com/Redna/evol-hive/issues/37) | [#39](https://github.com/Redna/evol-hive/pull/39) | cognition, shared |
 | [011](011-structured-output-to-tool-calling.md) | Replace Structured Output with Tool Calling | §6, §7, §8, §9 | 🔍 In Review | [#40](https://github.com/Redna/evol-hive/issues/40) | — | cognition, shared, examples |
-| [012](012-agent-persona-system.md) | Agent Persona System | §3, §6, §8, §11, §2 | 📝 Drafted | [#44](https://github.com/Redna/evol-hive/issues/44) | — | shared, cognition, engine |
-| [013](013-richer-prototype-scenes.md) | Richer Prototype Scenes — Multi-Room, Multi-Object, Multi-Agent | §2, §3, §4, §6, §8 | 📝 Drafted | [#45](https://github.com/Redna/evol-hive/issues/45) | — | shared, engine, examples |
+| [012](012-agent-persona-system.md) | Agent Persona System | §3, §6, §8, §11, §2 | 🔍 In Review | [#44](https://github.com/Redna/evol-hive/issues/44) | [#48](https://github.com/Redna/evol-hive/pull/48) | shared, cognition, engine |
 
 ## Architecture Coverage
 
 | Section | Topic | Spec(s) | Status |
 |---------|-------|---------|--------|
 | [§1](../architecture/01-vision.md) | Vision & Philosophy | — | ✅ Documented |
-| [§2](../architecture/02-system-overview.md) | System Overview | 008 (integration tests), 013 (richer scenes) | ✅ Documented |
+| [§2](../architecture/02-system-overview.md) | System Overview | 008 (integration tests) | ✅ Documented |
 | [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002 (partial), 008 (multi-agent isolation), 012 (persona) | 📝 Partial — full spec needed |
-| [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001 (partial), 003 (execution), 008 (room scoping), 013 (richer scenes) | 📝 Partial — full spec needed |
+| [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001 (partial), 003 (execution), 008 (room scoping) | 📝 Partial — full spec needed |
 | [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) | 001 (partial), 006 (EmbeddingProvider reuse), 007 (ONNX provider) | 📝 Partial — full spec needed |
 | [§6](../architecture/06-pper-loop.md) | PPER Loop | 001 (Perceive), 002 (Plan), 003 (Execute), 004 (Reflect), 006 (LLM client), 008 (concurrent cycles), 012 (persona injection) | 🔍 Perceive in review; 🔍 Plan in review; 🔍 Execute in review; 🔍 Reflect in review |
 | [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 002 (partial), 004 (reflectSchema), 006 (OpenAI response_format → superseded), 009 (superseded by 011), 010 (superseded by 011), 011 (tool calling) | 🔍 Spec 011 drafted |
@@ -51,11 +50,11 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      14
+Total specs:      13
 ✅ Done:          0
 🔨 In Development: 0
 🔍 In Review:     7
-📝 Drafted:       5
+📝 Drafted:       4
 🚫 Blocked:       0
 ⛔ Superseded:    2
 

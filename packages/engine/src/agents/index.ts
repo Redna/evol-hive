@@ -24,6 +24,8 @@ export interface AgentManager {
   getActiveAgents(): import('@evol-hive/shared').AgentInternalState[];
   /** Remove an agent from the simulation. */
   despawn(agentId: string): void;
+  /** Get the agent's stored profile (spec 012, Req 13). Returns `null` if not found. */
+  getProfile(agentId: string): import('@evol-hive/shared').AgentProfile | null;
 }
 
 // ── Drive System ──────────────────────────────────────────────────────────────
