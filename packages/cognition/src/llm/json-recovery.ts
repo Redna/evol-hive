@@ -10,6 +10,36 @@
  */
 
 /**
+ * Resolve a canonical field name against known aliases (spec 010, Req 11).
+ *
+ * Returns `{ value, usedAlias }` where:
+ *   - `usedAlias` is `null` when the canonical field is present (not undefined).
+ *   - `usedAlias` is the first matching alias when the canonical is missing and at
+ *     least one alias is present.
+ *   - `value` is `undefined` and `usedAlias` is `null` when neither is present.
+ *
+ * Canonical takes priority over aliases: even if both the canonical and an
+ * alias are present, the canonical value is returned.
+ */
+export function resolveField(
+  parsed: Record<string, unknown>,
+  canonical: string,
+  aliases: string[],
+): { value: unknown; usedAlias: string | null } {
+  const canonicalValue = parsed[canonical];
+  if (canonicalValue !== undefined) {
+    return { value: canonicalValue, usedAlias: null };
+  }
+  for (const alias of aliases) {
+    const aliasValue = parsed[alias];
+    if (aliasValue !== undefined) {
+      return { value: aliasValue, usedAlias: alias };
+    }
+  }
+  return { value: undefined, usedAlias: null };
+}
+
+/**
  * Attempt to extract a JSON object or array from a raw text string.
  *
  * Strategy (spec 009, Req 1):

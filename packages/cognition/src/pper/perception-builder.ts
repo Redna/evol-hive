@@ -8,7 +8,11 @@
  */
 
 import type { PerceptionResult } from '@evol-hive/shared';
-import { llmActionResponseSchema, JSON_INSTRUCTION_SUFFIX } from '@evol-hive/shared';
+import {
+  llmActionResponseSchema,
+  JSON_INSTRUCTION_SUFFIX,
+  ACTION_RESPONSE_SCHEMA_HINT,
+} from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
@@ -41,6 +45,7 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
       responseSchema: llmActionResponseSchema,
+      schemaHint: ACTION_RESPONSE_SCHEMA_HINT,
     };
   }
 }

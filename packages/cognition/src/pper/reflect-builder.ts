@@ -11,7 +11,7 @@
  */
 
 import type { AgentInternalState, ExecuteResult } from '@evol-hive/shared';
-import { reflectSchema, JSON_INSTRUCTION_SUFFIX } from '@evol-hive/shared';
+import { reflectSchema, JSON_INSTRUCTION_SUFFIX, REFLECT_SCHEMA_HINT } from '@evol-hive/shared';
 import type { LLMContextPayload, ReflectBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
@@ -91,6 +91,7 @@ export class ReflectBuilderImpl implements ReflectBuilder {
       availableAffordances: [],
       cognitiveTools: updateInternalStateTool,
       responseSchema: reflectSchema,
+      schemaHint: REFLECT_SCHEMA_HINT,
     };
   }
 }
