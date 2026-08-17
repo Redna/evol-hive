@@ -813,3 +813,194 @@ describe('AC-28: OfficeDayMockLLMClient drive prioritization', () => {
     expect(result.steps[0]!.targetAffordance).toBe('go_to_break_room');
   });
 });
+
+// ─── AC-4 supplementary: brew_coffee defensive handler ─────────────────────────
+
+describe('AC-4 (supplementary): brew_coffee defensive handler', () => {
+  it('handler defensively returns { success: false } when water_level is 0', async () => {
+    const core = setupMorningRoutine();
+    const handler = core.affordanceRegistry.getHandler('brew_coffee')!;
+    const res = await handler('coffee-1', 'agent-alice', { water_level: 0, bean_count: 12 });
+    expect(res.success).toBe(false);
+    expect(res.failureReason).toContain('No water or beans left');
+  });
+
+  it('handler defensively returns { success: false } when bean_count is 0', async () => {
+    const core = setupMorningRoutine();
+    const handler = core.affordanceRegistry.getHandler('brew_coffee')!;
+    const res = await handler('coffee-1', 'agent-alice', { water_level: 5, bean_count: 0 });
+    expect(res.success).toBe(false);
+    expect(res.failureReason).toContain('No water or beans left');
+  });
+});
+
+// ─── AC-18 supplementary: has_books and has_paper precondition checkers ────────
+
+describe('AC-18 (supplementary): has_books and has_paper precondition checkers', () => {
+  it('has_books returns true when book_count > 0 and false when book_count is 0', () => {
+    const core = setupMorningRoutine();
+    // bookshelf-1 starts with book_count: 8.
+    const prePass = core.affordanceRegistry.checkPreconditions('read_book', 'bookshelf-1');
+    expect(prePass.satisfied).toBe(true);
+    core.smartObjectRegistry.updateState('bookshelf-1', { book_count: 0 });
+    const preFail = core.affordanceRegistry.checkPreconditions('read_book', 'bookshelf-1');
+    expect(preFail.satisfied).toBe(false);
+    expect(preFail.failed).toContain('has_books');
+  });
+
+  it('has_paper returns true when paper_count > 0 and false when paper_count is 0', () => {
+    const core = setupOfficeDay();
+    // printer-1 starts with paper_count: 50.
+    const prePass = core.affordanceRegistry.checkPreconditions('print_document', 'printer-1');
+    expect(prePass.satisfied).toBe(true);
+    core.smartObjectRegistry.updateState('printer-1', { paper_count: 0 });
+    const preFail = core.affordanceRegistry.checkPreconditions('print_document', 'printer-1');
+    expect(preFail.satisfied).toBe(false);
+    expect(preFail.failed).toContain('has_paper');
+  });
+
+  it('has_beans returns true when bean_count > 0 and false when bean_count is 0', () => {
+    const core = setupMorningRoutine();
+    // coffee-1 starts with bean_count: 12.
+    const prePass = core.affordanceRegistry.checkPreconditions('brew_coffee', 'coffee-1');
+    expect(prePass.satisfied).toBe(true);
+    core.smartObjectRegistry.updateState('coffee-1', { water_level: 5, bean_count: 0 });
+    const preFail = core.affordanceRegistry.checkPreconditions('brew_coffee', 'coffee-1');
+    expect(preFail.satisfied).toBe(false);
+    expect(preFail.failed).toContain('has_beans');
+  });
+});
+
+// ─── AC-20 supplementary: all non-doorway objects' affordances & preconditions ──
+
+describe('AC-20 (supplementary): Morning Routine non-doorway object affordances', () => {
+  it('Bed has sleep (no preconditions, effects { energy: 30, comfort: -5 }) and observe', () => {
+    const bed = MORNING_ROUTINE_SCENE.objects.find((o) => o.id === 'bed-1')!;
+    const sleep = bed.affordances.find((a) => a.id === 'sleep')!;
+    expect(sleep).toBeDefined();
+    expect(sleep.preconditions).toEqual([]);
+    expect(sleep.effects).toEqual({ energy: 30, comfort: -5 });
+    expect(bed.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Shower has take_shower (preconditions [has_water], effects { comfort: 25, energy: -5 }) and observe', () => {
+    const shower = MORNING_ROUTINE_SCENE.objects.find((o) => o.id === 'shower-1')!;
+    const takeShower = shower.affordances.find((a) => a.id === 'take_shower')!;
+    expect(takeShower).toBeDefined();
+    expect(takeShower.preconditions).toEqual(['has_water']);
+    expect(takeShower.effects).toEqual({ comfort: 25, energy: -5 });
+    expect(shower.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('TV has watch_tv (preconditions [is_powered], effects { comfort: 15, energy: -5, curiosity: 5 }) and observe', () => {
+    const tv = MORNING_ROUTINE_SCENE.objects.find((o) => o.id === 'tv-1')!;
+    const watchTv = tv.affordances.find((a) => a.id === 'watch_tv')!;
+    expect(watchTv).toBeDefined();
+    expect(watchTv.preconditions).toEqual(['is_powered']);
+    expect(watchTv.effects).toEqual({ comfort: 15, energy: -5, curiosity: 5 });
+    expect(tv.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Bookshelf has read_book (preconditions [has_books], effects { curiosity: 20, energy: -10 }) and observe', () => {
+    const bookshelf = MORNING_ROUTINE_SCENE.objects.find((o) => o.id === 'bookshelf-1')!;
+    const readBook = bookshelf.affordances.find((a) => a.id === 'read_book')!;
+    expect(readBook).toBeDefined();
+    expect(readBook.preconditions).toEqual(['has_books']);
+    expect(readBook.effects).toEqual({ curiosity: 20, energy: -10 });
+    expect(bookshelf.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Front Door has go_outside (no preconditions, effects {}) and observe', () => {
+    const frontDoor = MORNING_ROUTINE_SCENE.objects.find((o) => o.id === 'front-door-1')!;
+    const goOutside = frontDoor.affordances.find((a) => a.id === 'go_outside')!;
+    expect(goOutside).toBeDefined();
+    expect(goOutside.preconditions).toEqual([]);
+    expect(goOutside.effects).toEqual({});
+    expect(frontDoor.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Coffee Machine has brew_coffee (preconditions [has_water, has_beans], effects { energy: 20 }) and observe', () => {
+    const coffee = MORNING_ROUTINE_SCENE.objects.find((o) => o.id === 'coffee-1')!;
+    const brew = coffee.affordances.find((a) => a.id === 'brew_coffee')!;
+    expect(brew).toBeDefined();
+    expect(brew.preconditions).toEqual(['has_water', 'has_beans']);
+    expect(brew.effects).toEqual({ energy: 20 });
+    expect(coffee.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+});
+
+// ─── AC-25 supplementary: all non-doorway objects' affordances & preconditions ──
+
+describe('AC-25 (supplementary): Office Day non-doorway object affordances', () => {
+  it('Computer has work (no preconditions, effects { energy: -15 }) and observe', () => {
+    const computer = OFFICE_DAY_SCENE.objects.find((o) => o.id === 'computer-1')!;
+    const work = computer.affordances.find((a) => a.id === 'work')!;
+    expect(work).toBeDefined();
+    expect(work.preconditions).toEqual([]);
+    expect(work.effects).toEqual({ energy: -15 });
+    expect(computer.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Whiteboard has brainstorm (no preconditions, effects { curiosity: 15, social: 5, energy: -10 }) and observe', () => {
+    const whiteboard = OFFICE_DAY_SCENE.objects.find((o) => o.id === 'whiteboard-1')!;
+    const brainstorm = whiteboard.affordances.find((a) => a.id === 'brainstorm')!;
+    expect(brainstorm).toBeDefined();
+    expect(brainstorm.preconditions).toEqual([]);
+    expect(brainstorm.effects).toEqual({ curiosity: 15, social: 5, energy: -10 });
+    expect(whiteboard.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Coffee Machine (coffee-2) has brew_coffee (preconditions [has_water, has_beans], effects { energy: 20 }) and observe', () => {
+    const coffee = OFFICE_DAY_SCENE.objects.find((o) => o.id === 'coffee-2')!;
+    const brew = coffee.affordances.find((a) => a.id === 'brew_coffee')!;
+    expect(brew).toBeDefined();
+    expect(brew.preconditions).toEqual(['has_water', 'has_beans']);
+    expect(brew.effects).toEqual({ energy: 20 });
+    expect(coffee.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Water Cooler has small_talk (no preconditions, effects { social: 15, energy: -2 }) and observe', () => {
+    const cooler = OFFICE_DAY_SCENE.objects.find((o) => o.id === 'cooler-1')!;
+    const smallTalk = cooler.affordances.find((a) => a.id === 'small_talk')!;
+    expect(smallTalk).toBeDefined();
+    expect(smallTalk.preconditions).toEqual([]);
+    expect(smallTalk.effects).toEqual({ social: 15, energy: -2 });
+    expect(cooler.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Meeting Table has hold_meeting (no preconditions, effects { social: 20, energy: -15, comfort: -5 }) and observe', () => {
+    const table = OFFICE_DAY_SCENE.objects.find((o) => o.id === 'table-1')!;
+    const holdMeeting = table.affordances.find((a) => a.id === 'hold_meeting')!;
+    expect(holdMeeting).toBeDefined();
+    expect(holdMeeting.preconditions).toEqual([]);
+    expect(holdMeeting.effects).toEqual({ social: 20, energy: -15, comfort: -5 });
+    expect(table.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Printer has print_document (preconditions [has_paper], effects { curiosity: 2 }) and observe', () => {
+    const printer = OFFICE_DAY_SCENE.objects.find((o) => o.id === 'printer-1')!;
+    const printDoc = printer.affordances.find((a) => a.id === 'print_document')!;
+    expect(printDoc).toBeDefined();
+    expect(printDoc.preconditions).toEqual(['has_paper']);
+    expect(printDoc.effects).toEqual({ curiosity: 2 });
+    expect(printer.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Toilet has use_bathroom (no preconditions, effects { comfort: 10 }) and observe', () => {
+    const toilet = OFFICE_DAY_SCENE.objects.find((o) => o.id === 'toilet-1')!;
+    const useBathroom = toilet.affordances.find((a) => a.id === 'use_bathroom')!;
+    expect(useBathroom).toBeDefined();
+    expect(useBathroom.preconditions).toEqual([]);
+    expect(useBathroom.effects).toEqual({ comfort: 10 });
+    expect(toilet.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+
+  it('Sink has wash_hands (no preconditions, effects { comfort: 5 }) and observe', () => {
+    const sink = OFFICE_DAY_SCENE.objects.find((o) => o.id === 'sink-1')!;
+    const washHands = sink.affordances.find((a) => a.id === 'wash_hands')!;
+    expect(washHands).toBeDefined();
+    expect(washHands.preconditions).toEqual([]);
+    expect(washHands.effects).toEqual({ comfort: 5 });
+    expect(sink.affordances.find((a) => a.id === 'observe')).toBeDefined();
+  });
+});
