@@ -6,7 +6,7 @@
  * to the LLM via the perception context payload.
  */
 
-import type { CognitiveTool } from '@evol-hive/shared';
+import type { CognitiveTool, ToolDefinition } from '@evol-hive/shared';
 
 /** The default cognitive tools available to every agent (Section 8). */
 export const defaultCognitiveTools: CognitiveTool[] = [
@@ -47,5 +47,20 @@ export const defaultCognitiveTools: CognitiveTool[] = [
     },
   },
 ];
+
+/**
+ * Converts `CognitiveTool[]` to `ToolDefinition[]` (spec 011, Req 21).
+ * Each `CognitiveTool`'s `argsSchema` becomes the tool's `parameters`.
+ */
+export function cognitiveToolsToToolDefinitions(tools: CognitiveTool[]): ToolDefinition[] {
+  return tools.map((tool) => ({
+    type: 'function' as const,
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.argsSchema,
+    },
+  }));
+}
 
 export {};

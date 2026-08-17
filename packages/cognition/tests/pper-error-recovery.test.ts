@@ -45,9 +45,27 @@ const BASE_URL = 'http://localhost:11434/v1';
 const MODEL = 'llama3.1';
 const CHAT_URL = `${BASE_URL}/chat/completions`;
 
-function chatResponse(content: string, status = 200): Response {
+/** Mock response with tool_calls in the body (spec 011 format). */
+function toolCallResponse(toolName: string, argumentsObj: unknown, status = 200): Response {
   const body = JSON.stringify({
-    choices: [{ message: { role: 'assistant', content } }],
+    choices: [
+      {
+        message: {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              id: 'call-1',
+              type: 'function',
+              function: {
+                name: toolName,
+                arguments: JSON.stringify(argumentsObj),
+              },
+            },
+          ],
+        },
+      },
+    ],
   });
   return new Response(body, {
     status,
@@ -95,7 +113,7 @@ describe('OpenAICompatibleLLMClient — retry on timeout (AC-1)', () => {
         perceptionContext: 'p',
         availableAffordances: [],
         cognitiveTools: [],
-        responseSchema: {},
+        tools: [],
       }),
     ).rejects.toThrow(LLMTimeoutError);
 
@@ -118,7 +136,7 @@ describe('OpenAICompatibleLLMClient — retry on timeout (AC-1)', () => {
         });
       }
       // Second call: succeed
-      return Promise.resolve(chatResponse(JSON.stringify({ reasoning: 'r', action: 'a' })));
+      return Promise.resolve(toolCallResponse('choose_action', { reasoning: 'r', action: 'a' }));
     });
 
     const client = new OpenAICompatibleLLMClient({
@@ -134,7 +152,7 @@ describe('OpenAICompatibleLLMClient — retry on timeout (AC-1)', () => {
       perceptionContext: 'p',
       availableAffordances: [],
       cognitiveTools: [],
-      responseSchema: {},
+      tools: [],
     });
 
     expect(result.action).toBe('a');
@@ -173,7 +191,7 @@ describe('OpenAICompatibleLLMClient — retry on fetch errors (AC-2)', () => {
         perceptionContext: 'p',
         availableAffordances: [],
         cognitiveTools: [],
-        responseSchema: {},
+        tools: [],
       }),
     ).rejects.toThrow(LLMError);
 
@@ -184,7 +202,7 @@ describe('OpenAICompatibleLLMClient — retry on fetch errors (AC-2)', () => {
   it('succeeds after a transient fetch error (retry then success)', async () => {
     fetchMock
       .mockRejectedValueOnce(new TypeError('fetch failed: DNS error'))
-      .mockResolvedValueOnce(chatResponse(JSON.stringify({ reasoning: 'r', action: 'a' })));
+      .mockResolvedValueOnce(toolCallResponse('choose_action', { reasoning: 'r', action: 'a' }));
 
     const client = new OpenAICompatibleLLMClient({
       baseUrl: BASE_URL,
@@ -198,7 +216,7 @@ describe('OpenAICompatibleLLMClient — retry on fetch errors (AC-2)', () => {
       perceptionContext: 'p',
       availableAffordances: [],
       cognitiveTools: [],
-      responseSchema: {},
+      tools: [],
     });
 
     expect(result.action).toBe('a');
@@ -246,7 +264,7 @@ describe('OpenAICompatibleLLMClient — retryOnTimeout=false (AC-3)', () => {
         perceptionContext: 'p',
         availableAffordances: [],
         cognitiveTools: [],
-        responseSchema: {},
+        tools: [],
       }),
     ).rejects.toThrow(LLMTimeoutError);
 

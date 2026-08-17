@@ -80,6 +80,21 @@ export interface LLMActionResponse {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Tool Calling — ToolDefinition (spec 011)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The OpenAI tool calling format (spec 011, Req 1). */
+export interface ToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    /** JSON schema for the tool's arguments. */
+    parameters: object;
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Cognitive Tools — Internal Affordances (Section 8)
 // ─────────────────────────────────────────────────────────────────────────────
 
