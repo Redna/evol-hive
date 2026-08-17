@@ -8,15 +8,18 @@
  */
 
 import type { PerceptionResult } from '@evol-hive/shared';
-import { llmActionResponseSchema } from '@evol-hive/shared';
+import { llmActionResponseSchema, JSON_INSTRUCTION_SUFFIX } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
-const SYSTEM_PROMPT = [
-  'You are an autonomous NPC in a deterministic simulation.',
-  'You perceive your surroundings passively and choose one action per tick.',
-  'Choose an affordance or a cognitive tool. Reason briefly before acting.',
-].join(' ');
+const SYSTEM_PROMPT =
+  [
+    'You are an autonomous NPC in a deterministic simulation.',
+    'You perceive your surroundings passively and choose one action per tick.',
+    'Choose an affordance or a cognitive tool. Reason briefly before acting.',
+  ].join(' ') +
+  '\n\n' +
+  JSON_INSTRUCTION_SUFFIX;
 
 /** Concrete PerceptionBuilder producing the LLM context payload. */
 export class PerceptionBuilderImpl implements PerceptionBuilder {

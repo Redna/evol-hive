@@ -12,7 +12,7 @@
  */
 
 import type { PerceptionResult } from '@evol-hive/shared';
-import { formulatePlanSchema } from '@evol-hive/shared';
+import { formulatePlanSchema, JSON_INSTRUCTION_SUFFIX } from '@evol-hive/shared';
 import type { LLMContextPayload, PlanBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
@@ -23,13 +23,16 @@ export class PlanBuilderImpl implements PlanBuilder {
     const objectNames = passive.objectsPresent.map((o) => o.name);
     const driveSummary = formatDrives(passive.drives);
 
-    const systemPrompt = [
-      'You are an autonomous NPC in a deterministic simulation.',
-      'You must formulate a plan to satisfy your most urgent drive.',
-      `Your primary drive is: ${primaryDriveLabel}.`,
-      'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
-      'Each step should map to an available affordance when possible.',
-    ].join(' ');
+    const systemPrompt =
+      [
+        'You are an autonomous NPC in a deterministic simulation.',
+        'You must formulate a plan to satisfy your most urgent drive.',
+        `Your primary drive is: ${primaryDriveLabel}.`,
+        'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
+        'Each step should map to an available affordance when possible.',
+      ].join(' ') +
+      '\n\n' +
+      JSON_INSTRUCTION_SUFFIX;
 
     const contextLines = [
       `Room: ${passive.roomId}`,

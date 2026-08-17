@@ -1,14 +1,21 @@
 /**
- * OpenAI-Compatible LLM Client (spec 006, issue #20)
+ * OpenAI-Compatible LLM Client (spec 006, issue #20; spec 009, issue #34)
  * ────────────────────────────────────────────────────────────────────────────
  * A concrete `LLMClient` that speaks the standard OpenAI Chat Completions API
  * (`/v1/chat/completions`). Works with any OpenAI-compatible inference server
  * (Ollama, vLLM, llama.cpp, LM Studio, hosted providers) with zero code
  * changes — only config (base URL, model, optional API key).
  *
- * Structured output uses `response_format: { type: "json_schema", ... }`.
- * Non-streaming (`stream: false`). Built-in `fetch` + `AbortController` — no
- * external HTTP library (ADR-0001 lean monorepo).
+ * Structured output uses `response_format` — either `{ type: "json_schema", ... }`
+ * (default for non-Ollama providers) or `{ type: "json_object" }` (Ollama or
+ * explicit config). Non-streaming (`stream: false`). Built-in `fetch` +
+ * `AbortController` — no external HTTP library (ADR-0001 lean monorepo).
+ *
+ * JSON Recovery (spec 009): when `JSON.parse(content)` fails, the client
+ * attempts to extract a JSON object from the raw text (substring search). If
+ * that fails, a single re-prompt is sent with `{ type: "json_object" }` and an
+ * explicit JSON instruction. This handles Ollama cloud-backed models that wrap
+ * responses in XML-like tags instead of enforcing `json_schema`.
  */
 
 import type {
@@ -23,6 +30,10 @@ import type {
 import { memoryConsolidationSchema } from '@evol-hive/shared';
 import type { LLMContextPayload } from '../index.js';
 import type { EmbeddingProvider } from '../classifier/index.js';
+import { extractJsonFromText } from './json-recovery.js';
+
+// Re-export for discoverability (spec 009, Req 19).
+export { extractJsonFromText } from './json-recovery.js';
 
 // ─── Error Hierarchy (Req 14) ────────────────────────────────────────────────
 
@@ -75,18 +86,35 @@ export class LLMRateLimitError extends LLMHTTPError {
 /** Thrown when the response content cannot be parsed as JSON or fails validation. */
 export class LLMResponseError extends LLMError {
   readonly rawContent?: string;
+  /** Raw content from the first response that triggered recovery (spec 009, Req 7). */
+  readonly originalRawContent?: string;
+  /** Whether JSON recovery (extraction + re-prompt) was attempted (spec 009, Req 7). */
+  readonly recoveryAttempted?: boolean;
 
-  constructor(message: string, rawContent?: string) {
+  constructor(
+    message: string,
+    rawContent?: string,
+    options?: { originalRawContent?: string; recoveryAttempted?: boolean },
+  ) {
     super(message);
     this.name = 'LLMResponseError';
     if (rawContent !== undefined) {
       this.rawContent = rawContent;
     }
+    if (options?.originalRawContent !== undefined) {
+      this.originalRawContent = options.originalRawContent;
+    }
+    if (options?.recoveryAttempted !== undefined) {
+      this.recoveryAttempted = options.recoveryAttempted;
+    }
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
-// ─── Config (Req 3) ──────────────────────────────────────────────────────────
+// ─── Config (Req 3, spec 009 Req 4/8) ─────────────────────────────────────────
+
+/** Preferred response format selection (spec 009, Req 4). */
+export type ResponseFormat = 'json_schema' | 'json_object' | 'auto';
 
 /** Configuration for {@link OpenAICompatibleLLMClient}. */
 export interface OpenAICompatibleLLMClientConfig {
@@ -108,6 +136,12 @@ export interface OpenAICompatibleLLMClientConfig {
   agentId?: string;
   /** Whether to retry on timeout errors (default: true). When false, timeout errors are thrown immediately (spec 008, Req 1.2). */
   retryOnTimeout?: boolean;
+  /** Preferred response format (spec 009, Req 4). `'auto'` uses `json_schema` for non-Ollama and `json_object` for Ollama (auto-detected from baseUrl). Default: `'auto'`. */
+  responseFormat?: ResponseFormat;
+  /** Backward-compatible boolean for response format (spec 009, Req 3). `true` → `json_schema`, `false` → `json_object`. Ignored when `responseFormat` is explicitly set. */
+  useJsonSchema?: boolean;
+  /** Whether to enable JSON recovery (extraction + re-prompt) on parse failure (spec 009, Req 8). Default: `true`. */
+  enableJsonRecovery?: boolean;
 }
 
 // ─── Internal types ──────────────────────────────────────────────────────────
@@ -128,6 +162,11 @@ interface ConsolidationResult {
   consolidatedNodeIds?: string[];
 }
 
+/** The response_format envelope sent in the request body. */
+type ResponseFormatEnvelope =
+  | { type: 'json_schema'; json_schema: { name: string; schema: object; strict: true } }
+  | { type: 'json_object' };
+
 // ─── Client ──────────────────────────────────────────────────────────────────
 
 /**
@@ -145,6 +184,8 @@ export class OpenAICompatibleLLMClient {
   private readonly embeddingProvider: EmbeddingProvider | undefined;
   private readonly agentId: string;
   private readonly retryOnTimeout: boolean;
+  private readonly responseFormat: ResponseFormat;
+  private readonly enableJsonRecovery: boolean;
 
   constructor(config: OpenAICompatibleLLMClientConfig) {
     this.baseUrl = config.baseUrl;
@@ -156,6 +197,19 @@ export class OpenAICompatibleLLMClient {
     this.embeddingProvider = config.embeddingProvider;
     this.agentId = config.agentId ?? '';
     this.retryOnTimeout = config.retryOnTimeout ?? true;
+    this.enableJsonRecovery = config.enableJsonRecovery ?? true;
+
+    // Resolve response format (spec 009, Req 4):
+    //   - responseFormat takes precedence if explicitly set.
+    //   - useJsonSchema maps to 'json_schema' (true) / 'json_object' (false).
+    //   - Default: 'auto'.
+    if (config.responseFormat !== undefined) {
+      this.responseFormat = config.responseFormat;
+    } else if (config.useJsonSchema !== undefined) {
+      this.responseFormat = config.useJsonSchema ? 'json_schema' : 'json_object';
+    } else {
+      this.responseFormat = 'auto';
+    }
   }
 
   // ── LLMClient: completeStructured (Req 7) ──────────────────────────────────
@@ -299,11 +353,12 @@ export class OpenAICompatibleLLMClient {
     };
   }
 
-  // ── Private: shared request method (Req 15) ────────────────────────────────
+  // ── Private: shared request method (Req 15, spec 009 recovery) ──────────────
 
   /**
    * Shared low-level request method used by all four public methods.
-   * Handles HTTP, authorization, timeout, retries (429), JSON parsing, and errors.
+   * Handles HTTP, authorization, timeout, retries (429), JSON parsing,
+   * JSON recovery (extraction + re-prompt, spec 009), and errors.
    * Returns the parsed JSON object from `choices[0].message.content`.
    */
   private async requestChat(
@@ -311,17 +366,81 @@ export class OpenAICompatibleLLMClient {
     responseSchema: object,
   ): Promise<Record<string, unknown>> {
     const url = `${this.baseUrl}/chat/completions`;
+    const envelope = this.resolveResponseFormat(responseSchema);
+
+    // Initial request.
+    const { content } = await this.sendRequest(url, messages, envelope);
+
+    // Try direct parse first.
+    const direct = this.tryParse(content);
+    if (direct !== undefined) {
+      return direct;
+    }
+
+    // JSON.parse failed — attempt recovery (spec 009).
+    if (!this.enableJsonRecovery) {
+      throw new LLMResponseError(`LLM response content from ${url} is not valid JSON.`, content);
+    }
+
+    // Step 1: extraction from raw text (Req 1).
+    const extracted = extractJsonFromText(content);
+    if (extracted !== null) {
+      this.warnRecovery(content, true, false);
+      return extracted.json as Record<string, unknown>;
+    }
+
+    // Step 2: re-prompt with json_object + schema summary (Req 2).
+    this.warnRecovery(content, false, true);
+    const rePromptMessages = this.buildRePromptMessages(messages, responseSchema);
+    const rePromptEnvelope: ResponseFormatEnvelope = { type: 'json_object' };
+
+    let rePromptContent: string;
+    try {
+      const reResult = await this.sendRequest(url, rePromptMessages, rePromptEnvelope);
+      rePromptContent = reResult.content;
+    } catch (err) {
+      // If the re-prompt itself throws (HTTP error, timeout), enrich and rethrow.
+      throw new LLMResponseError(
+        `LLM response content from ${url} is not valid JSON and re-prompt failed: ${(err as Error).message}`,
+        undefined,
+        { originalRawContent: content, recoveryAttempted: true },
+      );
+    }
+
+    // Try to parse the re-prompt response (direct + extraction).
+    const reParsed = this.tryParse(rePromptContent);
+    if (reParsed !== undefined) {
+      return reParsed;
+    }
+    const reExtracted = extractJsonFromText(rePromptContent);
+    if (reExtracted !== null) {
+      return reExtracted.json as Record<string, unknown>;
+    }
+
+    // Both original and re-prompt failed — throw enriched error (Req 6).
+    throw new LLMResponseError(
+      `LLM response content from ${url} is not valid JSON after recovery attempt.`,
+      rePromptContent,
+      { originalRawContent: content, recoveryAttempted: true },
+    );
+  }
+
+  // ── Private: low-level HTTP request with retry loop ─────────────────────────
+
+  /**
+   * Sends a single logical request (with 429 retry loop) and returns the raw
+   * `content` string from `choices[0].message.content`. Does NOT parse the
+   * content as JSON — that is the caller's responsibility (allows recovery).
+   */
+  private async sendRequest(
+    url: string,
+    messages: ChatMessage[],
+    envelope: ResponseFormatEnvelope,
+  ): Promise<{ content: string }> {
     const body = JSON.stringify({
       model: this.model,
       messages,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'response',
-          schema: responseSchema,
-          strict: true,
-        },
-      },
+      response_format: envelope,
       stream: false,
     });
 
@@ -353,7 +472,6 @@ export class OpenAICompatibleLLMClient {
       } catch (err) {
         clearTimeout(timeoutId);
         if (this.isAbortError(err)) {
-          // Timeout error (spec 008, Req 1.1) — retry if enabled and attempts remain.
           if (!this.retryOnTimeout) {
             throw new LLMTimeoutError(
               `LLM request to ${url} timed out after ${this.timeoutMs}ms.`,
@@ -375,7 +493,6 @@ export class OpenAICompatibleLLMClient {
             url,
           );
         }
-        // Non-abort fetch error (connection refused, DNS failure) — retry if attempts remain (spec 008, Req 1.1).
         if (attempt < this.maxRetries) {
           lastError = new LLMError(`LLM request to ${url} failed: ${(err as Error).message}`);
           continue;
@@ -390,7 +507,6 @@ export class OpenAICompatibleLLMClient {
           `LLM request to ${url} rate limited (429) after ${attempt} retries.`,
           respBody,
         );
-        // Retry if we haven't exhausted attempts.
         if (attempt < this.maxRetries) {
           continue;
         }
@@ -406,21 +522,20 @@ export class OpenAICompatibleLLMClient {
         );
       }
 
-      // Parse the OpenAI-style response envelope. Read text first so the body
-      // can be reused for debugging on parse failure.
+      // Parse the OpenAI-style response envelope.
       const rawEnvelope = await response.text().catch(() => '');
-      let envelope: unknown;
+      let parsedEnvelope: unknown;
       try {
-        envelope = JSON.parse(rawEnvelope);
+        parsedEnvelope = JSON.parse(rawEnvelope);
       } catch {
         throw new LLMResponseError(`LLM response from ${url} is not valid JSON.`, rawEnvelope);
       }
 
-      const choices = (envelope as Record<string, unknown> | null)?.['choices'];
+      const choices = (parsedEnvelope as Record<string, unknown> | null)?.['choices'];
       if (!Array.isArray(choices) || choices.length === 0) {
         throw new LLMResponseError(
           `LLM response from ${url} has no choices array.`,
-          JSON.stringify(envelope),
+          JSON.stringify(parsedEnvelope),
         );
       }
 
@@ -430,22 +545,144 @@ export class OpenAICompatibleLLMClient {
       if (typeof content !== 'string') {
         throw new LLMResponseError(
           `LLM response from ${url} has no string content in choices[0].message.`,
-          JSON.stringify(envelope),
+          JSON.stringify(parsedEnvelope),
         );
       }
 
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(content) as Record<string, unknown>;
-      } catch {
-        throw new LLMResponseError(`LLM response content from ${url} is not valid JSON.`, content);
-      }
-
-      return parsed;
+      return { content };
     }
 
     // Should be unreachable — the loop always returns or throws.
     throw lastError ?? new LLMError(`LLM request to ${url} failed unexpectedly.`);
+  }
+
+  // ── Private: response format resolution (spec 009, Req 3/4) ────────────────
+
+  /**
+   * Resolves the `response_format` envelope based on config and baseUrl.
+   * - `'json_schema'` → always `{ type: "json_schema", ... }`.
+   * - `'json_object'` → always `{ type: "json_object" }`.
+   * - `'auto'` → `json_object` if baseUrl matches Ollama, `json_schema` otherwise.
+   */
+  private resolveResponseFormat(responseSchema: object): ResponseFormatEnvelope {
+    let useSchema: boolean;
+    if (this.responseFormat === 'json_schema') {
+      useSchema = true;
+    } else if (this.responseFormat === 'json_object') {
+      useSchema = false;
+    } else {
+      // 'auto' — detect Ollama from baseUrl.
+      useSchema = !this.isOllamaBaseUrl(this.baseUrl);
+    }
+
+    if (useSchema) {
+      return {
+        type: 'json_schema',
+        json_schema: {
+          name: 'response',
+          schema: responseSchema,
+          strict: true,
+        },
+      };
+    }
+    return { type: 'json_object' };
+  }
+
+  /** Returns true when the baseUrl hostname matches an Ollama instance. */
+  private isOllamaBaseUrl(baseUrl: string): boolean {
+    try {
+      const url = new URL(baseUrl);
+      const host = url.hostname;
+      const port = url.port;
+      return (host === 'localhost' || host === '127.0.0.1') && port === '11434';
+    } catch {
+      return false;
+    }
+  }
+
+  // ── Private: JSON parsing helpers ──────────────────────────────────────────
+
+  /** Tries to parse `content` as a JSON object. Returns `undefined` on failure. */
+  private tryParse(content: string): Record<string, unknown> | undefined {
+    try {
+      const parsed = JSON.parse(content) as Record<string, unknown>;
+      return parsed;
+    } catch {
+      return undefined;
+    }
+  }
+
+  // ── Private: re-prompt construction (spec 009, Req 2/5) ─────────────────────
+
+  /**
+   * Builds the messages array for the re-prompt: original messages plus an
+   * additional user message instructing the LLM to respond in valid JSON with a
+   * human-readable summary of the expected schema.
+   */
+  private buildRePromptMessages(
+    originalMessages: ChatMessage[],
+    responseSchema: object,
+  ): ChatMessage[] {
+    const summary = this.summarizeSchema(responseSchema);
+    const instruction: ChatMessage = {
+      role: 'user',
+      content: `Your previous response was not valid JSON. Respond ONLY with a valid JSON object matching this structure: ${summary}. Do not include any prose, markdown, or code fences.`,
+    };
+    return [...originalMessages, instruction];
+  }
+
+  /**
+   * Generates a human-readable summary of a JSON schema (spec 009, Req 5).
+   * Includes top-level property names, their types, and required fields.
+   * For nested objects, only the first level of properties is summarized.
+   */
+  private summarizeSchema(schema: object): string {
+    const s = schema as Record<string, unknown>;
+    const properties = s['properties'] as Record<string, unknown> | undefined;
+    const required = s['required'] as string[] | undefined;
+
+    if (!properties || typeof properties !== 'object') {
+      return '{}';
+    }
+
+    const parts: string[] = [];
+    for (const [name, def] of Object.entries(properties)) {
+      const d = def as Record<string, unknown> | undefined;
+      if (!d) continue;
+      const type = d['type'];
+      let typeStr: string;
+      if (Array.isArray(type)) {
+        typeStr = type.join(' | ');
+      } else if (typeof type === 'string') {
+        typeStr = type;
+      } else if (d['properties'] !== undefined) {
+        typeStr = 'object';
+      } else if (d['items'] !== undefined) {
+        typeStr = 'array';
+      } else {
+        typeStr = 'unknown';
+      }
+      const isRequired = required?.includes(name) ?? false;
+      parts.push(`${name}: ${typeStr}${isRequired ? ' (required)' : ''}`);
+    }
+
+    const requiredList =
+      required && required.length > 0 ? ` Required: ${required.join(', ')}.` : '';
+    return `{ ${parts.join(', ')} }${requiredList}`;
+  }
+
+  // ── Private: observability (spec 009, Req 18) ───────────────────────────────
+
+  /** Logs a recovery warning with truncated raw content (≤500 chars). */
+  private warnRecovery(
+    rawContent: string,
+    extractionSucceeded: boolean,
+    rePromptAttempted: boolean,
+  ): void {
+    const truncated = rawContent.length > 500 ? rawContent.slice(0, 500) + '…' : rawContent;
+    console.warn(
+      `[JSON recovery] extractionSucceeded=${extractionSucceeded}, rePromptAttempted=${rePromptAttempted}, rawContent=${truncated}`,
+    );
   }
 
   // ── Private: message builders ──────────────────────────────────────────────
@@ -491,7 +728,6 @@ export class OpenAICompatibleLLMClient {
 
   private isAbortError(err: unknown): boolean {
     if (err instanceof Error && err.name === 'AbortError') return true;
-    // Some runtimes set a `code` property instead.
     const code = (err as Record<string, unknown> | null)?.['code'];
     return code === 'ABORT_ERR' || code === 'UND_ERR_ABORTED';
   }
