@@ -1,0 +1,7 @@
+{
+  "name": "feature-015-cognitive-tool-execution",
+  "description": "Full Cognitive Tools — wire query_memory and update_internal_state as real executable tool calls with a multi-turn tool call loop. Adds CognitiveToolExecutor bridge, extends OpenAICompatibleLLMClient with tool call loop support, and updates all PPER builders to include cognitive tools alongside primary tools.",
+  "createdAt": "2026-07-13T12:00:00Z",
+  "specIssue": 55,
+  "specFile": "docs/specs/015-full-cognitive-tools.md"
+}
