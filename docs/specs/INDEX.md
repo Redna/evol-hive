@@ -33,7 +33,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [013](013-richer-prototype-scenes.md) | Richer Prototype Scenes — Multi-Room, Multi-Object, Multi-Agent | §2, §3, §4, §6, §8 | 🔍 In Review | [#45](https://github.com/Redna/evol-hive/issues/45) | [#49](https://github.com/Redna/evol-hive/pull/49), [#52](https://github.com/Redna/evol-hive/pull/52) | shared, engine, examples |
 | [014](014-memory-consolidation-decay-retrieval.md) | Memory Consolidation — Background Reflection, Importance Scoring, Memory Decay, Weighted Retrieval | §11, §6, §9, §2 | 🔍 In Review | [#50](https://github.com/Redna/evol-hive/issues/50) | [#53](https://github.com/Redna/evol-hive/pull/53) | shared, memory, cognition, engine |
 | [015](015-full-cognitive-tools.md) | Full Cognitive Tools — query_memory and update_internal_state as Real Tool Calls | §8, §6, §11 | 📝 Drafted | [#55](https://github.com/Redna/evol-hive/issues/55) | — | cognition, shared, examples |
-| [016](016-cognitive-guardrails.md) | Cognitive Guardrails — Affordance Masking, Contextual Forcing, Plan Validation | §10, §6, §9 | 📝 Drafted | [#54](https://github.com/Redna/evol-hive/issues/54) | — | shared, cognition, engine |
+| [016](016-cognitive-guardrails.md) | Cognitive Guardrails — Affordance Masking, Contextual Forcing, Plan Validation | §10, §6, §9 | 🔍 In Review | [#54](https://github.com/Redna/evol-hive/issues/54) | [#59](https://github.com/Redna/evol-hive/pull/59) | shared, cognition, engine |
 
 ## Architecture Coverage
 
@@ -48,7 +48,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 002 (partial), 004 (reflectSchema), 006 (OpenAI response_format → superseded), 009 (superseded by 011), 010 (superseded by 011), 011 (tool calling) | 🔍 Spec 011 drafted |
 | [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002 (formulate_plan), 004 (update_internal_state), 011 (cognitive tools as native tool definitions), 015 (full cognitive tool execution) | 📝 Partial — spec 015 adds tool execution & loop |
 | [§9](../architecture/09-engine-routing.md) | Engine Routing | 002 (partial — isThinking), 003 (isThinking, feedback), 004 (isThinking), 006 (LLM error propagation), 008 (contention feedback), 009 (LLM JSON recovery error path) | 📝 Partial — full spec needed |
-| [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | 016 | 📝 Spec 016 drafted |
+| [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | 016 | 🔍 Spec 016 in review |
 | [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 001 (partial), 004 (MemoryStore, EmbeddingProvider), 006 (completeReflection, memoryConsolidationSchema), 007 (real embeddings), 014 (consolidation, decay, weighted retrieval) | 🔍 Spec 014 in review |
 
 ## Spec Status Summary
@@ -57,8 +57,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      17
 ✅ Done:          0
 🔨 In Development: 0
-🔍 In Review:     11
-📝 Drafted:       4
+🔍 In Review:     12
+📝 Drafted:       3
 🚫 Blocked:       0
 ⛔ Superseded:    2
 
