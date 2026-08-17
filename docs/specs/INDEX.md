@@ -30,7 +30,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [010](010-llm-schema-in-prompt-and-field-aliasing.md) | LLM Schema-in-Prompt & Field Name Aliasing | §6, §7, §9 | ⛔ Superseded by 011 | [#37](https://github.com/Redna/evol-hive/issues/37) | [#39](https://github.com/Redna/evol-hive/pull/39) | cognition, shared |
 | [011](011-structured-output-to-tool-calling.md) | Replace Structured Output with Tool Calling | §6, §7, §8, §9 | 🔍 In Review | [#40](https://github.com/Redna/evol-hive/issues/40) | — | cognition, shared, examples |
 | [012](012-agent-persona-system.md) | Agent Persona System | §3, §6, §8, §11, §2 | 📝 Drafted | [#44](https://github.com/Redna/evol-hive/issues/44) | — | shared, cognition, engine |
-| [013](013-richer-prototype-scenes.md) | Richer Prototype Scenes — Multi-Room, Multi-Object, Multi-Agent | §2, §3, §4, §6, §8 | 📝 Drafted | [#45](https://github.com/Redna/evol-hive/issues/45) | — | shared, engine, examples |
+| [013](013-richer-prototype-scenes.md) | Richer Prototype Scenes — Multi-Room, Multi-Object, Multi-Agent | §2, §3, §4, §6, §8 | 🔍 In Review | [#45](https://github.com/Redna/evol-hive/issues/45) | [#49](https://github.com/Redna/evol-hive/pull/49) | shared, engine, examples |
 
 ## Architecture Coverage
 
