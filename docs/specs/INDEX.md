@@ -26,7 +26,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [008](008-pper-error-recovery.md) | PPER Loop Error Recovery & Edge Cases | §6, §9, §10, §3 | 🔍 In Review | [#23](https://github.com/Redna/evol-hive/issues/23) | [#33](https://github.com/Redna/evol-hive/pull/33) | shared, cognition, engine |
 | [008](008-multi-agent-multi-room-integration-tests.md) | Multi-Agent & Multi-Room Integration Tests | §2, §3, §4, §6, §9 | 📝 Drafted | [#22](https://github.com/Redna/evol-hive/issues/22) | — | engine, shared |
 | [009](009-llm-json-recovery.md) | LLM JSON Response Recovery & Provider-Aware Structured Output | §6, §7, §9 | 🔍 In Review | [#34](https://github.com/Redna/evol-hive/issues/34) | [#36](https://github.com/Redna/evol-hive/pull/36) | cognition, shared, examples |
-| [010](010-llm-schema-in-prompt-and-field-aliasing.md) | LLM Schema-in-Prompt & Field Name Aliasing | §6, §7, §9 | 📝 Drafted | [#37](https://github.com/Redna/evol-hive/issues/37) | — | cognition, shared |
+| [010](010-llm-schema-in-prompt-and-field-aliasing.md) | LLM Schema-in-Prompt & Field Name Aliasing | §6, §7, §9 | 🔍 In Review | [#37](https://github.com/Redna/evol-hive/issues/37) | [#39](https://github.com/Redna/evol-hive/pull/39) | cognition, shared |
 
 ## Architecture Coverage
 
@@ -50,8 +50,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      11
 ✅ Done:          0
 🔨 In Development: 0
-🔍 In Review:     7
-📝 Drafted:       4
+🔍 In Review:     8
+📝 Drafted:       3
 🚫 Blocked:       0
 
 Architecture sections with specs: 8/11 (partial coverage)
