@@ -12,15 +12,25 @@ import type { AgentManager, DriveSystem } from '../index.js';
 /** The five primary drives, in canonical order. */
 const DRIVE_KEYS = ['energy', 'hunger', 'social', 'comfort', 'curiosity'] as const;
 
+/** Default drive decay rate (drive points lost per second). */
+const DEFAULT_DECAY_RATE = 0.1;
+
 /** Concrete DriveSystem. Optionally wired to an AgentManager for `applyChanges`. */
 export class DriveSystemImpl implements DriveSystem {
-  constructor(private readonly agentManager?: AgentManager) {}
+  private readonly decayRate: number;
+
+  constructor(
+    private readonly agentManager: AgentManager | undefined,
+    decayRate?: number,
+  ) {
+    this.decayRate = decayRate ?? DEFAULT_DECAY_RATE;
+  }
 
   /** Apply natural drive decay over a time delta (mutates `state.drives` in place). */
   applyDecay(state: AgentInternalState, deltaSeconds: number): void {
     for (const key of DRIVE_KEYS) {
       const current = state.drives[key];
-      state.drives[key] = clampDrive(current - deltaSeconds);
+      state.drives[key] = clampDrive(current - deltaSeconds * this.decayRate);
     }
   }
 

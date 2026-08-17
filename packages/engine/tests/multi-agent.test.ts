@@ -348,9 +348,9 @@ describe('Multi-Agent — independent drive decay (AC-7)', () => {
     const e1Tick1 = agents.getState('a1')!.drives.energy;
     const e2Tick1 = agents.getState('a2')!.drives.energy;
 
-    // a1: 50 - 5 = 45, a2: 80 - 5 = 75.
-    expect(e1Tick1).toBe(45);
-    expect(e2Tick1).toBe(75);
+    // a1: 50 - (5 * 0.1) = 49.5, a2: 80 - (5 * 0.1) = 79.5 (default decay rate 0.1)
+    expect(e1Tick1).toBe(49.5);
+    expect(e2Tick1).toBe(79.5);
 
     // Tick 2: deltaSeconds = 3.
     decaySystem.update({ tickNumber: 2, simulationTime: 8, deltaSeconds: 3 });
@@ -359,8 +359,8 @@ describe('Multi-Agent — independent drive decay (AC-7)', () => {
     const e2Tick2 = agents.getState('a2')!.drives.energy;
 
     // a1: 45 - 3 = 42, a2: 75 - 3 = 72.
-    expect(e1Tick2).toBe(42);
-    expect(e2Tick2).toBe(72);
+    expect(e1Tick2).toBe(49.2);
+    expect(e2Tick2).toBe(79.2);
 
     // Drives are independent — they don't match because initial values differ.
     expect(e1Tick2).not.toBe(e2Tick2);
@@ -371,8 +371,8 @@ describe('Multi-Agent — independent drive decay (AC-7)', () => {
     // Both started with hunger 50, decayed by 5 + 3 = 8 → 42. They match because
     // their initial hunger and actions were identical (AC-7 caveat: "unless
     // their initial drives and actions were identical").
-    expect(h1).toBe(42);
-    expect(h2).toBe(42);
+    expect(h1).toBe(49.2);
+    expect(h2).toBe(49.2);
   });
 
   it('agents with identical initial drives and actions have matching decayed values', () => {
@@ -386,6 +386,6 @@ describe('Multi-Agent — independent drive decay (AC-7)', () => {
 
     // Both agents started identically → drives match.
     expect(agents.getState('a1')!.drives.energy).toBe(agents.getState('a2')!.drives.energy);
-    expect(agents.getState('a1')!.drives.energy).toBe(58);
+    expect(agents.getState('a1')!.drives.energy).toBe(59.8);
   });
 });
