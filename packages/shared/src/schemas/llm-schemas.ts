@@ -122,6 +122,15 @@ export const memoryConsolidationSchema = {
   additionalProperties: false,
 } as const;
 
+/**
+ * The JSON instruction suffix appended to builder system prompts (spec 009, Req 15).
+ *
+ * Reminds the LLM to respond ONLY in valid JSON even when the backend does not
+ * enforce the `json_schema` grammar constraint (e.g. Ollama cloud-backed models).
+ */
+export const JSON_INSTRUCTION_SUFFIX =
+  'IMPORTANT: Respond ONLY with a valid JSON object. Do not include any prose, markdown formatting, code fences, or XML tags. The JSON must match the provided schema exactly.';
+
 /** The reflect phase response schema (spec 004, Req 4). No top-level fields are required. */
 export const reflectSchema = {
   type: 'object',

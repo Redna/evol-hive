@@ -34,7 +34,10 @@ import {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const BASE_URL = 'http://localhost:11434/v1';
+// NOTE: spec 009 changed the default responseFormat to 'auto' which auto-detects
+// Ollama (port 11434) and uses json_object. To preserve the spec 006 test behavior
+// (json_schema), we use a non-Ollama base URL.
+const BASE_URL = 'http://localhost:8080/v1';
 const MODEL = 'llama3.1';
 const CHAT_URL = `${BASE_URL}/chat/completions`;
 
@@ -567,7 +570,11 @@ describe('OpenAICompatibleLLMClient', () => {
   describe('Invalid JSON handling (AC-16, AC-33)', () => {
     it('throws LLMResponseError with rawContent when content is not valid JSON', async () => {
       fetchMock.mockResolvedValue(chatResponse('This is not JSON at all.'));
-      const client = new OpenAICompatibleLLMClient({ baseUrl: BASE_URL, model: MODEL });
+      const client = new OpenAICompatibleLLMClient({
+        baseUrl: BASE_URL,
+        model: MODEL,
+        enableJsonRecovery: false,
+      });
       try {
         await client.completeStructured(makePayload());
         expect.fail('should have thrown');
@@ -579,7 +586,11 @@ describe('OpenAICompatibleLLMClient', () => {
 
     it('LLMResponseError is distinguishable from LLMTimeoutError and LLMHTTPError', async () => {
       fetchMock.mockResolvedValue(chatResponse('not json'));
-      const client = new OpenAICompatibleLLMClient({ baseUrl: BASE_URL, model: MODEL });
+      const client = new OpenAICompatibleLLMClient({
+        baseUrl: BASE_URL,
+        model: MODEL,
+        enableJsonRecovery: false,
+      });
       try {
         await client.completeStructured(makePayload());
         expect.fail('should have thrown');
@@ -674,11 +685,11 @@ describe('OpenAICompatibleLLMClient', () => {
     await expect(client.completeStructured(makePayload())).rejects.toThrow(LLMResponseError);
   });
 
-  it('uses default baseUrl http://localhost:11434/v1', async () => {
+  it('uses the configured baseUrl for the request URL', async () => {
     fetchMock.mockResolvedValue(chatResponse(JSON.stringify({ reasoning: 'r', action: 'a' })));
     const client = new OpenAICompatibleLLMClient({ baseUrl: BASE_URL, model: MODEL });
     await client.completeStructured(makePayload());
     const call = callAt(fetchMock, 0);
-    expect(call.url).toBe('http://localhost:11434/v1/chat/completions');
+    expect(call.url).toBe(`${BASE_URL}/chat/completions`);
   });
 });

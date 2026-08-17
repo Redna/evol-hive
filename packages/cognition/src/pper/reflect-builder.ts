@@ -11,7 +11,7 @@
  */
 
 import type { AgentInternalState, ExecuteResult } from '@evol-hive/shared';
-import { reflectSchema } from '@evol-hive/shared';
+import { reflectSchema, JSON_INSTRUCTION_SUFFIX } from '@evol-hive/shared';
 import type { LLMContextPayload, ReflectBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
@@ -22,13 +22,16 @@ export class ReflectBuilderImpl implements ReflectBuilder {
     agentState: AgentInternalState,
     executeResult: ExecuteResult,
   ): LLMContextPayload {
-    const systemPrompt = [
-      'You are an autonomous NPC in a deterministic simulation.',
-      'You must reflect on the outcome of your last action.',
-      'Evaluate whether your goal or drives need adjustment based on what happened.',
-      'Decide if a memory entry should be stored for future reference.',
-      'Use the update_internal_state cognitive tool to adjust your goal, drives, or store a memory.',
-    ].join(' ');
+    const systemPrompt =
+      [
+        'You are an autonomous NPC in a deterministic simulation.',
+        'You must reflect on the outcome of your last action.',
+        'Evaluate whether your goal or drives need adjustment based on what happened.',
+        'Decide if a memory entry should be stored for future reference.',
+        'Use the update_internal_state cognitive tool to adjust your goal, drives, or store a memory.',
+      ].join(' ') +
+      '\n\n' +
+      JSON_INSTRUCTION_SUFFIX;
 
     const contextLines: string[] = [];
 

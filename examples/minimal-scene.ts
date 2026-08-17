@@ -245,11 +245,16 @@ export function buildMinimalEngine(): AssembledEngine {
 
   // PPER orchestrator (cognition) wired from the engine bridges + LLM.
   const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
+  const llmResponseFormat =
+    (process.env['LLM_RESPONSE_FORMAT'] as 'json_schema' | 'json_object' | 'auto' | undefined) ??
+    'auto';
   const llmClient: LLMClient = useRealLLM
     ? new OpenAICompatibleLLMClient({
         baseUrl: process.env['LLM_BASE_URL'] ?? 'http://localhost:11434/v1',
         model: process.env['LLM_MODEL'] ?? 'llama3.1',
         ...(process.env['LLM_API_KEY'] !== undefined ? { apiKey: process.env['LLM_API_KEY'] } : {}),
+        responseFormat: llmResponseFormat,
+        enableJsonRecovery: true,
       })
     : new MockLLMClient();
 
