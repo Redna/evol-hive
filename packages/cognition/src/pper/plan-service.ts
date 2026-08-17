@@ -46,6 +46,7 @@ export class PlanServiceImpl {
 
     try {
       const payload = planBuilder.build(perceptionResult);
+      payload.agentId = agentId;
       const result = await llmClient.completePlan(payload);
 
       // Validate the LLM response before storing (§7 / Req 15).

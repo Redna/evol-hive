@@ -61,13 +61,19 @@ export const formulatePlanSchema = {
   additionalProperties: false,
 } as const;
 
-/** The query_memory tool response schema. */
+/** The query_memory tool response schema (spec 015, Req 6 — adds optional `topK`). */
 export const queryMemorySchema = {
   type: 'object',
   properties: {
     query: {
       type: 'string',
       description: 'The search query for active recall.',
+    },
+    topK: {
+      type: 'integer',
+      minimum: 1,
+      maximum: 20,
+      description: 'Maximum number of memories to retrieve (default: 5).',
     },
   },
   required: ['query'],
@@ -194,5 +200,33 @@ export const memoryConsolidationTool: ToolDefinition = {
     name: 'consolidate_memories',
     description: 'Consolidate memory nodes into higher-level insights',
     parameters: memoryConsolidationSchema,
+  },
+};
+
+// ─── Cognitive Tool Definitions (spec 015, Req 7) ───────────────────────────
+//
+// `query_memory` and `update_internal_state` are mid-loop cognitive tools:
+// when the LLM calls them, the engine executes them and feeds the result back
+// to the LLM (see `OpenAICompatibleLLMClient` tool call loop). They reuse the
+// existing schemas (the updated `queryMemorySchema` with `topK`, and the
+// already-defined `updateInternalStateSchema`).
+
+/** Tool definition for the `query_memory` cognitive tool (spec 015, Req 7). */
+export const queryMemoryTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'query_memory',
+    description: 'Actively recall relevant memories for the current situation.',
+    parameters: queryMemorySchema,
+  },
+};
+
+/** Tool definition for the `update_internal_state` cognitive tool (spec 015, Req 7). */
+export const updateInternalStateTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'update_internal_state',
+    description: 'Update the agent goal or drive overrides.',
+    parameters: updateInternalStateSchema,
   },
 };

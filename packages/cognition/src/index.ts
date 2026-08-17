@@ -82,6 +82,14 @@ export interface LLMContextPayload {
   cognitiveTools: import('@evol-hive/shared').CognitiveTool[];
   /** Tool definitions sent to the LLM via the `tools` parameter (spec 011). */
   tools: import('@evol-hive/shared').ToolDefinition[];
+  /**
+   * The agent ID for this request (spec 015, Req 5). The PPER services set
+   * this after the builder creates the payload. The `OpenAICompatibleLLMClient`
+   * reads it to pass `agentId` to the `CognitiveToolExecutor` during the tool
+   * call loop. When absent (e.g. in tests), the tool call loop is not
+   * activated — the client falls back to single-request behavior.
+   */
+  agentId?: string;
 }
 
 // ── LLM Client ───────────────────────────────────────────────────────────────

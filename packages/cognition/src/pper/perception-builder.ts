@@ -12,9 +12,14 @@
  */
 
 import type { AgentProfile, PerceptionResult } from '@evol-hive/shared';
-import { chooseActionTool, formatPersona } from '@evol-hive/shared';
+import {
+  chooseActionTool,
+  formatPersona,
+  queryMemoryTool,
+  updateInternalStateTool,
+} from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
-import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
+import { defaultCognitiveTools } from '../tools/index.js';
 
 const GENERIC_SYSTEM_PROMPT = [
   'You are an autonomous NPC in a deterministic simulation.',
@@ -47,8 +52,8 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     );
 
     // Build tool definitions: chooseActionTool + cognitive tools (excluding formulate_plan).
-    const cognitiveTools = defaultCognitiveTools.filter((t) => t.name !== 'formulate_plan');
-    const tools = [chooseActionTool, ...cognitiveToolsToToolDefinitions(cognitiveTools)];
+    // Spec 015, Req 19: use dedicated tool constants instead of cognitiveToolsToToolDefinitions.
+    const tools = [chooseActionTool, queryMemoryTool, updateInternalStateTool];
 
     // System prompt: persona-prefixed or generic (spec 012, Req 7).
     const systemPrompt = buildSystemPrompt(persona);

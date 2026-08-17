@@ -12,7 +12,12 @@
  */
 
 import type { AgentInternalState, AgentProfile, ExecuteResult } from '@evol-hive/shared';
-import { reflectTool, formatPersona } from '@evol-hive/shared';
+import {
+  reflectTool,
+  formatPersona,
+  queryMemoryTool,
+  updateInternalStateTool,
+} from '@evol-hive/shared';
 import type { LLMContextPayload, ReflectBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
@@ -79,7 +84,7 @@ export class ReflectBuilderImpl implements ReflectBuilder {
     }
 
     // Select only the update_internal_state tool.
-    const updateInternalStateTool = defaultCognitiveTools.filter(
+    const updateInternalStateToolList = defaultCognitiveTools.filter(
       (tool) => tool.name === 'update_internal_state',
     );
 
@@ -87,8 +92,8 @@ export class ReflectBuilderImpl implements ReflectBuilder {
       systemPrompt,
       perceptionContext: contextLines.join('\n'),
       availableAffordances: [],
-      cognitiveTools: updateInternalStateTool,
-      tools: [reflectTool],
+      cognitiveTools: updateInternalStateToolList,
+      tools: [reflectTool, queryMemoryTool, updateInternalStateTool],
     };
   }
 }

@@ -28,7 +28,13 @@ export const defaultCognitiveTools: CognitiveTool[] = [
     argsSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'The recall query.' },
+        query: { type: 'string', description: 'The search query for active recall.' },
+        topK: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 20,
+          description: 'Maximum number of memories to retrieve (default: 5).',
+        },
       },
       required: ['query'],
       additionalProperties: false,
@@ -62,5 +68,10 @@ export function cognitiveToolsToToolDefinitions(tools: CognitiveTool[]): ToolDef
     },
   }));
 }
+
+export {
+  CognitiveToolExecutorImpl,
+  type CognitiveToolExecutorOptions,
+} from './cognitive-tool-executor.js';
 
 export {};

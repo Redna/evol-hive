@@ -128,6 +128,71 @@ export interface UpdateStateResult {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Cognitive Tool Execution — bridge interfaces (spec 015, §8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The result of executing `query_memory` mid-loop (spec 015, Req 3).
+ *
+ * `memories` contains the top-K `MemorySnippet[]` from `MemoryInjector.activeRecall`.
+ * If no memories are found, or no memory subsystem is wired, `memories` is an
+ * empty array (never an error).
+ */
+export interface QueryMemoryToolResult {
+  memories: MemorySnippet[];
+}
+
+/**
+ * The confirmation result of executing `update_internal_state` mid-loop
+ * (spec 015, Req 4). `success` is `true` when the update was applied (even
+ * partially). `goalUpdated` / `drivesUpdated` flag which parts were applied.
+ * `message` is a human-readable confirmation sent back to the LLM as the tool
+ * result content.
+ */
+export interface UpdateStateToolResult {
+  success: boolean;
+  goalUpdated: boolean;
+  drivesUpdated: boolean;
+  message: string;
+}
+
+/**
+ * Bridge interface (defined in `shared`) that the cognition layer calls to
+ * execute cognitive tools mid-loop during the LLM tool call loop (spec 015,
+ * Req 1). The application entry point provides a concrete implementation
+ * wired to the memory subsystem and the engine's state data provider.
+ *
+ * Per ADR-0001, `cognition` may import this type from `shared`; the concrete
+ * `CognitiveToolExecutorImpl` (in `cognition`) imports the `MemoryInjector`
+ * type from `memory`.
+ */
+export interface CognitiveToolExecutor {
+  /** Execute `query_memory`: embed the query, search the memory store, return top-K snippets. */
+  executeQueryMemory(agentId: string, query: string, topK: number): Promise<QueryMemoryToolResult>;
+  /** Execute `update_internal_state`: update goal and/or drives, return a confirmation. */
+  executeUpdateInternalState(
+    agentId: string,
+    newGoal?: string,
+    driveOverrides?: Partial<Record<string, number>>,
+  ): Promise<UpdateStateToolResult>;
+}
+
+/**
+ * Bridge interface (defined in `shared`) for the state update operations needed
+ * by `update_internal_state` (spec 015, Req 2). This is a focused subset of
+ * `ReflectDataProvider` (which already has both methods) so that
+ * `CognitiveToolExecutorImpl` does not need to depend on the full
+ * `ReflectDataProvider` (which carries memory storage and plan clearing
+ * methods unrelated to cognitive tool execution).
+ */
+export interface CognitiveToolDataProvider {
+  /** Update the agent's current goal. */
+  updateGoal(agentId: string, goal: string): void;
+  /** Apply drive changes (clamped to 0–100 by the DriveSystem). */
+  applyDriveChanges(agentId: string, changes: Partial<Record<string, number>>): void;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Cognitive Guardrails (Section 10)
 // ─────────────────────────────────────────────────────────────────────────────
 

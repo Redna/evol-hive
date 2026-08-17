@@ -24,17 +24,23 @@ import type {
   EngineConfig,
 } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
-import { createPPEROrchestrator, OpenAICompatibleLLMClient } from '@evol-hive/cognition';
+import {
+  createPPEROrchestrator,
+  OpenAICompatibleLLMClient,
+  CognitiveToolExecutorImpl,
+} from '@evol-hive/cognition';
 import type { AffordanceClassifier } from '@evol-hive/cognition';
 import { OnnxEmbeddingProvider, AffordanceClassifierImpl, defaultClassifierConfig } from '@evol-hive/cognition';
 import type {
   EmbeddingProvider as MemEmbeddingProvider,
   VectorStore,
   MemoryStore,
+  MemoryInjector,
 } from '@evol-hive/memory';
 import { MemoryStoreImpl } from '@evol-hive/memory';
 import { createEngineCore, assembleGameLoop, loadScene } from '@evol-hive/engine';
 import type { AssembledEngine } from '@evol-hive/engine';
+import type { CognitiveToolDataProvider } from '@evol-hive/shared';
 
 // ── Scene definition (AC-18) ─────────────────────────────────────────────────
 
@@ -246,12 +252,39 @@ export function buildMinimalEngine(): AssembledEngine {
   // PPER orchestrator (cognition) wired from the engine bridges + LLM.
   const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
   const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as 'low' | 'medium' | 'high' | 'none' | undefined;
+
+  // Cognitive tool executor (spec 015, Req 24/26). The minimal scene does not
+  // wire a MemoryInjector (active recall retrieval engine), so `memoryInjector`
+  // stays undefined. When a memory subsystem is wired, construct a
+  // `CognitiveToolExecutorImpl` here and pass it to the client config to enable
+  // the multi-turn tool call loop. The engine's reflect bridge already
+  // implements `updateGoal` / `applyDriveChanges`, so it can serve as the
+  // `CognitiveToolDataProvider`.
+  const memoryInjector: MemoryInjector | undefined = undefined;
+  const stateDataProvider: CognitiveToolDataProvider | undefined = useRealLLM
+    ? {
+        updateGoal: (agentId, goal) => core.bridges.reflect.updateGoal(agentId, goal),
+        applyDriveChanges: (agentId, changes) =>
+          core.bridges.reflect.applyDriveChanges(agentId, changes),
+      }
+    : undefined;
+  const cognitiveToolExecutor =
+    useRealLLM && (memoryInjector !== undefined || stateDataProvider !== undefined)
+      ? new CognitiveToolExecutorImpl({ memoryInjector, stateDataProvider })
+      : undefined;
+  const maxToolCallIterations =
+    process.env['LLM_MAX_TOOL_CALL_ITERATIONS'] !== undefined
+      ? Number(process.env['LLM_MAX_TOOL_CALL_ITERATIONS'])
+      : undefined;
+
   const llmClient: LLMClient = useRealLLM
     ? new OpenAICompatibleLLMClient({
         baseUrl: process.env['LLM_BASE_URL'] ?? 'http://localhost:11434/v1',
         model: process.env['LLM_MODEL'] ?? 'llama3.1',
         ...(process.env['LLM_API_KEY'] !== undefined ? { apiKey: process.env['LLM_API_KEY'] } : {}),
         ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
+        ...(cognitiveToolExecutor !== undefined ? { cognitiveToolExecutor } : {}),
+        ...(maxToolCallIterations !== undefined ? { maxToolCallIterations } : {}),
       })
     : new MockLLMClient();
 

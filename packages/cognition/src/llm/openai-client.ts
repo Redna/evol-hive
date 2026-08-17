@@ -23,6 +23,7 @@ import type {
   MemorySnippet,
   MemoryType,
   ToolDefinition,
+  CognitiveToolExecutor,
 } from '@evol-hive/shared';
 import { memoryConsolidationTool } from '@evol-hive/shared';
 import type { LLMContextPayload } from '../index.js';
@@ -114,14 +115,50 @@ export interface OpenAICompatibleLLMClientConfig {
   retryOnTimeout?: boolean;
   /** Optional reasoning effort level (spec 011, Req 7). When set, `reasoning_effort` is included in the request body. */
   reasoningEffort?: 'low' | 'medium' | 'high' | 'none';
+  /**
+   * Optional cognitive tool executor (spec 015, Req 12). When set, the client
+   * executes cognitive tools (`query_memory`, `update_internal_state`) mid-loop
+   * and feeds their results back to the LLM. When absent, the client falls
+   * back to single-request behavior (no loop).
+   */
+  cognitiveToolExecutor?: CognitiveToolExecutor;
+  /**
+   * Maximum number of tool call iterations in the loop (spec 015, Req 12).
+   * Default: 3. Must be ≥ 1; values ≤ 0 default to 3.
+   */
+  maxToolCallIterations?: number;
 }
 
 // ─── Internal types ──────────────────────────────────────────────────────────
 
-interface ChatMessage {
-  role: 'system' | 'user';
-  content: string;
-}
+/**
+ * Internal chat message type (spec 015, Req 13). Extended to support assistant
+ * messages carrying `tool_calls` and tool result messages produced by the tool
+ * call loop. `buildPayloadMessages` / `buildReflectionUserMessage` continue to
+ * produce only `system` and `user` messages — the new variants are constructed
+ * internally by the loop.
+ */
+type ChatMessage =
+  | { role: 'system' | 'user'; content: string }
+  | {
+      role: 'assistant';
+      content: string | null;
+      tool_calls?: Array<{
+        id: string;
+        type: 'function';
+        function: { name: string; arguments: string };
+      }>;
+    }
+  | { role: 'tool'; content: string; tool_call_id: string };
+
+/**
+ * The set of tool names that are executed mid-loop via the
+ * `CognitiveToolExecutor` (spec 015, Req 14). When the LLM calls a tool in
+ * this set, the client executes it and continues the loop. When the LLM calls
+ * a tool NOT in this set, the loop terminates and the tool's arguments are
+ * returned as the result.
+ */
+const COGNITIVE_TOOL_NAMES = new Set<string>(['query_memory', 'update_internal_state']);
 
 interface ConsolidatedMemoryItem {
   content: string;
@@ -156,6 +193,8 @@ export class OpenAICompatibleLLMClient {
   private readonly agentId: string;
   private readonly retryOnTimeout: boolean;
   private readonly reasoningEffort: 'low' | 'medium' | 'high' | 'none' | undefined;
+  private readonly cognitiveToolExecutor: CognitiveToolExecutor | undefined;
+  private readonly maxToolCallIterations: number;
 
   constructor(config: OpenAICompatibleLLMClientConfig) {
     this.baseUrl = config.baseUrl;
@@ -168,13 +207,16 @@ export class OpenAICompatibleLLMClient {
     this.agentId = config.agentId ?? '';
     this.retryOnTimeout = config.retryOnTimeout ?? true;
     this.reasoningEffort = config.reasoningEffort;
+    this.cognitiveToolExecutor = config.cognitiveToolExecutor;
+    const rawMax = config.maxToolCallIterations ?? 3;
+    this.maxToolCallIterations = rawMax >= 1 ? rawMax : 3;
   }
 
   // ── LLMClient: completeStructured (Req 10) ─────────────────────────────────
 
   async completeStructured(payload: LLMContextPayload): Promise<LLMActionResponse> {
     const messages = this.buildPayloadMessages(payload);
-    const parsed = await this.requestChat(messages, payload.tools);
+    const parsed = await this.requestChat(messages, payload.tools, payload.agentId);
 
     const reasoning = parsed['reasoning'];
     const action = parsed['action'];
@@ -202,7 +244,7 @@ export class OpenAICompatibleLLMClient {
 
   async completePlan(payload: LLMContextPayload): Promise<FormulatePlanResult> {
     const messages = this.buildPayloadMessages(payload);
-    const parsed = await this.requestChat(messages, payload.tools);
+    const parsed = await this.requestChat(messages, payload.tools, payload.agentId);
 
     const description = parsed['description'];
     const steps = parsed['steps'];
@@ -243,7 +285,7 @@ export class OpenAICompatibleLLMClient {
 
   async completeReflect(payload: LLMContextPayload): Promise<ReflectLLMResponse> {
     const messages = this.buildPayloadMessages(payload);
-    const parsed = await this.requestChat(messages, payload.tools);
+    const parsed = await this.requestChat(messages, payload.tools, payload.agentId);
 
     const result: ReflectLLMResponse = {};
     if (typeof parsed['newGoal'] === 'string') {
@@ -322,34 +364,127 @@ export class OpenAICompatibleLLMClient {
     };
   }
 
-  // ── Private: shared request method (spec 011 — tool calling) ────────────────
+  // ── Private: shared request method (spec 011 — tool calling; spec 015 — loop) ─
 
   /**
-   * Shared low-level request method used by all four public methods.
-   * Sends tool definitions via the `tools` parameter and parses the response
-   * from `choices[0].message.tool_calls[0].function.arguments`.
-   * Handles HTTP, authorization, timeout, retries (429), and errors.
+   * Shared low-level request method used by all four public methods. Sends
+   * tool definitions via the `tools` parameter and parses the response from
+   * `choices[0].message.tool_calls[0].function.arguments`.
+   *
+   * Spec 015: when `cognitiveToolExecutor` is configured and `agentId` is
+   * provided, this method implements the multi-turn tool call loop. When the
+   * LLM calls a cognitive tool (`query_memory` / `update_internal_state`), the
+   * executor runs it, the result is appended as a `tool` message, and another
+   * request is sent. When the LLM calls a terminal tool, the loop terminates
+   * and the parsed arguments are returned. The loop is bounded by
+   * `maxToolCallIterations` (default 3).
    */
   private async requestChat(
     messages: ChatMessage[],
     tools: ToolDefinition[],
+    agentId?: string,
   ): Promise<Record<string, unknown>> {
     const url = `${this.baseUrl}/chat/completions`;
-    const { rawBody } = await this.sendRequest(url, messages, tools);
-    return rawBody;
+    const loopActive =
+      this.cognitiveToolExecutor !== undefined && typeof agentId === 'string' && agentId.length > 0;
+
+    // Working copy of messages — appended to during the loop.
+    const conversation: ChatMessage[] = [...messages];
+    let iteration = 0;
+
+    for (;;) {
+      const { rawBody, toolCallId, toolName, assistantMessage } = await this.sendRequest(
+        url,
+        conversation,
+        tools,
+      );
+
+      // Terminal tool (or loop not active) → return parsed arguments as before.
+      if (!loopActive || !COGNITIVE_TOOL_NAMES.has(toolName)) {
+        return rawBody;
+      }
+
+      // Cognitive tool called mid-loop. Append the assistant message carrying tool_calls.
+      conversation.push(assistantMessage);
+
+      // Execute the cognitive tool via the executor.
+      let toolResultContent: string;
+      try {
+        toolResultContent = await this.executeCognitiveTool(toolName, rawBody, agentId!);
+      } catch (err) {
+        // Secondary safety net (Req 17): the executor methods catch errors
+        // internally, but if one escapes, send the error back to the LLM.
+        const message = err instanceof Error ? err.message : String(err);
+        toolResultContent = JSON.stringify({ error: message });
+      }
+
+      // Append the tool result message.
+      const toolMessage: ChatMessage = {
+        role: 'tool',
+        content: toolResultContent,
+        tool_call_id: toolCallId,
+      };
+      conversation.push(toolMessage);
+
+      iteration += 1;
+      if (iteration >= this.maxToolCallIterations) {
+        throw new LLMError(
+          `Tool call loop exceeded max iterations (${this.maxToolCallIterations}). Last tool: ${toolName}.`,
+        );
+      }
+
+      // Loop continues — send another request with the updated conversation.
+    }
+  }
+
+  /**
+   * Executes a cognitive tool by name and returns the JSON string to place in
+   * the `tool` result message (spec 015, Req 15 step 4b).
+   */
+  private async executeCognitiveTool(
+    toolName: string,
+    args: Record<string, unknown>,
+    agentId: string,
+  ): Promise<string> {
+    const executor = this.cognitiveToolExecutor!;
+    if (toolName === 'query_memory') {
+      const query = typeof args['query'] === 'string' ? (args['query'] as string) : '';
+      const rawTopK = args['topK'];
+      const topK =
+        typeof rawTopK === 'number' && Number.isInteger(rawTopK) && rawTopK >= 1 ? rawTopK : 5;
+      const result = await executor.executeQueryMemory(agentId, query, topK);
+      return JSON.stringify(result);
+    }
+    if (toolName === 'update_internal_state') {
+      const newGoal = typeof args['newGoal'] === 'string' ? (args['newGoal'] as string) : undefined;
+      const driveOverrides =
+        typeof args['driveOverrides'] === 'object' && args['driveOverrides'] !== null
+          ? (args['driveOverrides'] as Partial<Record<string, number>>)
+          : undefined;
+      const result = await executor.executeUpdateInternalState(agentId, newGoal, driveOverrides);
+      return JSON.stringify(result);
+    }
+    // Unknown cognitive tool name — should not happen (COGNITIVE_TOOL_NAMES is the gate).
+    return JSON.stringify({ error: `Unknown cognitive tool: ${toolName}` });
   }
 
   // ── Private: low-level HTTP request with retry loop ─────────────────────────
 
   /**
-   * Sends a single logical request (with 429 retry loop) and returns the parsed
-   * tool call arguments from `choices[0].message.tool_calls[0].function.arguments`.
+   * Sends a single logical request (with 429 retry loop) and returns the
+   * parsed tool call arguments plus the metadata needed by the tool call loop
+   * (spec 015): the tool call id, name, and the assistant message to append.
    */
   private async sendRequest(
     url: string,
     messages: ChatMessage[],
     tools: ToolDefinition[],
-  ): Promise<{ rawBody: Record<string, unknown> }> {
+  ): Promise<{
+    rawBody: Record<string, unknown>;
+    toolCallId: string;
+    toolName: string;
+    assistantMessage: ChatMessage;
+  }> {
     const bodyObj: Record<string, unknown> = {
       model: this.model,
       messages,
@@ -484,6 +619,9 @@ export class OpenAICompatibleLLMClient {
       const toolCall = toolCalls[0] as Record<string, unknown>;
       const fn = toolCall['function'] as Record<string, unknown> | undefined;
       const argsStr = fn?.['arguments'];
+      const toolCallId =
+        typeof toolCall['id'] === 'string' ? (toolCall['id'] as string) : `call-${Date.now()}`;
+      const toolName = typeof fn?.['name'] === 'string' ? (fn!['name'] as string) : '';
 
       if (typeof argsStr !== 'string') {
         throw new LLMResponseError(
@@ -492,15 +630,27 @@ export class OpenAICompatibleLLMClient {
         );
       }
 
+      let parsed: Record<string, unknown>;
       try {
-        const parsed = JSON.parse(argsStr) as Record<string, unknown>;
-        return { rawBody: parsed };
+        parsed = JSON.parse(argsStr) as Record<string, unknown>;
       } catch {
         throw new LLMResponseError(
           `LLM response from ${url} has invalid JSON in tool_calls[0].function.arguments.`,
           argsStr,
         );
       }
+
+      // Construct the assistant message carrying tool_calls (spec 015, Req 13).
+      // Used by the tool call loop to append to the conversation.
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: typeof message?.['content'] === 'string' ? (message!['content'] as string) : null,
+        tool_calls: [
+          { id: toolCallId, type: 'function', function: { name: toolName, arguments: argsStr } },
+        ],
+      };
+
+      return { rawBody: parsed, toolCallId, toolName, assistantMessage };
     }
 
     // Should be unreachable — the loop always returns or throws.

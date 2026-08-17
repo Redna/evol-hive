@@ -10,7 +10,12 @@
  */
 
 import type { AgentProfile, PerceptionResult } from '@evol-hive/shared';
-import { formulatePlanTool, formatPersona } from '@evol-hive/shared';
+import {
+  formulatePlanTool,
+  formatPersona,
+  queryMemoryTool,
+  updateInternalStateTool,
+} from '@evol-hive/shared';
 import type { LLMContextPayload, PlanBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
@@ -47,7 +52,7 @@ export class PlanBuilderImpl implements PlanBuilder {
       perceptionContext: contextLines.join('\n'),
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
-      tools: [formulatePlanTool],
+      tools: [formulatePlanTool, queryMemoryTool, updateInternalStateTool],
     };
   }
 }
