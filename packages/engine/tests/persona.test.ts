@@ -1,9 +1,12 @@
 /**
  * Tests for the Agent Persona System — engine layer (spec 012).
- * Covers AC-23 through AC-25 (AgentManager profile storage & DataProvider bridges).
+ * Covers AC-23 through AC-25, AC-30, AC-31 (AgentManager profile storage,
+ * DataProvider bridges, read-only profile, backward compatibility).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { AgentProfile, Affordance, SmartObject } from '@evol-hive/shared';
+import { formatPersona } from '@evol-hive/shared';
+import { MINIMAL_SCENE, buildMinimalEngine } from '../../../examples/minimal-scene.ts';
 import { AgentManagerImpl } from '../src/agents/state/index.js';
 import { DriveSystemImpl } from '../src/agents/drives/index.js';
 import { SmartObjectRegistryImpl } from '../src/world/objects/index.js';
@@ -158,5 +161,46 @@ describe('ReflectDataProviderImpl.getAgentProfile (AC-25)', () => {
     );
 
     expect(provider.getAgentProfile('unknown')).toBeNull();
+  });
+});
+
+// ─── AC-31: Backward compatibility with minimal scene (old-style profile) ─────
+
+describe('Backward compatibility — minimal scene old-style profile (AC-31)', () => {
+  it('minimal scene agent profile has no new persona fields', () => {
+    const agent = MINIMAL_SCENE.agents[0]!;
+    expect(agent.backstory).toBeUndefined();
+    expect(agent.longTermGoals).toBeUndefined();
+    expect(agent.behavioralTendencies).toBeUndefined();
+    expect(agent.speechStyle).toBeUndefined();
+    expect(agent.relationships).toBeUndefined();
+  });
+
+  it('formatPersona falls back to description for the minimal scene profile', () => {
+    const agent = MINIMAL_SCENE.agents[0]!;
+    const personaText = formatPersona(agent);
+    // With no new persona fields, formatPersona returns the description.
+    expect(personaText).toBe(agent.description);
+    expect(personaText).toContain('sleepy agent who needs coffee');
+  });
+
+  it('minimal scene runs a full PPER cycle without modification (AC-31)', async () => {
+    const { gameLoop, agentManager } = buildMinimalEngine();
+    const logs: string[] = [];
+    const origLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.map(String).join(' '));
+
+    try {
+      gameLoop.start();
+      await new Promise((r) => setTimeout(r, 50));
+      gameLoop.stop();
+    } finally {
+      console.log = origLog;
+    }
+
+    // The PPER cycle completed successfully — no errors, isThinking reset.
+    const cycleLog = logs.find((l) => l.includes('completed PPER cycle'));
+    expect(cycleLog).toBeDefined();
+    expect(agentManager.getState('agent-1')?.isThinking).toBe(false);
   });
 });
