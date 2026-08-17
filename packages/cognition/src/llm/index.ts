@@ -15,4 +15,5 @@ export {
   LLMRateLimitError,
   LLMResponseError,
   extractJsonFromText,
+  resolveField,
 } from './openai-client.js';

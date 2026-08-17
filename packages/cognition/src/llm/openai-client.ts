@@ -27,13 +27,13 @@ import type {
   MemorySnippet,
   MemoryType,
 } from '@evol-hive/shared';
-import { memoryConsolidationSchema } from '@evol-hive/shared';
+import { memoryConsolidationSchema, MEMORY_CONSOLIDATION_SCHEMA_HINT } from '@evol-hive/shared';
 import type { LLMContextPayload } from '../index.js';
 import type { EmbeddingProvider } from '../classifier/index.js';
-import { extractJsonFromText } from './json-recovery.js';
+import { extractJsonFromText, resolveField } from './json-recovery.js';
 
-// Re-export for discoverability (spec 009, Req 19).
-export { extractJsonFromText } from './json-recovery.js';
+// Re-export for discoverability (spec 009, Req 19; spec 010, Req 11).
+export { extractJsonFromText, resolveField } from './json-recovery.js';
 
 // ─── Error Hierarchy (Req 14) ────────────────────────────────────────────────
 
@@ -217,8 +217,20 @@ export class OpenAICompatibleLLMClient {
   async completeStructured(payload: LLMContextPayload): Promise<LLMActionResponse> {
     const messages = this.buildPayloadMessages(payload);
     const parsed = await this.requestChat(messages, payload.responseSchema);
-    const reasoning = parsed['reasoning'];
-    const action = parsed['action'];
+
+    // Field name alias mapping (spec 010, Req 9, AC-15..AC-17).
+    const reasoningRes = resolveField(parsed, 'reasoning', ['reason']);
+    const actionRes = resolveField(parsed, 'action', ['tool']);
+    this.warnAliasIfUsed(
+      'completeStructured',
+      'reasoning',
+      reasoningRes.usedAlias,
+      reasoningRes.value,
+    );
+    this.warnAliasIfUsed('completeStructured', 'action', actionRes.usedAlias, actionRes.value);
+
+    const reasoning = reasoningRes.value;
+    const action = actionRes.value;
     if (typeof reasoning !== 'string' || typeof action !== 'string') {
       throw new LLMResponseError(
         'LLM response missing required "reasoning" (string) or "action" (string) field.',
@@ -226,14 +238,38 @@ export class OpenAICompatibleLLMClient {
       );
     }
     const result: LLMActionResponse = { reasoning, action };
-    if (typeof parsed['actionArgs'] === 'object' && parsed['actionArgs'] !== null) {
-      result.actionArgs = parsed['actionArgs'] as Record<string, unknown>;
+
+    const actionArgsRes = resolveField(parsed, 'actionArgs', ['args', 'arguments']);
+    this.warnAliasIfUsed(
+      'completeStructured',
+      'actionArgs',
+      actionArgsRes.usedAlias,
+      actionArgsRes.value,
+    );
+    if (typeof actionArgsRes.value === 'object' && actionArgsRes.value !== null) {
+      result.actionArgs = actionArgsRes.value as Record<string, unknown>;
     }
-    if (typeof parsed['observeTarget'] === 'string') {
-      result.observeTarget = parsed['observeTarget'];
+
+    const observeTargetRes = resolveField(parsed, 'observeTarget', ['observe_target']);
+    this.warnAliasIfUsed(
+      'completeStructured',
+      'observeTarget',
+      observeTargetRes.usedAlias,
+      observeTargetRes.value,
+    );
+    if (typeof observeTargetRes.value === 'string') {
+      result.observeTarget = observeTargetRes.value;
     }
-    if (typeof parsed['updatedGoal'] === 'string') {
-      result.updatedGoal = parsed['updatedGoal'];
+
+    const updatedGoalRes = resolveField(parsed, 'updatedGoal', ['updated_goal', 'goal']);
+    this.warnAliasIfUsed(
+      'completeStructured',
+      'updatedGoal',
+      updatedGoalRes.usedAlias,
+      updatedGoalRes.value,
+    );
+    if (typeof updatedGoalRes.value === 'string') {
+      result.updatedGoal = updatedGoalRes.value;
     }
     return result;
   }
@@ -243,7 +279,16 @@ export class OpenAICompatibleLLMClient {
   async completePlan(payload: LLMContextPayload): Promise<FormulatePlanResult> {
     const messages = this.buildPayloadMessages(payload);
     const parsed = await this.requestChat(messages, payload.responseSchema);
-    const description = parsed['description'];
+
+    // Field name alias mapping (spec 010, Req 8, AC-12..AC-14).
+    const descriptionRes = resolveField(parsed, 'description', ['goal']);
+    this.warnAliasIfUsed(
+      'completePlan',
+      'description',
+      descriptionRes.usedAlias,
+      descriptionRes.value,
+    );
+    const description = descriptionRes.value;
     const steps = parsed['steps'];
     if (
       typeof description !== 'string' ||
@@ -263,9 +308,18 @@ export class OpenAICompatibleLLMClient {
         const step: { description: string; targetAffordance?: string } = {
           description: String(obj['description'] ?? ''),
         };
-        if (typeof obj['targetAffordance'] === 'string') {
-          step.targetAffordance = obj['targetAffordance'];
+        // Step-level alias: affordance → targetAffordance (spec 010, Req 8).
+        const targetRes = resolveField(obj, 'targetAffordance', ['affordance']);
+        this.warnAliasIfUsed(
+          'completePlan',
+          'targetAffordance',
+          targetRes.usedAlias,
+          targetRes.value,
+        );
+        if (typeof targetRes.value === 'string') {
+          step.targetAffordance = targetRes.value;
         }
+        // affordance: null is mapped to targetAffordance: undefined (no affordance — valid per schema).
         return step;
       }),
     };
@@ -276,14 +330,33 @@ export class OpenAICompatibleLLMClient {
   async completeReflect(payload: LLMContextPayload): Promise<ReflectLLMResponse> {
     const messages = this.buildPayloadMessages(payload);
     const parsed = await this.requestChat(messages, payload.responseSchema);
+
+    // Field name alias mapping (spec 010, Req 10, AC-18, AC-19).
+    const newGoalRes = resolveField(parsed, 'newGoal', ['goal', 'new_goal']);
+    this.warnAliasIfUsed('completeReflect', 'newGoal', newGoalRes.usedAlias, newGoalRes.value);
+    const driveOverridesRes = resolveField(parsed, 'driveOverrides', ['drives', 'drive_overrides']);
+    this.warnAliasIfUsed(
+      'completeReflect',
+      'driveOverrides',
+      driveOverridesRes.usedAlias,
+      driveOverridesRes.value,
+    );
+    const memoryEntryRes = resolveField(parsed, 'memoryEntry', ['memory', 'memory_entry']);
+    this.warnAliasIfUsed(
+      'completeReflect',
+      'memoryEntry',
+      memoryEntryRes.usedAlias,
+      memoryEntryRes.value,
+    );
+
     const result: ReflectLLMResponse = {};
-    if (typeof parsed['newGoal'] === 'string') {
-      result.newGoal = parsed['newGoal'];
+    if (typeof newGoalRes.value === 'string') {
+      result.newGoal = newGoalRes.value;
     }
-    if (typeof parsed['driveOverrides'] === 'object' && parsed['driveOverrides'] !== null) {
-      result.driveOverrides = parsed['driveOverrides'] as Partial<Record<string, number>>;
+    if (typeof driveOverridesRes.value === 'object' && driveOverridesRes.value !== null) {
+      result.driveOverrides = driveOverridesRes.value as Partial<Record<string, number>>;
     }
-    const memEntry = parsed['memoryEntry'];
+    const memEntry = memoryEntryRes.value;
     if (typeof memEntry === 'object' && memEntry !== null) {
       const me = memEntry as Record<string, unknown>;
       const content = me['content'];
@@ -671,7 +744,7 @@ export class OpenAICompatibleLLMClient {
     return `{ ${parts.join(', ')} }${requiredList}`;
   }
 
-  // ── Private: observability (spec 009, Req 18) ───────────────────────────────
+  // ── Private: observability (spec 009, Req 18; spec 010, Req 12) ────────────
 
   /** Logs a recovery warning with truncated raw content (≤500 chars). */
   private warnRecovery(
@@ -682,6 +755,27 @@ export class OpenAICompatibleLLMClient {
     const truncated = rawContent.length > 500 ? rawContent.slice(0, 500) + '…' : rawContent;
     console.warn(
       `[JSON recovery] extractionSucceeded=${extractionSucceeded}, rePromptAttempted=${rePromptAttempted}, rawContent=${truncated}`,
+    );
+  }
+
+  /**
+   * Logs a field-alias warning when an alias is used instead of the canonical
+   * field name (spec 010, Req 12, AC-24). Lightweight observability consistent
+   * with spec 009's recovery logging.
+   */
+  private warnAliasIfUsed(
+    method: string,
+    canonical: string,
+    usedAlias: string | null,
+    value: unknown,
+  ): void {
+    if (usedAlias === null) {
+      return;
+    }
+    const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
+    const truncated = valueStr.length > 200 ? valueStr.slice(0, 200) + '…' : valueStr;
+    console.warn(
+      `[field-alias] ${method}: canonical="${canonical}", usedAlias="${usedAlias}", value="${truncated}"`,
     );
   }
 
@@ -713,15 +807,20 @@ export class OpenAICompatibleLLMClient {
       parts.push(`Cognitive tools:\n${lines.join('\n')}`);
     }
 
+    // Append schema hint as a separate paragraph (spec 010, Req 6, AC-9).
+    if (typeof payload.schemaHint === 'string' && payload.schemaHint.length > 0) {
+      parts.push(payload.schemaHint);
+    }
+
     return parts.join('\n\n');
   }
 
-  /** Constructs the user message for memory consolidation (Req 10). */
+  /** Constructs the user message for memory consolidation (Req 10; spec 010, Req 7, AC-11). */
   private buildReflectionUserMessage(memoryNodes: MemorySnippet[]): string {
     const lines = memoryNodes.map(
       (n) => `id: ${n.id}, content: ${n.content}, importance: ${n.importance}`,
     );
-    return `Memory nodes to consolidate:\n${lines.join('\n')}`;
+    return `Memory nodes to consolidate:\n${lines.join('\n')}\n\n${MEMORY_CONSOLIDATION_SCHEMA_HINT}`;
   }
 
   // ── Private: utilities ─────────────────────────────────────────────────────

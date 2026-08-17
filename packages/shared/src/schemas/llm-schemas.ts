@@ -131,6 +131,30 @@ export const memoryConsolidationSchema = {
 export const JSON_INSTRUCTION_SUFFIX =
   'IMPORTANT: Respond ONLY with a valid JSON object. Do not include any prose, markdown formatting, code fences, or XML tags. The JSON must match the provided schema exactly.';
 
+// ─── Schema-in-Prompt Hints (spec 010, Req 2) ────────────────────────────────
+//
+// Concrete field-by-field JSON templates appended to the **user message** so
+// the LLM sees the exact field names it must produce, regardless of whether
+// the backend enforces `json_schema` or `json_object`. These are distinct from
+// `JSON_INSTRUCTION_SUFFIX` (a general "respond in JSON" reminder in the system
+// prompt) — the schema hint is a concrete template in the user message.
+
+/** Schema hint for `formulatePlanSchema` (spec 010, Req 2, AC-2). */
+export const PLAN_SCHEMA_HINT =
+  'Respond with JSON in this exact format: {"description": "<plan description>", "steps": [{"description": "<step description>", "targetAffordance": "<affordance id or null>"}]}';
+
+/** Schema hint for `llmActionResponseSchema` (spec 010, Req 2, AC-3). */
+export const ACTION_RESPONSE_SCHEMA_HINT =
+  'Respond with JSON in this exact format: {"reasoning": "<your reasoning>", "action": "<affordance id or cognitive tool name>", "actionArgs": {}, "observeTarget": "<object id or null>", "updatedGoal": "<new goal or null>"}';
+
+/** Schema hint for `reflectSchema` (spec 010, Req 2, AC-4). */
+export const REFLECT_SCHEMA_HINT =
+  'Respond with JSON in this exact format: {"newGoal": "<new goal or null>", "driveOverrides": {"<driveName>": <value>}, "memoryEntry": {"content": "<description>", "importance": 1, "type": "observation", "location": "<room or null>"}}';
+
+/** Schema hint for `memoryConsolidationSchema` (spec 010, Req 2, AC-5). */
+export const MEMORY_CONSOLIDATION_SCHEMA_HINT =
+  'Respond with JSON in this exact format: {"consolidatedMemories": [{"content": "<description>", "importance": 1, "type": "observation"}], "consolidatedNodeIds": ["<nodeId>"]}';
+
 /** The reflect phase response schema (spec 004, Req 4). No top-level fields are required. */
 export const reflectSchema = {
   type: 'object',

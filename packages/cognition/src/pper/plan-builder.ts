@@ -12,7 +12,7 @@
  */
 
 import type { PerceptionResult } from '@evol-hive/shared';
-import { formulatePlanSchema, JSON_INSTRUCTION_SUFFIX } from '@evol-hive/shared';
+import { formulatePlanSchema, JSON_INSTRUCTION_SUFFIX, PLAN_SCHEMA_HINT } from '@evol-hive/shared';
 import type { LLMContextPayload, PlanBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
@@ -59,6 +59,7 @@ export class PlanBuilderImpl implements PlanBuilder {
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
       responseSchema: formulatePlanSchema,
+      schemaHint: PLAN_SCHEMA_HINT,
     };
   }
 }
