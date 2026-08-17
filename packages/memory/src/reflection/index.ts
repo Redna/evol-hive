@@ -1,3 +1,2 @@
-// reflection/ — Background asynchronous reflection & consolidation
-// Implementation TBD: Threshold check, background LLM call, memory consolidation.
-export {};
+// reflection/ — Background asynchronous reflection & consolidation (spec 014).
+export { ReflectionLoopImpl, type ReflectionLoopOptions } from './reflection-loop.js';

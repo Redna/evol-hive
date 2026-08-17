@@ -69,3 +69,5 @@ export class MemoryStoreImpl implements MemoryStore {
 }
 
 export {};
+
+export { InMemoryVectorStore, cosineSimilarity } from './in-memory-vector-store.js';
