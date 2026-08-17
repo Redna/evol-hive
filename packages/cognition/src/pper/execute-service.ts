@@ -65,14 +65,13 @@ export class ExecuteServiceImpl {
       // Resolve the affordance to a specific object in the agent's room.
       const resolved = dataProvider.resolveAffordance(agentState.location, step.targetAffordance);
       if (!resolved) {
-        const feedback = `Cannot find object with affordance '${step.targetAffordance}' in room '${agentState.location}'.`;
+        // Skip steps with unresolvable affordances (LLM may plan actions that
+        // don't map to real affordances). Advance to the next step and continue.
+        dataProvider.advanceStep(agentId);
+        const planComplete = dataProvider.isPlanComplete(agentId);
+        const feedback = `Skipped step: affordance '${step.targetAffordance}' not found in room '${agentState.location}'.`;
         dataProvider.setSystemFeedback(agentId, feedback);
-        dataProvider.setThinking(agentId, false);
-        return {
-          success: false,
-          error: `Affordance '${step.targetAffordance}' not found in room '${agentState.location}'`,
-          planComplete: false,
-        };
+        return { success: true, planComplete, stepSkipped: true };
       }
 
       // Check preconditions.
