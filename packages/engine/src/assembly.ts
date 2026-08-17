@@ -17,13 +17,14 @@
 
 import type {
   EngineConfig,
+  MemoryDecayConfig,
   PPEROrchestratorPort,
   PPERSchedulerConfig,
   Room,
   SceneDefinition,
 } from '@evol-hive/shared';
-import { defaultPPERSchedulerConfig } from '@evol-hive/shared';
-import type { MemoryStore } from '@evol-hive/memory';
+import { defaultPPERSchedulerConfig, defaultMemoryDecayConfig } from '@evol-hive/shared';
+import type { MemoryStore, MemoryDecayService, ReflectionLoop } from '@evol-hive/memory';
 import type { MemoryNode, MemoryEntryInput } from '@evol-hive/shared';
 import { AgentManagerImpl } from './agents/state/index.js';
 import { DriveSystemImpl } from './agents/drives/index.js';
@@ -40,6 +41,7 @@ import { SceneManagerImpl } from './world/scenes/index.js';
 import { GameLoopImpl } from './loop/index.js';
 import { DriveDecaySystem } from './systems/drive-decay.js';
 import { PPERScheduler } from './systems/pper-scheduler.js';
+import { MemoryMaintenanceSystem } from './systems/memory-maintenance.js';
 import type { GameLoop } from './index.js';
 
 /** A no-op MemoryStore used when no real memory subsystem is wired. */
@@ -90,6 +92,12 @@ export interface EngineCore {
     reflect: ReflectDataProviderImpl;
   };
   clock: GameLoopClock;
+  /** Optional memory decay service (spec 014, Req 18). */
+  memoryDecayService?: MemoryDecayService;
+  /** Optional reflection loop (spec 014, Req 18). */
+  reflectionLoop?: ReflectionLoop;
+  /** Optional memory decay config (spec 014, Req 18). */
+  memoryMaintenanceConfig?: MemoryDecayConfig;
 }
 
 /** Build all engine subsystems and bridges (no spec-mandated systems registered yet). */
@@ -158,12 +166,35 @@ export function createEngineCore(
   };
 }
 
-/** Register the three spec-mandated EngineSystems in order and return the loop. */
-export function assembleGameLoop(core: EngineCore, orchestrator: PPEROrchestratorPort): GameLoop {
+/** Register the spec-mandated EngineSystems in order and return the loop. */
+export function assembleGameLoop(
+  core: EngineCore,
+  orchestrator: PPEROrchestratorPort,
+  memoryMaintenance?: {
+    memoryDecayService: MemoryDecayService;
+    reflectionLoop?: ReflectionLoop;
+    decayConfig?: MemoryDecayConfig;
+  },
+): GameLoop {
   const schedulerConfig: PPERSchedulerConfig = defaultPPERSchedulerConfig();
   core.gameLoop.registerSystem(core.spatial); // (1) SpatialSystem
   core.gameLoop.registerSystem(new DriveDecaySystem(core.agentManager, core.driveSystem)); // (2) DriveDecaySystem
   core.gameLoop.registerSystem(new PPERScheduler(core.agentManager, orchestrator, schedulerConfig)); // (3) PPERScheduler
+
+  // (4) MemoryMaintenanceSystem — only when a decay service is provided (spec 014, Req 17/18).
+  if (memoryMaintenance?.memoryDecayService) {
+    const decayConfig = memoryMaintenance.decayConfig ?? defaultMemoryDecayConfig;
+    core.gameLoop.registerSystem(
+      new MemoryMaintenanceSystem({
+        agentManager: core.agentManager,
+        memoryDecayService: memoryMaintenance.memoryDecayService,
+        ...(memoryMaintenance.reflectionLoop
+          ? { reflectionLoop: memoryMaintenance.reflectionLoop }
+          : {}),
+        decayConfig,
+      }),
+    );
+  }
   return core.gameLoop;
 }
 

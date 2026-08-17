@@ -5,6 +5,8 @@
  * asynchronous reflection/consolidation.
  */
 
+import type { MemorySnippet } from './cognition.js';
+
 /** A single memory node in the vector store. */
 export interface MemoryNode {
   id: string;
@@ -23,6 +25,13 @@ export interface MemoryNode {
   location?: string;
   /** IDs of related memory nodes (for associative chaining). */
   relatedNodes?: string[];
+  /**
+   * The last simulation time the memory was retrieved or accessed (spec 014,
+   * Req 1). Set to `timestamp` at creation; updated to the current sim time on
+   * retrieval. If `undefined` (legacy nodes), treated as equal to `timestamp`
+   * for all decay computations.
+   */
+  lastAccessed?: number;
 }
 
 export type MemoryType = 'observation' | 'reflection' | 'action' | 'interaction';
@@ -67,3 +76,71 @@ export interface ReflectionConfig {
   /** Whether the reflection loop is currently running in the background. */
   enabled: boolean;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spec 014 — Consolidation, Decay & Retrieval additions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Bridge interface (defined in `shared` per ADR-0001) that lets the memory
+ * layer call the LLM for memory consolidation without importing from the
+ * `cognition` package. The `cognition` package provides a concrete
+ * implementation wrapping `LLMClient.completeReflection` (spec 014, Req 19).
+ */
+export interface ConsolidationProvider {
+  /** Consolidate low-level memories into higher-level insights via an LLM call. */
+  consolidate(
+    agentId: string,
+    systemPrompt: string,
+    memoryNodes: MemorySnippet[],
+  ): Promise<ReflectionResult>;
+}
+
+/**
+ * Configuration for the background memory decay system (spec 014, Req 5).
+ * Decay is computed on-the-fly, not stored — see {@link MemoryDecayService}.
+ */
+export interface MemoryDecayConfig {
+  /** Exponential decay rate for importance (per simulation second). Higher = faster decay. */
+  decayRate: number;
+  /** Effective importance below which a memory is a pruning candidate. */
+  pruneThreshold: number;
+  /** Run the decay pass every N engine ticks. */
+  decayIntervalTicks: number;
+}
+
+/**
+ * Result of a decay pass over an agent's memories (spec 014, Req 12). The
+ * effective importance is computed on-the-fly — the stored `importance` is NOT
+ * modified. `pruneCandidateIds` lists memories whose effective importance is
+ * below the configured prune threshold.
+ */
+export interface DecayResult {
+  agentId: string;
+  /** IDs of memories whose effective importance is below the prune threshold. */
+  pruneCandidateIds: string[];
+  /** Effective importance scores for all memories (for debugging/inspection). */
+  scores: { memoryId: string; effectiveImportance: number; baseImportance: number }[];
+}
+
+/** Default retrieval weights from §11.2 (spec 014, Req 6). */
+export const defaultRetrievalWeights: RetrievalWeights = {
+  recencyWeight: 1.0,
+  importanceWeight: 1.0,
+  relevanceWeight: 1.0,
+  recencyDecayRate: 0.01,
+};
+
+/** Default reflection config from §11.3 (spec 014, Req 7). */
+export const defaultReflectionConfig: ReflectionConfig = {
+  nodeThreshold: 50,
+  idleThresholdSeconds: 30,
+  enabled: true,
+};
+
+/** Default memory decay config (spec 014, Req 8). */
+export const defaultMemoryDecayConfig: MemoryDecayConfig = {
+  decayRate: 0.001,
+  pruneThreshold: 0.5,
+  decayIntervalTicks: 100,
+};

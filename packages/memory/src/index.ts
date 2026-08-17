@@ -22,6 +22,17 @@ export interface VectorStore {
   delete(ids: string[]): Promise<void>;
   /** Get count of recent nodes for reflection threshold check. */
   countRecent(agentId: string, sinceTimestamp: number): Promise<number>;
+  /**
+   * Partially update a stored `MemoryNode` — only `importance` and
+   * `lastAccessed` are mutable (spec 014, Req 2). No-op if the `id` does not
+   * exist (does not throw).
+   */
+  update(
+    id: string,
+    changes: Partial<Pick<import('@evol-hive/shared').MemoryNode, 'importance' | 'lastAccessed'>>,
+  ): Promise<void>;
+  /** Return all `MemoryNode` objects stored for the given `agentId` (spec 014, Req 3). */
+  queryByAgent(agentId: string): Promise<import('@evol-hive/shared').MemoryNode[]>;
 }
 
 // ── Retrieval (Section 11.2) ──────────────────────────────────────────────────
@@ -88,6 +99,25 @@ export interface ReflectionLoop {
   start(): void;
   /** Stop the background loop. */
   stop(): void;
+}
+
+// ── Memory Decay (Section 11.3 / spec 014, Req 12) ───────────────────────────
+
+/** A simulation clock — `() => number` returning the current sim time (spec 014, Req 28). */
+export type SimulationClock = () => number;
+
+/**
+ * Computes effective importance (decay is computed, not stored) and identifies
+ * prune candidates. The stored `MemoryNode.importance` is NOT modified.
+ */
+export interface MemoryDecayService {
+  /** Compute effective importance for all of an agent's memories and identify prune candidates. */
+  applyDecay(
+    agentId: string,
+    currentSimTime: number,
+  ): Promise<import('@evol-hive/shared').DecayResult>;
+  /** Prune memories whose effective importance is below the threshold. Returns count of pruned nodes. */
+  pruneMemories(agentId: string, currentSimTime: number): Promise<number>;
 }
 
 // ── Embedding Provider (spec 004, Req 6) ─────────────────────────────────────

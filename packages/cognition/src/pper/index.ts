@@ -106,4 +106,8 @@ export { ReflectServiceImpl } from './reflect-service.js';
 export type { ReflectServiceOptions } from './reflect-service.js';
 export { PPEROrchestratorImpl, createPPEROrchestrator } from './orchestrator.js';
 export type { PPEROrchestratorOptions } from './orchestrator.js';
+export {
+  ConsolidationProviderImpl,
+  type ConsolidationProviderOptions,
+} from './consolidation-provider.js';
 export {};
