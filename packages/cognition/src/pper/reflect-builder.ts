@@ -3,15 +3,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Section 6 / §7 / §8 / spec 004: Transforms the agent's current state and the
  * Execute-phase result into the `LLMContextPayload` sent to the heavy LLM during
- * reflection. The response schema is `reflectSchema` (NOT `llmActionResponseSchema`).
- *
- * The perception context includes: the execution result (success/failure, error
- * message if any), the agent's current drives, the agent's current goal, and the
- * plan status (complete or in-progress with remaining steps).
+ * reflection. Uses tool calling (spec 011) — sends `reflectTool`.
  */
 
 import type { AgentInternalState, ExecuteResult } from '@evol-hive/shared';
-import { reflectSchema, JSON_INSTRUCTION_SUFFIX, REFLECT_SCHEMA_HINT } from '@evol-hive/shared';
+import { reflectTool } from '@evol-hive/shared';
 import type { LLMContextPayload, ReflectBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
@@ -22,16 +18,13 @@ export class ReflectBuilderImpl implements ReflectBuilder {
     agentState: AgentInternalState,
     executeResult: ExecuteResult,
   ): LLMContextPayload {
-    const systemPrompt =
-      [
-        'You are an autonomous NPC in a deterministic simulation.',
-        'You must reflect on the outcome of your last action.',
-        'Evaluate whether your goal or drives need adjustment based on what happened.',
-        'Decide if a memory entry should be stored for future reference.',
-        'Use the update_internal_state cognitive tool to adjust your goal, drives, or store a memory.',
-      ].join(' ') +
-      '\n\n' +
-      JSON_INSTRUCTION_SUFFIX;
+    const systemPrompt = [
+      'You are an autonomous NPC in a deterministic simulation.',
+      'You must reflect on the outcome of your last action.',
+      'Evaluate whether your goal or drives need adjustment based on what happened.',
+      'Decide if a memory entry should be stored for future reference.',
+      'Use the update_internal_state cognitive tool to adjust your goal, drives, or store a memory.',
+    ].join(' ');
 
     const contextLines: string[] = [];
 
@@ -90,8 +83,7 @@ export class ReflectBuilderImpl implements ReflectBuilder {
       perceptionContext: contextLines.join('\n'),
       availableAffordances: [],
       cognitiveTools: updateInternalStateTool,
-      responseSchema: reflectSchema,
-      schemaHint: REFLECT_SCHEMA_HINT,
+      tools: [reflectTool],
     };
   }
 }

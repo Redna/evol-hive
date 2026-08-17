@@ -2,28 +2,20 @@
  * pper/perception-builder — LLM context payload construction
  * ──────────────────────────────────────────────────────────
  * Section 6.1 / §7: Transforms a PerceptionResult into the LLMContextPayload
- * sent to the heavy LLM in the Plan phase. The perception context stays compact
- * (room name, object names, drive summary) — affordance labels/descriptions go
- * into `availableAffordances`, not the context string.
+ * sent to the heavy LLM in the Execute/Perceive phase. Uses tool calling
+ * (spec 011) — sends `chooseActionTool` plus cognitive tool definitions.
  */
 
 import type { PerceptionResult } from '@evol-hive/shared';
-import {
-  llmActionResponseSchema,
-  JSON_INSTRUCTION_SUFFIX,
-  ACTION_RESPONSE_SCHEMA_HINT,
-} from '@evol-hive/shared';
+import { chooseActionTool } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
-import { defaultCognitiveTools } from '../tools/index.js';
+import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
 
-const SYSTEM_PROMPT =
-  [
-    'You are an autonomous NPC in a deterministic simulation.',
-    'You perceive your surroundings passively and choose one action per tick.',
-    'Choose an affordance or a cognitive tool. Reason briefly before acting.',
-  ].join(' ') +
-  '\n\n' +
-  JSON_INSTRUCTION_SUFFIX;
+const SYSTEM_PROMPT = [
+  'You are an autonomous NPC in a deterministic simulation.',
+  'You perceive your surroundings passively and choose one action per tick.',
+  'Choose an affordance or a cognitive tool. Reason briefly before acting.',
+].join(' ');
 
 /** Concrete PerceptionBuilder producing the LLM context payload. */
 export class PerceptionBuilderImpl implements PerceptionBuilder {
@@ -39,13 +31,16 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       `Drives: ${driveSummary}`,
     ].join('\n');
 
+    // Build tool definitions: chooseActionTool + cognitive tools (excluding formulate_plan).
+    const cognitiveTools = defaultCognitiveTools.filter((t) => t.name !== 'formulate_plan');
+    const tools = [chooseActionTool, ...cognitiveToolsToToolDefinitions(cognitiveTools)];
+
     return {
       systemPrompt: SYSTEM_PROMPT,
       perceptionContext,
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
-      responseSchema: llmActionResponseSchema,
-      schemaHint: ACTION_RESPONSE_SCHEMA_HINT,
+      tools,
     };
   }
 }

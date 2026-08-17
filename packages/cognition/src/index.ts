@@ -79,14 +79,8 @@ export interface LLMContextPayload {
   perceptionContext: string;
   availableAffordances: import('@evol-hive/shared').Affordance[];
   cognitiveTools: import('@evol-hive/shared').CognitiveTool[];
-  responseSchema: object;
-  /**
-   * Concrete JSON template appended to the user message (spec 010, Req 1).
-   * When provided (non-empty string), `buildUserMessage()` appends it as a
-   * separate paragraph so the LLM sees the exact field names it must produce.
-   * Optional for backward compatibility — existing payloads omit it.
-   */
-  schemaHint?: string;
+  /** Tool definitions sent to the LLM via the `tools` parameter (spec 011). */
+  tools: import('@evol-hive/shared').ToolDefinition[];
 }
 
 // ── LLM Client ───────────────────────────────────────────────────────────────

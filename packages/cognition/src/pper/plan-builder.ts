@@ -2,17 +2,12 @@
  * pper/plan-builder — LLM context payload construction for the Plan phase
  * ─────────────────────────────────────────────────────────────────────
  * Section 6.2 / §7 / §8.1: Transforms a PerceptionResult into the
- * LLMContextPayload sent to the heavy LLM during plan formulation. The
- * response schema is `formulatePlanSchema` (NOT `llmActionResponseSchema`).
- *
- * The perception context stays compact (room name, object names, drive
- * summary) — the same format as `PerceptionBuilder`. When `systemFeedback`
- * is present (prior action failure, §9.2), it is appended so the LLM is
- * aware of what went wrong.
+ * LLMContextPayload sent to the heavy LLM during plan formulation. Uses
+ * tool calling (spec 011) — sends `formulatePlanTool`.
  */
 
 import type { PerceptionResult } from '@evol-hive/shared';
-import { formulatePlanSchema, JSON_INSTRUCTION_SUFFIX, PLAN_SCHEMA_HINT } from '@evol-hive/shared';
+import { formulatePlanTool } from '@evol-hive/shared';
 import type { LLMContextPayload, PlanBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
@@ -23,16 +18,13 @@ export class PlanBuilderImpl implements PlanBuilder {
     const objectNames = passive.objectsPresent.map((o) => o.name);
     const driveSummary = formatDrives(passive.drives);
 
-    const systemPrompt =
-      [
-        'You are an autonomous NPC in a deterministic simulation.',
-        'You must formulate a plan to satisfy your most urgent drive.',
-        `Your primary drive is: ${primaryDriveLabel}.`,
-        'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
-        'Each step should map to an available affordance when possible.',
-      ].join(' ') +
-      '\n\n' +
-      JSON_INSTRUCTION_SUFFIX;
+    const systemPrompt = [
+      'You are an autonomous NPC in a deterministic simulation.',
+      'You must formulate a plan to satisfy your most urgent drive.',
+      `Your primary drive is: ${primaryDriveLabel}.`,
+      'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
+      'Each step should map to an available affordance when possible.',
+    ].join(' ');
 
     const contextLines = [
       `Room: ${passive.roomId}`,
@@ -58,8 +50,7 @@ export class PlanBuilderImpl implements PlanBuilder {
       perceptionContext: contextLines.join('\n'),
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
-      responseSchema: formulatePlanSchema,
-      schemaHint: PLAN_SCHEMA_HINT,
+      tools: [formulatePlanTool],
     };
   }
 }

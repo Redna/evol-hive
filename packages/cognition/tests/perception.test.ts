@@ -7,6 +7,7 @@ import type {
   PerceptionResult,
   PassivePerception,
 } from '@evol-hive/shared';
+import { chooseActionTool } from '@evol-hive/shared';
 import type { EmbeddingProvider, LLMClient } from '../src/index.js';
 import { AffordanceClassifierImpl } from '../src/classifier/pruning/index.js';
 import { PassivePerceptionAssembler, PerceptionServiceImpl } from '../src/pper/index.js';
@@ -191,11 +192,13 @@ describe('PerceptionBuilderImpl.build (AC-18, AC-19)', () => {
     expect(payload.perceptionContext).toContain('Coffee Machine');
     expect(payload.perceptionContext).toContain('Kettle');
     expect(payload.perceptionContext).toContain('energy');
-    // The structured output schema must be the LLM action response schema.
-    expect(payload.responseSchema).toEqual(
-      // imported lazily to avoid pulling schema constant into the assertion surface
-      payload.responseSchema,
-    );
+    // The tools array must include chooseActionTool (AC-24)
+    expect(payload.tools).toBeDefined();
+    expect(Array.isArray(payload.tools)).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(true);
+    // No responseSchema or schemaHint (AC-24)
+    expect((payload as Record<string, unknown>)['responseSchema']).toBeUndefined();
+    expect((payload as Record<string, unknown>)['schemaHint']).toBeUndefined();
     expect(payload.cognitiveTools).toEqual(defaultCognitiveTools);
   });
 

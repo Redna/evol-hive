@@ -12,7 +12,7 @@ import type {
   FormulatePlanResult,
   PlanDataProvider,
 } from '@evol-hive/shared';
-import { formulatePlanSchema, llmActionResponseSchema } from '@evol-hive/shared';
+import { formulatePlanTool } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload } from '../src/index.js';
 import { PlanBuilderImpl } from '../src/pper/plan-builder.js';
 import { PlanServiceImpl } from '../src/pper/plan-service.js';
@@ -61,10 +61,14 @@ function makePerceptionResult(
 describe('PlanBuilderImpl.build (AC-4, AC-5, AC-6, AC-7, AC-26)', () => {
   const builder = new PlanBuilderImpl();
 
-  it('returns an LLMContextPayload whose responseSchema is formulatePlanSchema (AC-4)', () => {
+  it('returns an LLMContextPayload whose tools include formulatePlanTool (AC-4, AC-23)', () => {
     const payload = builder.build(makePerceptionResult());
-    expect(payload.responseSchema).toEqual(formulatePlanSchema);
-    expect(payload.responseSchema).not.toEqual(llmActionResponseSchema);
+    expect(payload.tools).toBeDefined();
+    expect(Array.isArray(payload.tools)).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'formulate_plan')).toBe(true);
+    // No responseSchema or schemaHint (AC-23)
+    expect((payload as Record<string, unknown>)['responseSchema']).toBeUndefined();
+    expect((payload as Record<string, unknown>)['schemaHint']).toBeUndefined();
   });
 
   it('perceptionContext contains the room name and object names (AC-5)', () => {
@@ -223,7 +227,8 @@ describe('PlanServiceImpl.plan (AC-9 through AC-14, AC-23, AC-24, AC-25)', () =>
     llm.completePlan = vi.fn().mockImplementation(async (payload: LLMContextPayload) => {
       // While the LLM is in-flight, isThinking should be true.
       expect(provider.setThinkingCalls.some((c) => c.isThinking === true)).toBe(true);
-      expect(payload.responseSchema).toEqual(formulatePlanSchema);
+      expect(typeof payload.tools).toBe('object');
+      expect((payload as Record<string, unknown>)['responseSchema']).toBeUndefined();
       return makeFormulatePlanResult();
     });
     const service = new PlanServiceImpl({
@@ -250,7 +255,8 @@ describe('PlanServiceImpl.plan (AC-9 through AC-14, AC-23, AC-24, AC-25)', () =>
 
     expect(llm.completePlan).toHaveBeenCalledTimes(1);
     const payload = llm.completePlan.mock.calls[0]![0] as LLMContextPayload;
-    expect(payload.responseSchema).toEqual(formulatePlanSchema);
+    expect(typeof payload.tools).toBe('object');
+    expect((payload as Record<string, unknown>)['responseSchema']).toBeUndefined();
     expect(payload.perceptionContext).toContain(ROOM_ID);
   });
 

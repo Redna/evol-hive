@@ -13,7 +13,7 @@ import type {
   ReflectLLMResponse,
   ReflectResult,
 } from '@evol-hive/shared';
-import { reflectSchema } from '@evol-hive/shared';
+import { reflectTool } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload, ReflectBuilder, ReflectService } from '../src/index.js';
 import { ReflectBuilderImpl } from '../src/pper/reflect-builder.js';
 import { ReflectServiceImpl } from '../src/pper/reflect-service.js';
@@ -53,9 +53,14 @@ describe('ReflectBuilderImpl.build (AC-12, AC-13, AC-35, AC-36)', () => {
   const agentState = makeAgentState();
   const executeResult = makeExecuteResult();
 
-  it('returns an LLMContextPayload whose responseSchema is reflectSchema (AC-12)', () => {
+  it('returns an LLMContextPayload whose tools include reflectTool (AC-12, AC-25)', () => {
     const payload = builder.build(AGENT_ID, agentState, executeResult);
-    expect(payload.responseSchema).toEqual(reflectSchema);
+    expect(payload.tools).toBeDefined();
+    expect(Array.isArray(payload.tools)).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'reflect')).toBe(true);
+    // No responseSchema or schemaHint (AC-25)
+    expect((payload as Record<string, unknown>)['responseSchema']).toBeUndefined();
+    expect((payload as Record<string, unknown>)['schemaHint']).toBeUndefined();
   });
 
   it('sets availableAffordances to an empty array (AC-12)', () => {
@@ -160,7 +165,7 @@ describe('ReflectService and ReflectBuilder interfaces (AC-10, AC-11)', () => {
           perceptionContext: 'test',
           availableAffordances: [],
           cognitiveTools: [],
-          responseSchema: {},
+          tools: [],
         };
       },
     };
@@ -513,8 +518,9 @@ describe('ReflectServiceImpl.reflect (AC-15 through AC-26)', () => {
 
     expect(llm.completeReflect).toHaveBeenCalledTimes(1);
     const payload = llm.completeReflect.mock.calls[0]![0] as LLMContextPayload;
-    // The payload should have the reflectSchema as its responseSchema.
-    expect(payload.responseSchema).toEqual(reflectSchema);
+    // The payload should have tools including reflectTool.
+    expect(typeof payload.tools).toBe('object');
+    expect((payload as Record<string, unknown>)['responseSchema']).toBeUndefined();
     // The payload should include the agent's current goal in the perception context.
     expect(payload.perceptionContext).toContain('Stay alive');
     // The payload should include the execution result status.

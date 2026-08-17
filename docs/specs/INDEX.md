@@ -28,7 +28,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [008](008-multi-agent-multi-room-integration-tests.md) | Multi-Agent & Multi-Room Integration Tests | §2, §3, §4, §6, §9 | 📝 Drafted | [#22](https://github.com/Redna/evol-hive/issues/22) | — | engine, shared |
 | [009](009-llm-json-recovery.md) | LLM JSON Response Recovery & Provider-Aware Structured Output | §6, §7, §9 | ⛔ Superseded by 011 | [#34](https://github.com/Redna/evol-hive/issues/34) | [#36](https://github.com/Redna/evol-hive/pull/36) | cognition, shared, examples |
 | [010](010-llm-schema-in-prompt-and-field-aliasing.md) | LLM Schema-in-Prompt & Field Name Aliasing | §6, §7, §9 | ⛔ Superseded by 011 | [#37](https://github.com/Redna/evol-hive/issues/37) | [#39](https://github.com/Redna/evol-hive/pull/39) | cognition, shared |
-| [011](011-structured-output-to-tool-calling.md) | Replace Structured Output with Tool Calling | §6, §7, §8, §9 | 📝 Drafted | [#40](https://github.com/Redna/evol-hive/issues/40) | — | cognition, shared, examples |
+| [011](011-structured-output-to-tool-calling.md) | Replace Structured Output with Tool Calling | §6, §7, §8, §9 | 🔍 In Review | [#40](https://github.com/Redna/evol-hive/issues/40) | — | cognition, shared, examples |
 
 ## Architecture Coverage
 
@@ -52,8 +52,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      12
 ✅ Done:          0
 🔨 In Development: 0
-🔍 In Review:     6
-📝 Drafted:       4
+🔍 In Review:     7
+📝 Drafted:       3
 🚫 Blocked:       0
 ⛔ Superseded:    2
 

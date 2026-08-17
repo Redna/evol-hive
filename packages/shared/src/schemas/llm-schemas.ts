@@ -1,9 +1,9 @@
 /**
- * JSON Schemas for Structured Outputs (Grammar Constraints)
- * ──────────────────────────────────────────────────────────
+ * JSON Schemas for Structured Outputs — now used as tool `parameters` (spec 011).
+ * ────────────────────────────────────────────────────────────────────────────
  * Section 7: The engine strictly relies on Structured Outputs to parse LLM
- * intentions. These schemas are passed to the LLM backend (Ollama, vLLM,
- * llama.cpp) as grammar constraints / response_format.
+ * intentions. These schemas are passed to the LLM backend as tool definition
+ * `parameters` via the OpenAI-compatible `tools` parameter (spec 011).
  */
 
 /** The LLM action response schema (Section 7). */
@@ -122,39 +122,6 @@ export const memoryConsolidationSchema = {
   additionalProperties: false,
 } as const;
 
-/**
- * The JSON instruction suffix appended to builder system prompts (spec 009, Req 15).
- *
- * Reminds the LLM to respond ONLY in valid JSON even when the backend does not
- * enforce the `json_schema` grammar constraint (e.g. Ollama cloud-backed models).
- */
-export const JSON_INSTRUCTION_SUFFIX =
-  'IMPORTANT: Respond ONLY with a valid JSON object. Do not include any prose, markdown formatting, code fences, or XML tags. The JSON must match the provided schema exactly.';
-
-// ─── Schema-in-Prompt Hints (spec 010, Req 2) ────────────────────────────────
-//
-// Concrete field-by-field JSON templates appended to the **user message** so
-// the LLM sees the exact field names it must produce, regardless of whether
-// the backend enforces `json_schema` or `json_object`. These are distinct from
-// `JSON_INSTRUCTION_SUFFIX` (a general "respond in JSON" reminder in the system
-// prompt) — the schema hint is a concrete template in the user message.
-
-/** Schema hint for `formulatePlanSchema` (spec 010, Req 2, AC-2). */
-export const PLAN_SCHEMA_HINT =
-  'Respond with JSON in this exact format: {"description": "<plan description>", "steps": [{"description": "<step description>", "targetAffordance": "<affordance id or null>"}]}';
-
-/** Schema hint for `llmActionResponseSchema` (spec 010, Req 2, AC-3). */
-export const ACTION_RESPONSE_SCHEMA_HINT =
-  'Respond with JSON in this exact format: {"reasoning": "<your reasoning>", "action": "<affordance id or cognitive tool name>", "actionArgs": {}, "observeTarget": "<object id or null>", "updatedGoal": "<new goal or null>"}';
-
-/** Schema hint for `reflectSchema` (spec 010, Req 2, AC-4). */
-export const REFLECT_SCHEMA_HINT =
-  'Respond with JSON in this exact format: {"newGoal": "<new goal or null>", "driveOverrides": {"<driveName>": <value>}, "memoryEntry": {"content": "<description>", "importance": 1, "type": "observation", "location": "<room or null>"}}';
-
-/** Schema hint for `memoryConsolidationSchema` (spec 010, Req 2, AC-5). */
-export const MEMORY_CONSOLIDATION_SCHEMA_HINT =
-  'Respond with JSON in this exact format: {"consolidatedMemories": [{"content": "<description>", "importance": 1, "type": "observation"}], "consolidatedNodeIds": ["<nodeId>"]}';
-
 /** The reflect phase response schema (spec 004, Req 4). No top-level fields are required. */
 export const reflectSchema = {
   type: 'object',
@@ -181,3 +148,51 @@ export const reflectSchema = {
   },
   additionalProperties: false,
 } as const;
+
+// ─── Tool Definitions (spec 011, Req 3) ─────────────────────────────────────
+//
+// Each PPER phase has a primary tool definition. The existing JSON schema objects
+// are reused as the tool `parameters` — no modification needed. The LLM calls the
+// tool and returns `tool_calls[0].function.arguments` as valid JSON.
+
+import type { ToolDefinition } from '../types/cognition.js';
+
+/** Tool definition for the Plan phase (spec 011, Req 3). */
+export const formulatePlanTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'formulate_plan',
+    description: "Create a plan to satisfy the agent's drives",
+    parameters: formulatePlanSchema,
+  },
+};
+
+/** Tool definition for the Execute/Perceive phase (spec 011, Req 3). */
+export const chooseActionTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'choose_action',
+    description: 'Choose one action to perform this tick',
+    parameters: llmActionResponseSchema,
+  },
+};
+
+/** Tool definition for the Reflect phase (spec 011, Req 3). */
+export const reflectTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'reflect',
+    description: 'Reflect on the last action and update internal state',
+    parameters: reflectSchema,
+  },
+};
+
+/** Tool definition for memory consolidation (spec 011, Req 3). */
+export const memoryConsolidationTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'consolidate_memories',
+    description: 'Consolidate memory nodes into higher-level insights',
+    parameters: memoryConsolidationSchema,
+  },
+};
