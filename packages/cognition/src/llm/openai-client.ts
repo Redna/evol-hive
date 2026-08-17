@@ -226,7 +226,9 @@ export class OpenAICompatibleLLMClient {
         // - targetAffordance: the affordance ID to execute
         // Common aliases: reason→description, action→targetAffordance, affordance→targetAffordance
         const step: { description: string; targetAffordance?: string } = {
-          description: String(obj['description'] ?? obj['reason'] ?? obj['action'] ?? obj['name'] ?? ''),
+          description: String(
+            obj['description'] ?? obj['reason'] ?? obj['action'] ?? obj['name'] ?? '',
+          ),
         };
         const ta = obj['targetAffordance'] ?? obj['action'] ?? obj['affordance'] ?? obj['target'];
         if (typeof ta === 'string') {

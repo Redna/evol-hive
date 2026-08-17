@@ -20,10 +20,7 @@ import type {
 } from '@evol-hive/shared';
 import { chooseActionTool, formulatePlanTool, reflectTool } from '@evol-hive/shared';
 import type { LLMContextPayload } from '../src/index.js';
-import {
-  OpenAICompatibleLLMClient,
-  LLMResponseError,
-} from '../src/llm/openai-client.js';
+import { OpenAICompatibleLLMClient, LLMResponseError } from '../src/llm/openai-client.js';
 import { PlanBuilderImpl } from '../src/pper/plan-builder.js';
 import { PerceptionBuilderImpl } from '../src/pper/perception-builder.js';
 import { ReflectBuilderImpl } from '../src/pper/reflect-builder.js';
@@ -194,9 +191,7 @@ describe('No alias mapping logic (AC-14)', () => {
   });
 
   it('completeStructured does not perform alias mapping — canonical field names used directly', async () => {
-    fetchMock.mockResolvedValue(
-      toolCallResponse('choose_action', { reasoning: 'r', action: 'a' }),
-    );
+    fetchMock.mockResolvedValue(toolCallResponse('choose_action', { reasoning: 'r', action: 'a' }));
     const client = new OpenAICompatibleLLMClient({ baseUrl: BASE_URL, model: MODEL });
     const result = await client.completeStructured(makePayload());
     expect(result.reasoning).toBe('r');
