@@ -1032,14 +1032,14 @@ describe('Execute → Perceive system feedback flow (AC-12)', () => {
       getSystemFeedback: () => feedbackStore,
     };
 
-    // Run execute → should fail and set systemFeedback.
+    // Run execute → should skip the step and set systemFeedback (spec 011 behavior change).
     const { ExecuteServiceImpl } = await import('../src/pper/execute-service.js');
     const execService = new ExecuteServiceImpl({ dataProvider: executeProvider });
     const execResult = await execService.execute('a1');
-    expect(execResult.success).toBe(false);
-    expect(execResult.error).toContain('nonexistent_action');
+    expect(execResult.success).toBe(true);
+    expect(execResult.stepSkipped).toBe(true);
     // Verify feedback was set.
-    expect(feedbackStore).toContain("Cannot find object with affordance 'nonexistent_action'");
+    expect(feedbackStore).toContain('nonexistent_action');
 
     // Run perceive → passive.systemFeedback should contain the failure message.
     const service = new PerceptionServiceImpl({

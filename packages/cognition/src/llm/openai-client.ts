@@ -221,11 +221,18 @@ export class OpenAICompatibleLLMClient {
       description,
       steps: (steps as unknown[]).map((s) => {
         const obj = s as Record<string, unknown>;
+        // LLMs may use different field names for step items:
+        // - description: the step's human-readable description
+        // - targetAffordance: the affordance ID to execute
+        // Common aliases: reason→description, action→targetAffordance, affordance→targetAffordance
         const step: { description: string; targetAffordance?: string } = {
-          description: String(obj['description'] ?? ''),
+          description: String(
+            obj['description'] ?? obj['reason'] ?? obj['action'] ?? obj['name'] ?? '',
+          ),
         };
-        if (typeof obj['targetAffordance'] === 'string') {
-          step.targetAffordance = obj['targetAffordance'];
+        const ta = obj['targetAffordance'] ?? obj['action'] ?? obj['affordance'] ?? obj['target'];
+        if (typeof ta === 'string') {
+          step.targetAffordance = ta;
         }
         return step;
       }),
