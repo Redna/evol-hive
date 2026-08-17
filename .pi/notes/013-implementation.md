@@ -30,3 +30,24 @@ Implement spec 013 (Richer Prototype Scenes — Multi-Room, Multi-Object, Multi-
 ## Test results
 - 239 tests pass (56 new), typecheck clean, lint clean, format clean, build succeeds.
 - Both example scenes run without errors via `npx tsx`.
+
+## QA Coverage Review (PR #49)
+
+**Status: ✅ All 35 ACs fully covered. 609 tests pass across all packages.**
+
+### Gaps found and fixed by QA
+1. **AC-4** — `brew_coffee` handler defensive failure path (water_level=0, bean_count=0) not tested directly. Added 2 tests.
+2. **AC-18** — `has_books`, `has_paper`, `has_beans` precondition checkers only tested indirectly. Added 3 standalone tests.
+3. **AC-20** — Only Coffee Machine affordances/preconditions verified; Bed, Shower, TV, Bookshelf, Front Door were not. Added 6 tests verifying each non-doorway object's full affordance list, preconditions, and effects.
+4. **AC-25** — Only object placement verified, not affordance/precondition details. Added 8 tests verifying each Office Day non-doorway object's affordances, preconditions, and effects.
+
+### Final test counts
+- `richer-scenes.test.ts`: 75 tests (up from 56; 19 supplementary tests added)
+- Engine total: 258 tests
+- All packages: 609 tests pass
+- Typecheck: clean. Lint: clean.
+
+### Actions taken
+- Posted QA coverage report as comment on PR #49.
+- Added label "Status: In Review/QA" to issue #45.
+- Committed supplementary tests to branch `feature/013-richer-prototype-scenes`.
