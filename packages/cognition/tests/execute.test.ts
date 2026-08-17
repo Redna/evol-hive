@@ -254,8 +254,8 @@ describe('ExecuteServiceImpl.execute (AC-21 through AC-35)', () => {
     expect(provider.applyDriveChangesCalls).toHaveLength(0);
   });
 
-  // AC-24: Affordance not found in room
-  it('sets system feedback, sets isThinking=false, returns failure when resolveAffordance returns null (AC-24, AC-30)', async () => {
+  // AC-24: Affordance not found in room — step is skipped (spec 011 behavior change)
+  it('skips the step, sets system feedback, returns success with stepSkipped when resolveAffordance returns null (AC-24)', async () => {
     provider.agentState = makeAgentState({
       currentPlan: {
         id: 'plan1',
@@ -270,17 +270,11 @@ describe('ExecuteServiceImpl.execute (AC-21 through AC-35)', () => {
     const service = new ExecuteServiceImpl({ dataProvider: provider });
     const result = await service.execute(AGENT_ID);
 
-    expect(result.success).toBe(false);
-    expect(result.planComplete).toBe(false);
-    expect(result.error).toContain('brew_coffee');
-    expect(result.error).toContain(ROOM_ID);
+    expect(result.success).toBe(true);
+    expect(result.stepSkipped).toBe(true);
     // System feedback must have been set.
     expect(provider.setSystemFeedbackCalls).toHaveLength(1);
     expect(provider.setSystemFeedbackCalls[0]!.feedback).toContain('brew_coffee');
-    expect(provider.setSystemFeedbackCalls[0]!.feedback).toContain(ROOM_ID);
-    // isThinking must be set to false.
-    expect(provider.setThinkingCalls).toContainEqual({ agentId: AGENT_ID, isThinking: false });
-    expect(provider.agentState?.isThinking).toBe(false);
   });
 
   // AC-25: Preconditions not met
