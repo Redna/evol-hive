@@ -21,27 +21,34 @@
 
 **Prototype works end-to-end:** one room, one Coffee Machine, one agent (Alice) that perceives, plans, brews coffee, and reflects — with a real LLM.
 
-## What's Missing (Prioritized)
+## What's Next (Prioritized)
 
-### Immediate — Quality of Life
-- [ ] **Agent Persona System** — agents need personality, backstory, goals that influence LLM prompts (not just "you are an NPC")
-- [ ] **Richer Prototype Scene** — more rooms, objects, agents, inter-object relationships
-- [ ] **Visual Output** — headless simulation → canvas/WebGL renderer
+> **Focus: core agent mechanics and emergent behavior.**
+> Scenes, objects, and agents stay static and manageable for now.
+> Visual output and scene authoring are deferred until the cognitive core is solid.
 
-### Near Term — Cognition
+### Phase 2: Cognition Deep Dive
+> Make the agent's mind more sophisticated — this is where emergent behavior comes from.
+
+- [ ] **Agent Persona System** (#44) — personality, backstory, goals that influence LLM prompts → *Architect running*
+- [ ] **Richer Prototype Scene** (#45) — multiple rooms, objects, agents (static, for testing) → *Architect running*
+- [ ] **Memory Consolidation** — background reflection, importance scoring, memory decay (§11)
 - [ ] **Cognitive Guardrails** — affordance masking, contextual forcing, plan validation (§10)
 - [ ] **Full Cognitive Tools** — `query_memory` and `update_internal_state` as real tool calls (§8)
-- [ ] **Engine Routing** — `is_thinking` state management, async LLM concurrency (§9)
 
-### Medium Term — World
-- [ ] **Scene Authoring** — tools for defining rooms, objects, agents, connections
-- [ ] **Object Interactions** — objects that change state, multi-step affordances
-- [ ] **Multi-Agent Social** — agents that perceive each other, communicate, form relationships
+### Phase 3: Agent State & Persistence
+> Agents that remember across sessions and maintain coherent internal state.
 
-### Long Term — Polish
-- [ ] **Memory Consolidation** — background reflection, memory decay, importance scoring (§11)
-- [ ] **Performance Tuning** — LLM call batching, context window optimization
 - [ ] **Persistence** — save/load game state, agent memory across sessions
+- [ ] **Multi-Agent Social** — agents that perceive each other, communicate, form relationships
+- [ ] **Object Interactions** — multi-step affordances, object state changes, dependencies
+
+### Phase 4: Presentation & Scale (Deferred)
+> Visual layer and authoring tools — only after the cognitive core is solid.
+
+- [ ] **Visual Output** — canvas/WebGL renderer for the simulation
+- [ ] **Scene Authoring** — tools for defining rooms, objects, agents
+- [ ] **Performance Tuning** — LLM batching, context window optimization
 
 ## Architecture Coverage Map
 
@@ -73,3 +80,4 @@
 | 2026-08-07 | Controller → Pipeline Orchestrator | Single workflow, no event storms |
 | 2026-08-17 | Tool calling replaces structured output | 3x faster, reliable field names, simpler code |
 | 2026-08-17 | Configurable decay rate (0.1/sec) | Real LLM too slow for 1.0/sec decay |
+| 2026-08-17 | Core cognition before visuals | Emergent behavior is the priority, not presentation |
