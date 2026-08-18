@@ -82,6 +82,7 @@ export class ReflectServiceImpl {
 
       // Build the context payload.
       const payload = reflectBuilder.build(agentId, agentState, executeResult, profile);
+      payload.agentId = agentId;
 
       // Call the LLM and await the ReflectLLMResponse.
       const response = await llmClient.completeReflect(payload);

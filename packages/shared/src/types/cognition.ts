@@ -128,6 +128,68 @@ export interface UpdateStateResult {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Cognitive Tool Execution (spec 015 — §8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The result of executing `query_memory` mid-loop (spec 015, Req 3).
+ *
+ * `memories` contains the top-K `MemorySnippet` objects from
+ * `MemoryInjector.activeRecall`. An empty array means no memories were found
+ * or no memory subsystem is wired (never an error).
+ */
+export interface QueryMemoryToolResult {
+  memories: MemorySnippet[];
+}
+
+/**
+ * The confirmation result of executing `update_internal_state` mid-loop
+ * (spec 015, Req 4). Sent back to the LLM as the tool result content.
+ */
+export interface UpdateStateToolResult {
+  /** `true` when the update was applied (even partially). */
+  success: boolean;
+  /** `true` only if `newGoal` was provided and applied. */
+  goalUpdated: boolean;
+  /** `true` only if `driveOverrides` was provided and applied. */
+  drivesUpdated: boolean;
+  /** Human-readable confirmation sent back to the LLM. */
+  message: string;
+}
+
+/**
+ * Bridge interface (defined in `shared`) for the state update operations needed
+ * by `update_internal_state` mid-loop (spec 015, Req 2). A focused subset of
+ * `ReflectDataProvider` so `CognitiveToolExecutorImpl` does not need to depend
+ * on the full `ReflectDataProvider` (which carries memory storage and plan
+ * clearing methods unrelated to cognitive tool execution).
+ */
+export interface CognitiveToolDataProvider {
+  /** Update the agent's current goal. */
+  updateGoal(agentId: string, goal: string): void;
+  /** Apply drive changes (clamped to 0–100 by the DriveSystem). */
+  applyDriveChanges(agentId: string, changes: Partial<Record<string, number>>): void;
+}
+
+/**
+ * Bridge interface (defined in `shared`) that the cognition layer calls to
+ * execute cognitive tools mid-loop (spec 015, Req 1). The application entry
+ * point provides a concrete implementation (e.g., `CognitiveToolExecutorImpl`
+ * in `cognition`) that wires `MemoryInjector.activeRecall` and the state data
+ * provider.
+ */
+export interface CognitiveToolExecutor {
+  /** Execute query_memory: embed the query, search the memory store, return top-K snippets. */
+  executeQueryMemory(agentId: string, query: string, topK: number): Promise<QueryMemoryToolResult>;
+  /** Execute update_internal_state: update goal and/or drives, return confirmation. */
+  executeUpdateInternalState(
+    agentId: string,
+    newGoal?: string,
+    driveOverrides?: Partial<Record<string, number>>,
+  ): Promise<UpdateStateToolResult>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Cognitive Guardrails (Section 10)
 // ─────────────────────────────────────────────────────────────────────────────
 
