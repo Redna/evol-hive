@@ -23,7 +23,7 @@ import type {
   ReflectionResult,
 } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
-import { createPPEROrchestrator } from '@evol-hive/cognition';
+import { createPPEROrchestrator, GuardrailEngineImpl } from '@evol-hive/cognition';
 import type { AffordanceClassifier } from '@evol-hive/cognition';
 import type {
   EmbeddingProvider as MemEmbeddingProvider,
@@ -361,6 +361,7 @@ function makeConfig(): import('@evol-hive/shared').EngineConfig {
     spatialDebounceSeconds: 5,
     maxConcurrentLLM: 8,
     guardrailsEnabled: true,
+    guardrails: { affordanceMasking: true, contextualForcing: true, planValidation: true },
   };
 }
 
@@ -378,6 +379,11 @@ export function buildOfficeDayEngine(): AssembledEngine {
   const llmClient: LLMClient = new OfficeDayMockLLMClient();
   const classifier: AffordanceClassifier = makeMockClassifier();
 
+  const guardrail =
+    config.guardrailsEnabled
+      ? new GuardrailEngineImpl(config.guardrails)
+      : undefined;
+
   const orchestrator = createPPEROrchestrator({
     perceptionProvider: core.bridges.perception,
     planProvider: core.bridges.plan,
@@ -385,6 +391,7 @@ export function buildOfficeDayEngine(): AssembledEngine {
     reflectProvider: core.bridges.reflect,
     classifier,
     llmClient,
+    ...(guardrail !== undefined ? { guardrail } : {}),
   });
 
   const gameLoop = assembleGameLoop(core, orchestrator);

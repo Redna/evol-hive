@@ -19,10 +19,13 @@
  */
 
 import type { ExecuteResult, ExecuteDataProvider } from '@evol-hive/shared';
+import type { GuardrailEngine } from '../index.js';
 
 /** Constructor options for {@link ExecuteServiceImpl}. */
 export interface ExecuteServiceOptions {
   dataProvider: ExecuteDataProvider;
+  /** Optional guardrail engine for plan validation (spec 016, Req 11). */
+  guardrail?: GuardrailEngine;
 }
 
 /** Concrete ExecuteService that orchestrates deterministic affordance execution. */
@@ -60,6 +63,25 @@ export class ExecuteServiceImpl {
         dataProvider.advanceStep(agentId);
         const planComplete = dataProvider.isPlanComplete(agentId);
         return { success: true, planComplete, stepSkipped: true };
+      }
+
+      // Plan validation (spec 016, Req 11): before executing, validate that the
+      // action aligns with the current plan. If the guardrail rejects it, set
+      // system feedback, stop thinking, and return a deviation result.
+      const guardrail = this.options.guardrail;
+      if (guardrail !== undefined) {
+        const validation = guardrail.validateAction(step.targetAffordance, agentState.currentPlan);
+        if (!validation.valid) {
+          const reason = validation.reason ?? 'Action deviates from plan';
+          dataProvider.setSystemFeedback(agentId, reason);
+          dataProvider.setThinking(agentId, false);
+          return {
+            success: false,
+            error: reason,
+            planComplete: false,
+            deviationRejected: true,
+          };
+        }
       }
 
       // Resolve the affordance to a specific object in the agent's room.

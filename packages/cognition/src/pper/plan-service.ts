@@ -18,7 +18,7 @@ import type {
   PlanDataProvider,
   FormulatePlanResult,
 } from '@evol-hive/shared';
-import type { LLMClient, PlanBuilder } from '../index.js';
+import type { LLMClient, PlanBuilder, GuardrailEngine } from '../index.js';
 import { LLMResponseError } from '../llm/index.js';
 
 /** Constructor options for {@link PlanServiceImpl}. */
@@ -26,6 +26,8 @@ export interface PlanServiceOptions {
   planBuilder: PlanBuilder;
   llmClient: LLMClient;
   dataProvider: PlanDataProvider;
+  /** Optional guardrail engine for contextual forcing (spec 016, Req 9). */
+  guardrail?: GuardrailEngine;
 }
 
 /** Concrete PlanService that orchestrates plan formulation via the LLM. */
@@ -45,7 +47,19 @@ export class PlanServiceImpl {
     dataProvider.setThinking(agentId, true);
 
     try {
-      const payload = planBuilder.build(perceptionResult);
+      // Determine guardrail flags for contextual forcing (spec 016, Req 9).
+      const guardrail = this.options.guardrail;
+      let builderOptions: import('./plan-builder.js').PlanBuilderGuardrailOptions | undefined;
+      if (guardrail !== undefined) {
+        const hasPlan =
+          existingState?.currentPlan !== null && existingState?.currentPlan !== undefined;
+        builderOptions = {
+          hasPlan,
+          forcingEnabled: guardrail.config.contextualForcing,
+        };
+      }
+
+      const payload = planBuilder.build(perceptionResult, builderOptions);
       const result = await llmClient.completePlan(payload);
 
       // Validate the LLM response before storing (§7 / Req 15).

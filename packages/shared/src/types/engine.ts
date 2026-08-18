@@ -20,12 +20,16 @@ export interface PendingAction {
   };
 }
 
+import type { GuardrailConfig } from './cognition.js';
+
 /** Engine configuration. */
 export interface EngineConfig {
   fps: number;
   spatialDebounceSeconds: number;
   maxConcurrentLLM: number;
   guardrailsEnabled: boolean;
+  /** Per-guardrail toggle flags (spec 016, Req 1). */
+  guardrails: GuardrailConfig;
 }
 
 /** A single game loop tick. */
@@ -48,6 +52,22 @@ export interface PPERSchedulerConfig {
 export function defaultPPERSchedulerConfig(): PPERSchedulerConfig {
   const maxConcurrentCycles = Number(process.env['ENGINE_MAX_CONCURRENT_LLM'] ?? 8);
   return { maxConcurrentCycles };
+}
+
+/** Default guardrail config — all three guardrails enabled (spec 016, Req 2, AC-1). */
+export function defaultGuardrailConfig(): GuardrailConfig {
+  return { affordanceMasking: true, contextualForcing: true, planValidation: true };
+}
+
+/** Default engine config with all existing defaults plus guardrails (spec 016, Req 2, AC-2). */
+export function defaultEngineConfig(): EngineConfig {
+  return {
+    fps: 60,
+    spatialDebounceSeconds: 5,
+    maxConcurrentLLM: 8,
+    guardrailsEnabled: true,
+    guardrails: defaultGuardrailConfig(),
+  };
 }
 
 /**

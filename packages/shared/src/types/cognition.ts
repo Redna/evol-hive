@@ -141,6 +141,20 @@ export interface GuardrailConfig {
   planValidation: boolean;
 }
 
+/** The result of plan validation (spec 016, Req 3). */
+export interface PlanValidationResult {
+  valid: boolean;
+  reason?: string;
+}
+
+/** Forcing directive injected when the agent has no plan (spec 016, Req 4). */
+export const GUARDRAIL_FORCING_DIRECTIVE =
+  'You have no active plan. You must use formulate_plan to create a plan before taking any physical action.';
+
+/** Deviation feedback template — `{action}` is replaced with the rejected action (spec 016, Req 4). */
+export const GUARDRAIL_DEVIATION_FEEDBACK_TEMPLATE =
+  "Action '{action}' deviates from your plan. Use reflect to reconsider.";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Re-exports
 // ─────────────────────────────────────────────────────────────────────────────
@@ -201,6 +215,8 @@ export interface PerceptionDataProvider {
   getAssociativeMemories?(agentId: string): MemorySnippet[] | undefined;
   /** The agent's full profile (including persona fields), or `null` if the agent does not exist (spec 012, Req 4). */
   getAgentProfile(agentId: string): AgentProfile | null;
+  /** The agent's current internal state, or `null` if the agent does not exist (spec 016, Req 8). */
+  getAgentState?(agentId: string): AgentInternalState | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -221,6 +237,8 @@ export interface ExecuteResult {
   error?: string;
   planComplete: boolean;
   stepSkipped?: boolean;
+  /** `true` when the action was rejected by plan validation (spec 016, Req 13). */
+  deviationRejected?: boolean;
 }
 
 /**
