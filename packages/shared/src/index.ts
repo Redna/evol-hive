@@ -10,6 +10,7 @@ export * from './types/engine.js';
 export * from './types/memory.js';
 export * from './types/world.js';
 export * from './types/embedding.js';
+export * from './types/persistence.js';
 
 // Schemas
 export * from './schemas/llm-schemas.js';

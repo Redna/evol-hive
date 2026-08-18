@@ -46,6 +46,22 @@ export class SceneManagerImpl implements SceneManager {
     if (!state) return null;
     return this.rooms.get(state.location) ?? null;
   }
+
+  /** Return all rooms as an array (spec 017, Req 15 / AC-26). Read-only. */
+  getAllRooms(): Room[] {
+    return [...this.rooms.values()];
+  }
+
+  /**
+   * Replace the internal room map contents with the provided rooms (spec 017,
+   * Req 15 / AC-27). The existing `agentManager` binding is preserved.
+   */
+  restoreRooms(rooms: Map<string, Room>): void {
+    this.rooms.clear();
+    for (const [id, room] of rooms) {
+      this.rooms.set(id, room);
+    }
+  }
 }
 
 export {};
