@@ -33,6 +33,10 @@ export interface VectorStore {
   ): Promise<void>;
   /** Return all `MemoryNode` objects stored for the given `agentId` (spec 014, Req 3). */
   queryByAgent(agentId: string): Promise<import('@evol-hive/shared').MemoryNode[]>;
+  /** Return all `MemoryNode` objects in the store, regardless of `agentId` (spec 017, Req 9). */
+  exportAll(): Promise<import('@evol-hive/shared').MemoryNode[]>;
+  /** Clear the store and replace its contents with the provided nodes (spec 017, Req 10). */
+  importAll(nodes: import('@evol-hive/shared').MemoryNode[]): Promise<void>;
 }
 
 // ── Retrieval (Section 11.2) ──────────────────────────────────────────────────

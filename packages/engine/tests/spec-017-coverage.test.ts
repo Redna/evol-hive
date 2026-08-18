@@ -49,7 +49,9 @@ describe('Spec 017 — Document structure', () => {
 
   it('spec file has the correct title', () => {
     const content = readFile(SPEC_PATH);
-    expect(content).toContain('# Feature: Persistence — Save/Load Game State and Agent Memory Across Sessions');
+    expect(content).toContain(
+      '# Feature: Persistence — Save/Load Game State and Agent Memory Across Sessions',
+    );
   });
 
   it('spec file contains 29 requirements', () => {
@@ -199,9 +201,7 @@ describe('Spec 017 — Acceptance Criteria scaffolds (pending implementation)', 
     'AC-4: WorldSnapshot interface is defined in persistence.ts with rooms: Room[] and objects: SmartObject[].',
   );
 
-  it.todo(
-    'AC-5: SAVE_FORMAT_VERSION constant is defined in persistence.ts with value 1.',
-  );
+  it.todo('AC-5: SAVE_FORMAT_VERSION constant is defined in persistence.ts with value 1.');
 
   it.todo(
     'AC-6: SaveFormatVersionError class is defined in persistence.ts, extends Error, and has expected and actual number properties.',
@@ -293,9 +293,7 @@ describe('Spec 017 — Acceptance Criteria scaffolds (pending implementation)', 
     'AC-25: GameLoopImpl.restoreState(tickNumber, simulationTime) sets the internal tickNumber and simulationTime and updates currentGameTick. After restoreState(42, 123.45), currentTick() returns { tickNumber: 42, simulationTime: 123.45, deltaSeconds: <existing> }.',
   );
 
-  it.todo(
-    'AC-26: SceneManagerImpl.getAllRooms() returns all rooms as an array.',
-  );
+  it.todo('AC-26: SceneManagerImpl.getAllRooms() returns all rooms as an array.');
 
   it.todo(
     'AC-27: SceneManagerImpl.restoreRooms(rooms) replaces the internal room map. After restoreRooms(newMap), getRoom() returns rooms from the new map.',
@@ -311,9 +309,7 @@ describe('Spec 017 — Acceptance Criteria scaffolds (pending implementation)', 
     'AC-29: AutoSaveSystem is defined in packages/engine/src/systems/auto-save.ts and exported from packages/engine/src/index.ts. Its name is "auto-save".',
   );
 
-  it.todo(
-    'AC-30: AutoSaveSystem.update() is a no-op when config.enabled is false.',
-  );
+  it.todo('AC-30: AutoSaveSystem.update() is a no-op when config.enabled is false.');
 
   it.todo(
     'AC-31: AutoSaveSystem.update() calls persistence.saveToFile(config.filePath) every intervalTicks ticks when enabled is true and filePath is set (fire-and-forget).',
