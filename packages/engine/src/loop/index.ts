@@ -61,6 +61,26 @@ export class GameLoopImpl implements GameLoop {
     return this.currentGameTick;
   }
 
+  /**
+   * Restore the internal `tickNumber` and `simulationTime` and update
+   * `currentGameTick` (spec 017, Req 15). The loop must not be running when
+   * called — if it is, a warning is logged and the restore proceeds anyway.
+   */
+  restoreState(tickNumber: number, simulationTime: number): void {
+    if (this.running) {
+      console.warn(
+        '[GameLoopImpl] restoreState called while running — caller should stop the loop first.',
+      );
+    }
+    this.tickNumber = tickNumber;
+    this.simulationTime = simulationTime;
+    this.currentGameTick = {
+      tickNumber,
+      simulationTime,
+      deltaSeconds: this.deltaSeconds,
+    };
+  }
+
   /** Schedule the next frame via setTimeout (deterministic & test-friendly). */
   private scheduleNextFrame(): void {
     if (!this.running) return;

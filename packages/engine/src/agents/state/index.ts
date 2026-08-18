@@ -60,6 +60,14 @@ export class AgentManagerImpl implements AgentManager {
   getProfile(agentId: string): AgentProfile | null {
     return this.profiles.get(agentId) ?? null;
   }
+
+  // ── Spec 017 (persistence) ────────────────────────────────────────────────
+
+  /** Clear all agents and profiles (spec 017 — used by load() before rebuilding). */
+  clear(): void {
+    this.agents.clear();
+    this.profiles.clear();
+  }
 }
 
 export {};

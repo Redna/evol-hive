@@ -94,6 +94,21 @@ export class InMemoryVectorStore implements VectorStore {
     }
     return result;
   }
+
+  // ── Spec 017 (persistence) — export/import ────────────────────────────────
+
+  /** Return copies of all stored `MemoryNode` objects (spec 017, Req 11). */
+  async exportAll(): Promise<MemoryNode[]> {
+    return [...this.nodes.values()].map((n) => ({ ...n }));
+  }
+
+  /** Clear all existing nodes and store copies of the provided `nodes` (spec 017, Req 12). */
+  async importAll(nodes: MemoryNode[]): Promise<void> {
+    this.nodes.clear();
+    for (const node of nodes) {
+      this.nodes.set(node.id, { ...node });
+    }
+  }
 }
 
 export {};

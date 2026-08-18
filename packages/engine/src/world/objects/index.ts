@@ -51,6 +51,18 @@ export class SmartObjectRegistryImpl implements SmartObjectRegistry {
       this.objects.set(objectId, { ...object, state: newState });
     }
   }
+
+  // ── Spec 017 (persistence) — export ───────────────────────────────────────
+
+  /** Return all objects as an array, including their current runtime state (spec 017, Req 15). */
+  getAllObjects(): SmartObject[] {
+    return [...this.objects.values()];
+  }
+
+  /** Clear all registered objects (spec 017 — used by load() before rebuilding). */
+  clear(): void {
+    this.objects.clear();
+  }
 }
 
 export {};
