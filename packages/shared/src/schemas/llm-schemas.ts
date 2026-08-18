@@ -69,6 +69,12 @@ export const queryMemorySchema = {
       type: 'string',
       description: 'The search query for active recall.',
     },
+    topK: {
+      type: 'integer',
+      minimum: 1,
+      maximum: 20,
+      description: 'Maximum number of memories to retrieve (default: 5).',
+    },
   },
   required: ['query'],
   additionalProperties: false,
@@ -194,5 +200,25 @@ export const memoryConsolidationTool: ToolDefinition = {
     name: 'consolidate_memories',
     description: 'Consolidate memory nodes into higher-level insights',
     parameters: memoryConsolidationSchema,
+  },
+};
+
+/** Tool definition for the query_memory cognitive tool (spec 015, Req 7). */
+export const queryMemoryTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'query_memory',
+    description: 'Actively recall relevant memories for the current situation.',
+    parameters: queryMemorySchema,
+  },
+};
+
+/** Tool definition for the update_internal_state cognitive tool (spec 015, Req 7). */
+export const updateInternalStateTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'update_internal_state',
+    description: 'Update the agent goal or drive overrides.',
+    parameters: updateInternalStateSchema,
   },
 };

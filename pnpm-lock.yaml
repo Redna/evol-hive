@@ -50,6 +50,9 @@ importers:
 
   packages/cognition:
     dependencies:
+      '@evol-hive/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@evol-hive/shared':
         specifier: workspace:*
         version: link:../shared

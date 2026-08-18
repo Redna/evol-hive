@@ -8,6 +8,11 @@
 
 import type { CognitiveTool, ToolDefinition } from '@evol-hive/shared';
 
+export {
+  CognitiveToolExecutorImpl,
+  type CognitiveToolExecutorOptions,
+} from './cognitive-tool-executor.js';
+
 /** The default cognitive tools available to every agent (Section 8). */
 export const defaultCognitiveTools: CognitiveTool[] = [
   {
@@ -28,7 +33,13 @@ export const defaultCognitiveTools: CognitiveTool[] = [
     argsSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'The recall query.' },
+        query: { type: 'string', description: 'The search query for active recall.' },
+        topK: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 20,
+          description: 'Maximum number of memories to retrieve (default: 5).',
+        },
       },
       required: ['query'],
       additionalProperties: false,

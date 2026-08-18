@@ -23,6 +23,7 @@ import type {
   MemorySnippet,
   MemoryType,
   ToolDefinition,
+  CognitiveToolExecutor,
 } from '@evol-hive/shared';
 import { memoryConsolidationTool } from '@evol-hive/shared';
 import type { LLMContextPayload } from '../index.js';
@@ -114,14 +115,43 @@ export interface OpenAICompatibleLLMClientConfig {
   retryOnTimeout?: boolean;
   /** Optional reasoning effort level (spec 011, Req 7). When set, `reasoning_effort` is included in the request body. */
   reasoningEffort?: 'low' | 'medium' | 'high' | 'none';
+  /**
+   * Optional cognitive tool executor (spec 015, Req 12). When set, the client
+   * executes cognitive tools (`query_memory`, `update_internal_state`) mid-loop
+   * via this executor. When absent, the client falls back to single-request
+   * behavior (no loop).
+   */
+  cognitiveToolExecutor?: CognitiveToolExecutor;
+  /**
+   * Maximum number of tool call iterations in the loop (default: 3, spec 015,
+   * Req 12). Must be ≥ 1. If set to 0 or negative, defaults to 3.
+   */
+  maxToolCallIterations?: number;
 }
 
 // ─── Internal types ──────────────────────────────────────────────────────────
 
-interface ChatMessage {
-  role: 'system' | 'user';
-  content: string;
-}
+/**
+ * Chat message types used by the client (spec 015, Req 13). The system/user
+ * variants are produced by the message builders; the assistant (with
+ * `tool_calls`) and tool result variants are constructed internally by the
+ * tool call loop.
+ */
+export type ChatMessage =
+  | { role: 'system' | 'user'; content: string }
+  | {
+      role: 'assistant';
+      content: string | null;
+      tool_calls?: Array<{
+        id: string;
+        type: 'function';
+        function: { name: string; arguments: string };
+      }>;
+    }
+  | { role: 'tool'; content: string; tool_call_id: string };
+
+/** The set of cognitive tool names executed mid-loop (spec 015, Req 14). */
+const COGNITIVE_TOOL_NAMES = new Set<string>(['query_memory', 'update_internal_state']);
 
 interface ConsolidatedMemoryItem {
   content: string;
@@ -156,6 +186,8 @@ export class OpenAICompatibleLLMClient {
   private readonly agentId: string;
   private readonly retryOnTimeout: boolean;
   private readonly reasoningEffort: 'low' | 'medium' | 'high' | 'none' | undefined;
+  private readonly cognitiveToolExecutor: CognitiveToolExecutor | undefined;
+  private readonly maxToolCallIterations: number;
 
   constructor(config: OpenAICompatibleLLMClientConfig) {
     this.baseUrl = config.baseUrl;
@@ -168,13 +200,16 @@ export class OpenAICompatibleLLMClient {
     this.agentId = config.agentId ?? '';
     this.retryOnTimeout = config.retryOnTimeout ?? true;
     this.reasoningEffort = config.reasoningEffort;
+    this.cognitiveToolExecutor = config.cognitiveToolExecutor;
+    const configuredIterations = config.maxToolCallIterations ?? 3;
+    this.maxToolCallIterations = configuredIterations >= 1 ? configuredIterations : 3;
   }
 
   // ── LLMClient: completeStructured (Req 10) ─────────────────────────────────
 
   async completeStructured(payload: LLMContextPayload): Promise<LLMActionResponse> {
     const messages = this.buildPayloadMessages(payload);
-    const parsed = await this.requestChat(messages, payload.tools);
+    const parsed = await this.requestChat(messages, payload.tools, payload.agentId);
 
     const reasoning = parsed['reasoning'];
     const action = parsed['action'];
@@ -202,7 +237,7 @@ export class OpenAICompatibleLLMClient {
 
   async completePlan(payload: LLMContextPayload): Promise<FormulatePlanResult> {
     const messages = this.buildPayloadMessages(payload);
-    const parsed = await this.requestChat(messages, payload.tools);
+    const parsed = await this.requestChat(messages, payload.tools, payload.agentId);
 
     const description = parsed['description'];
     const steps = parsed['steps'];
@@ -243,7 +278,7 @@ export class OpenAICompatibleLLMClient {
 
   async completeReflect(payload: LLMContextPayload): Promise<ReflectLLMResponse> {
     const messages = this.buildPayloadMessages(payload);
-    const parsed = await this.requestChat(messages, payload.tools);
+    const parsed = await this.requestChat(messages, payload.tools, payload.agentId);
 
     const result: ReflectLLMResponse = {};
     if (typeof parsed['newGoal'] === 'string') {
@@ -322,34 +357,127 @@ export class OpenAICompatibleLLMClient {
     };
   }
 
-  // ── Private: shared request method (spec 011 — tool calling) ────────────────
+  // ── Private: shared request method (spec 011 — tool calling; spec 015 — tool call loop) ────
 
   /**
    * Shared low-level request method used by all four public methods.
    * Sends tool definitions via the `tools` parameter and parses the response
    * from `choices[0].message.tool_calls[0].function.arguments`.
-   * Handles HTTP, authorization, timeout, retries (429), and errors.
+   *
+   * When a `cognitiveToolExecutor` is configured and `agentId` is provided
+   * (spec 015, Req 15), runs a multi-turn tool call loop: cognitive tools
+   * (`query_memory`, `update_internal_state`) are executed mid-loop and their
+   * results fed back to the LLM; the loop terminates when a terminal tool is
+   * called or `maxToolCallIterations` is exceeded. Otherwise behaves exactly
+   * as the single-request implementation (spec 011).
    */
   private async requestChat(
     messages: ChatMessage[],
     tools: ToolDefinition[],
+    agentId?: string,
   ): Promise<Record<string, unknown>> {
     const url = `${this.baseUrl}/chat/completions`;
-    const { rawBody } = await this.sendRequest(url, messages, tools);
-    return rawBody;
+
+    // When the cognitive tool executor is not wired or no agentId is available,
+    // fall back to single-request behavior (spec 015, Req 15 step 5).
+    if (this.cognitiveToolExecutor === undefined || agentId === undefined) {
+      const { argsStr } = await this.sendRequest(url, messages, tools);
+      return this.parseToolCallArgs(argsStr, url);
+    }
+
+    // Multi-turn tool call loop (spec 015, Req 15).
+    const executor = this.cognitiveToolExecutor;
+    const workingMessages = [...messages];
+    let iterationCount = 0;
+
+    for (;;) {
+      const { toolCallId, toolName, argsStr } = await this.sendRequest(url, workingMessages, tools);
+
+      // Terminal tool — parse arguments and return (Req 15 step 3).
+      if (!COGNITIVE_TOOL_NAMES.has(toolName)) {
+        return this.parseToolCallArgs(argsStr, url);
+      }
+
+      // Cognitive tool — execute mid-loop (Req 15 step 4).
+      let toolResultContent: string;
+      try {
+        const args = this.parseToolCallArgs(argsStr, url);
+        let result: unknown;
+        if (toolName === 'query_memory') {
+          const query = typeof args['query'] === 'string' ? (args['query'] as string) : '';
+          const topK = typeof args['topK'] === 'number' ? (args['topK'] as number) : 5;
+          result = await executor.executeQueryMemory(agentId, query, topK);
+        } else {
+          // update_internal_state
+          const newGoal =
+            typeof args['newGoal'] === 'string' ? (args['newGoal'] as string) : undefined;
+          const driveOverrides =
+            typeof args['driveOverrides'] === 'object' && args['driveOverrides'] !== null
+              ? (args['driveOverrides'] as Partial<Record<string, number>>)
+              : undefined;
+          result = await executor.executeUpdateInternalState(agentId, newGoal, driveOverrides);
+        }
+        toolResultContent = JSON.stringify(result);
+      } catch (err) {
+        // Secondary safety net — send the error back to the LLM (Req 17).
+        const message = err instanceof Error ? err.message : String(err);
+        toolResultContent = JSON.stringify({ error: message });
+      }
+
+      // Append the assistant message (with tool_calls) and the tool result message.
+      workingMessages.push({
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          { id: toolCallId, type: 'function', function: { name: toolName, arguments: argsStr } },
+        ],
+      });
+      workingMessages.push({
+        role: 'tool',
+        content: toolResultContent,
+        tool_call_id: toolCallId,
+      });
+
+      // Increment the iteration counter and enforce the limit (Req 15 step 4e).
+      // The limit counts cognitive tool executions — after `maxToolCallIterations`
+      // executions, the loop terminates rather than sending another request.
+      iterationCount++;
+      if (iterationCount >= this.maxToolCallIterations) {
+        throw new LLMError(
+          `Tool call loop exceeded max iterations (${this.maxToolCallIterations}). Last tool: ${toolName}.`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Parses the raw `function.arguments` string into an object, throwing
+   * `LLMResponseError` on invalid JSON.
+   */
+  private parseToolCallArgs(argsStr: string, url: string): Record<string, unknown> {
+    try {
+      return JSON.parse(argsStr) as Record<string, unknown>;
+    } catch {
+      throw new LLMResponseError(
+        `LLM response from ${url} has invalid JSON in tool_calls[0].function.arguments.`,
+        argsStr,
+      );
+    }
   }
 
   // ── Private: low-level HTTP request with retry loop ─────────────────────────
 
   /**
-   * Sends a single logical request (with 429 retry loop) and returns the parsed
-   * tool call arguments from `choices[0].message.tool_calls[0].function.arguments`.
+   * Sends a single logical request (with 429 retry loop) and returns the raw
+   * tool call details (`toolCallId`, `toolName`, `argsStr`) extracted from
+   * `choices[0].message.tool_calls[0]` (spec 015 refactor). The caller parses
+   * `argsStr` and decides whether to continue the tool call loop.
    */
   private async sendRequest(
     url: string,
     messages: ChatMessage[],
     tools: ToolDefinition[],
-  ): Promise<{ rawBody: Record<string, unknown> }> {
+  ): Promise<{ toolCallId: string; toolName: string; argsStr: string }> {
     const bodyObj: Record<string, unknown> = {
       model: this.model,
       messages,
@@ -482,7 +610,9 @@ export class OpenAICompatibleLLMClient {
       }
 
       const toolCall = toolCalls[0] as Record<string, unknown>;
+      const toolCallId = typeof toolCall['id'] === 'string' ? (toolCall['id'] as string) : '';
       const fn = toolCall['function'] as Record<string, unknown> | undefined;
+      const toolName = typeof fn?.['name'] === 'string' ? (fn!['name'] as string) : '';
       const argsStr = fn?.['arguments'];
 
       if (typeof argsStr !== 'string') {
@@ -492,15 +622,7 @@ export class OpenAICompatibleLLMClient {
         );
       }
 
-      try {
-        const parsed = JSON.parse(argsStr) as Record<string, unknown>;
-        return { rawBody: parsed };
-      } catch {
-        throw new LLMResponseError(
-          `LLM response from ${url} has invalid JSON in tool_calls[0].function.arguments.`,
-          argsStr,
-        );
-      }
+      return { toolCallId, toolName, argsStr };
     }
 
     // Should be unreachable — the loop always returns or throws.

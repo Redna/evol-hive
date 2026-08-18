@@ -466,9 +466,10 @@ describe('Package boundaries (AC-34)', () => {
     // The dependency list should not include any new packages beyond what
     // was already there. We verify the key set is stable (no unexpected additions).
     const deps = Object.keys(pkgJson.dependencies || {});
-    // @evol-hive/shared should be the only workspace dependency.
+    // @evol-hive/shared and @evol-hive/memory (added by spec 015, AC-36) are the
+    // only allowed workspace dependencies.
     const workspaceDeps = deps.filter((d) => d.startsWith('@evol-hive/'));
-    expect(workspaceDeps).toEqual(['@evol-hive/shared']);
+    expect(workspaceDeps).toEqual(['@evol-hive/shared', '@evol-hive/memory']);
   });
 
   it('no new npm dependencies in shared package.json', () => {

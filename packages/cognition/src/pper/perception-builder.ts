@@ -12,7 +12,13 @@
  */
 
 import type { AgentProfile, PerceptionResult } from '@evol-hive/shared';
-import { chooseActionTool, formatPersona, GUARDRAIL_FORCING_DIRECTIVE } from '@evol-hive/shared';
+import {
+  chooseActionTool,
+  queryMemoryTool,
+  updateInternalStateTool,
+  formatPersona,
+  GUARDRAIL_FORCING_DIRECTIVE,
+} from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
 
@@ -73,8 +79,7 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     if (noPlan && maskingEnabled) {
       tools = cognitiveToolsToToolDefinitions(defaultCognitiveTools);
     } else {
-      const actionCognitiveTools = defaultCognitiveTools.filter((t) => t.name !== 'formulate_plan');
-      tools = [chooseActionTool, ...cognitiveToolsToToolDefinitions(actionCognitiveTools)];
+      tools = [chooseActionTool, queryMemoryTool, updateInternalStateTool];
     }
 
     // System prompt: persona-prefixed or generic (spec 012, Req 7).

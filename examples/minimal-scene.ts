@@ -24,7 +24,7 @@ import type {
   EngineConfig,
 } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
-import { createPPEROrchestrator, OpenAICompatibleLLMClient, GuardrailEngineImpl } from '@evol-hive/cognition';
+import { createPPEROrchestrator, OpenAICompatibleLLMClient, GuardrailEngineImpl, CognitiveToolExecutorImpl } from '@evol-hive/cognition';
 import type { AffordanceClassifier } from '@evol-hive/cognition';
 import { OnnxEmbeddingProvider, AffordanceClassifierImpl, defaultClassifierConfig } from '@evol-hive/cognition';
 import type {
@@ -247,12 +247,29 @@ export function buildMinimalEngine(): AssembledEngine {
   // PPER orchestrator (cognition) wired from the engine bridges + LLM.
   const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
   const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as 'low' | 'medium' | 'high' | 'none' | undefined;
+
+  // Cognitive tool executor (spec 015, Req 24/26): wire the state data provider
+  // (the engine's reflect bridge implements updateGoal + applyDriveChanges) so
+  // `update_internal_state` is executed mid-loop. The minimal scene does not
+  // wire a MemoryInjector, so `query_memory` returns an empty result. When not
+  // using a real LLM, the mock client bypasses the loop entirely.
+  const maxToolCallIterationsEnv = process.env['LLM_MAX_TOOL_CALL_ITERATIONS'];
+  const maxToolCallIterations =
+    maxToolCallIterationsEnv !== undefined ? Number(maxToolCallIterationsEnv) : undefined;
+  const cognitiveToolExecutor = useRealLLM
+    ? new CognitiveToolExecutorImpl({
+        stateDataProvider: core.bridges.reflect,
+      })
+    : undefined;
+
   const llmClient: LLMClient = useRealLLM
     ? new OpenAICompatibleLLMClient({
         baseUrl: process.env['LLM_BASE_URL'] ?? 'http://localhost:11434/v1',
         model: process.env['LLM_MODEL'] ?? 'llama3.1',
         ...(process.env['LLM_API_KEY'] !== undefined ? { apiKey: process.env['LLM_API_KEY'] } : {}),
         ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
+        ...(cognitiveToolExecutor !== undefined ? { cognitiveToolExecutor } : {}),
+        ...(maxToolCallIterations !== undefined ? { maxToolCallIterations } : {}),
       })
     : new MockLLMClient();
 
