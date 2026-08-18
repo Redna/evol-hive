@@ -31,7 +31,7 @@ import type {
   PPERCycleStatus,
 } from '@evol-hive/shared';
 import { defaultPPERErrorConfig } from '@evol-hive/shared';
-import type { LLMClient } from '../index.js';
+import type { LLMClient, GuardrailEngine } from '../index.js';
 import type { AffordanceClassifier } from '../classifier/index.js';
 import {
   PerceptionServiceImpl,
@@ -52,6 +52,8 @@ export interface PPEROrchestratorOptions {
   llmClient: LLMClient;
   /** Optional error recovery config (spec 008, Req 8.3, AC-25). When omitted, defaults are used. */
   errorConfig?: PPERErrorConfig;
+  /** Optional guardrail engine for cognitive guardrails (spec 016, Req 12). */
+  guardrail?: GuardrailEngine;
 }
 
 /** Concrete PPEROrchestrator wiring the four phase services in sequence. */
@@ -73,17 +75,21 @@ export class PPEROrchestratorImpl {
   private readonly cooldownStartedAt = new Map<string, number>();
 
   constructor(options: PPEROrchestratorOptions) {
+    const guardrail = options.guardrail;
     this.perceptionService = new PerceptionServiceImpl({
       provider: options.perceptionProvider,
       classifier: options.classifier,
+      ...(guardrail !== undefined ? { guardrail } : {}),
     });
     this.planService = new PlanServiceImpl({
       planBuilder: new PlanBuilderImpl(),
       llmClient: options.llmClient,
       dataProvider: options.planProvider,
+      ...(guardrail !== undefined ? { guardrail } : {}),
     });
     this.executeService = new ExecuteServiceImpl({
       dataProvider: options.executeProvider,
+      ...(guardrail !== undefined ? { guardrail } : {}),
     });
     this.reflectService = new ReflectServiceImpl({
       reflectBuilder: new ReflectBuilderImpl(),
@@ -136,6 +142,23 @@ export class PPEROrchestratorImpl {
       // "No active plan" is not a failure (spec 008, Req 4.1, AC-11).
       if (execute.error === 'No active plan' && execute.planComplete) {
         // Expected state — cycle completes normally.
+        this.setPhase(agentId, 'perceive');
+        return;
+      }
+      // Plan-validation deviation routes to Reflect (spec 016, Req 12, AC-22).
+      if (execute.deviationRejected === true) {
+        this.setPhase(agentId, 'reflect');
+        const reflect: ReflectResult = await this.reflectService.reflect(agentId, execute);
+        if (!reflect.success) {
+          // Reflect failure on a deviation is still not counted as a cycle
+          // failure — the deviation itself is a recovery path, not an error.
+          this.setPhase(agentId, 'perceive');
+          return;
+        }
+        // Successful reflect after deviation — reset failure counter.
+        this.consecutiveFailures.set(agentId, 0);
+        this.cooldownStartedAt.delete(agentId);
+        this.lastErrors.delete(agentId);
         this.setPhase(agentId, 'perceive');
         return;
       }

@@ -20,7 +20,10 @@ export interface PPEROrchestrator {
 /** Builds the context window payload for the LLM (passive perception + memory). */
 export interface PerceptionBuilder {
   /** Construct the LLM context payload from the bundled Perceive-phase result. */
-  build(perceptionResult: import('@evol-hive/shared').PerceptionResult): LLMContextPayload;
+  build(
+    perceptionResult: import('@evol-hive/shared').PerceptionResult,
+    guardrailOptions?: import('./pper/perception-builder.js').PerceptionBuilderGuardrailOptions,
+  ): LLMContextPayload;
 }
 
 // ── Plan Builder ─────────────────────────────────────────────────────────────
@@ -28,7 +31,10 @@ export interface PerceptionBuilder {
 /** Builds the LLM context payload specifically for plan formulation (spec 002). */
 export interface PlanBuilder {
   /** Construct the plan-formulation context payload from the PerceptionResult. */
-  build(perceptionResult: import('@evol-hive/shared').PerceptionResult): LLMContextPayload;
+  build(
+    perceptionResult: import('@evol-hive/shared').PerceptionResult,
+    guardrailOptions?: import('./pper/plan-builder.js').PlanBuilderGuardrailOptions,
+  ): LLMContextPayload;
 }
 
 // ── Plan Service ──────────────────────────────────────────────────────────────
@@ -146,7 +152,7 @@ export interface GuardrailEngine {
   validateAction(
     action: string,
     plan: import('@evol-hive/shared').AgentPlan | null,
-  ): { valid: boolean; reason?: string };
+  ): import('@evol-hive/shared').PlanValidationResult;
 }
 
 // ── Re-exports ───────────────────────────────────────────────────────────────

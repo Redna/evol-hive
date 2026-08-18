@@ -280,12 +280,12 @@ describe('Spec 016 — Existing scaffolding verification', () => {
     expect(content).toContain('guardrailsEnabled: boolean');
   });
 
-  it('guardrails stub file exists (empty, awaiting implementation)', () => {
+  it('guardrails implementation file exists (implemented)', () => {
     const guardrailsPath = join(REPO_ROOT, 'packages/cognition/src/guardrails/index.ts');
     expect(fileExists(guardrailsPath)).toBe(true);
     const content = readFile(guardrailsPath);
-    // The stub should be essentially empty — just a comment and export {}
+    // The implementation now exports GuardrailEngineImpl.
+    expect(content).toContain('GuardrailEngineImpl');
     expect(content).toContain('export {}');
-    expect(content).toContain('TBD');
   });
 });

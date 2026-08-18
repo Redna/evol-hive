@@ -12,6 +12,7 @@ import type {
   PerceptionDataProvider,
 } from '@evol-hive/shared';
 import type { AffordanceClassifier } from '../classifier/index.js';
+import type { GuardrailEngine } from '../index.js';
 
 /**
  * Assembles a PassivePerception from the engine-facing data provider.
@@ -48,6 +49,8 @@ export class PassivePerceptionAssembler {
 export interface PerceptionServiceOptions {
   provider: PerceptionDataProvider;
   classifier: AffordanceClassifier;
+  /** Optional guardrail engine for affordance masking (spec 016, Req 8). */
+  guardrail?: GuardrailEngine;
 }
 
 /**
@@ -85,9 +88,27 @@ export class PerceptionServiceImpl {
       persona = undefined;
     }
 
+    // Affordance masking (spec 016, Req 8): after classifier pruning, if a
+    // guardrail engine is present, mask physical affordances when the agent
+    // has no plan. Cognitive tools are never masked (handled by the builder).
+    let maskedAffordances = prunedAffordances;
+    const guardrail = this.options.guardrail;
+    if (guardrail !== undefined) {
+      let hasPlan = false;
+      try {
+        if (typeof this.options.provider.getAgentState === 'function') {
+          const agentState = this.options.provider.getAgentState(agentId);
+          hasPlan = agentState?.currentPlan !== null && agentState?.currentPlan !== undefined;
+        }
+      } catch {
+        hasPlan = false;
+      }
+      maskedAffordances = guardrail.maskAffordances(prunedAffordances, hasPlan);
+    }
+
     return {
       passive,
-      prunedAffordances,
+      prunedAffordances: maskedAffordances,
       primaryDriveLabel,
       ...(stuck ? { stuck } : {}),
       ...(persona !== undefined ? { persona } : {}),

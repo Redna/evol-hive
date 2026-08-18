@@ -10,6 +10,7 @@
 import type {
   Affordance,
   AgentProfile,
+  AgentInternalState,
   SmartObjectSummary,
   PerceptionDataProvider,
 } from '@evol-hive/shared';
@@ -78,6 +79,10 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
 
   getAgentProfile(agentId: string): AgentProfile | null {
     return this.agentManager.getProfile(agentId);
+  }
+
+  getAgentState(agentId: string): AgentInternalState | null {
+    return this.agentManager.getState(agentId);
   }
 }
 

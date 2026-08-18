@@ -10,23 +10,36 @@
  */
 
 import type { AgentProfile, PerceptionResult } from '@evol-hive/shared';
-import {
-  formulatePlanTool,
-  formatPersona,
-  queryMemoryTool,
-  updateInternalStateTool,
-} from '@evol-hive/shared';
+import { formulatePlanTool, formatPersona, GUARDRAIL_FORCING_DIRECTIVE } from '@evol-hive/shared';
 import type { LLMContextPayload, PlanBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
+/** Options for contextual forcing in the Plan builder (spec 016, Req 9). */
+export interface PlanBuilderGuardrailOptions {
+  /** Whether the agent has an active plan. */
+  hasPlan?: boolean;
+  /** Whether contextual forcing is enabled. */
+  forcingEnabled?: boolean;
+}
+
 /** Concrete PlanBuilder producing the LLM context payload for plan formulation. */
 export class PlanBuilderImpl implements PlanBuilder {
-  build(perceptionResult: PerceptionResult): LLMContextPayload {
+  build(
+    perceptionResult: PerceptionResult,
+    guardrailOptions?: PlanBuilderGuardrailOptions,
+  ): LLMContextPayload {
     const { passive, prunedAffordances, primaryDriveLabel, persona } = perceptionResult;
     const objectNames = passive.objectsPresent.map((o) => o.name);
     const driveSummary = formatDrives(passive.drives);
 
-    const systemPrompt = buildSystemPrompt(persona, primaryDriveLabel);
+    let systemPrompt = buildSystemPrompt(persona, primaryDriveLabel);
+
+    // Contextual forcing directive (spec 016, Req 9).
+    const hasPlan = guardrailOptions?.hasPlan ?? true;
+    const forcingEnabled = guardrailOptions?.forcingEnabled ?? false;
+    if (!hasPlan && forcingEnabled) {
+      systemPrompt = `${systemPrompt} ${GUARDRAIL_FORCING_DIRECTIVE}`;
+    }
 
     const contextLines = [
       `Room: ${passive.roomId}`,
@@ -52,7 +65,7 @@ export class PlanBuilderImpl implements PlanBuilder {
       perceptionContext: contextLines.join('\n'),
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
-      tools: [formulatePlanTool, queryMemoryTool, updateInternalStateTool],
+      tools: [formulatePlanTool],
     };
   }
 }
