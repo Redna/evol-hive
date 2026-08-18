@@ -34,7 +34,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [014](014-memory-consolidation-decay-retrieval.md) | Memory Consolidation — Background Reflection, Importance Scoring, Memory Decay, Weighted Retrieval | §11, §6, §9, §2 | 🔍 In Review | [#50](https://github.com/Redna/evol-hive/issues/50) | [#53](https://github.com/Redna/evol-hive/pull/53) | shared, memory, cognition, engine |
 | [015](015-full-cognitive-tools.md) | Full Cognitive Tools — query_memory and update_internal_state as Real Tool Calls | §8, §6, §11 | 🔍 In Review | [#55](https://github.com/Redna/evol-hive/issues/55) | [#60](https://github.com/Redna/evol-hive/pull/60) | cognition, shared, examples |
 | [016](016-cognitive-guardrails.md) | Cognitive Guardrails — Affordance Masking, Contextual Forcing, Plan Validation | §10, §6, §9 | 🔍 In Review | [#54](https://github.com/Redna/evol-hive/issues/54) | [#59](https://github.com/Redna/evol-hive/pull/59) | shared, cognition, engine |
-| [017](017-persistence-save-load-game-state.md) | Persistence — Save/Load Game State and Agent Memory Across Sessions | §2, §3, §6, §11 | 📝 Drafted | [#61](https://github.com/Redna/evol-hive/issues/61) | [#64](https://github.com/Redna/evol-hive/pull/64) | shared, memory, engine |
+| [017](017-persistence-save-load-game-state.md) | Persistence — Save/Load Game State and Agent Memory Across Sessions | §2, §3, §6, §11 | 🔍 In Review | [#61](https://github.com/Redna/evol-hive/issues/61) | [#64](https://github.com/Redna/evol-hive/pull/64), [#67](https://github.com/Redna/evol-hive/pull/67) | shared, memory, engine |
 
 ## Architecture Coverage
 
@@ -58,8 +58,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      18
 ✅ Done:          0
 🔨 In Development: 0
-🔍 In Review:     13
-📝 Drafted:       3
+🔍 In Review:     14
+📝 Drafted:       2
 🚫 Blocked:       0
 ⛔ Superseded:    2
 
