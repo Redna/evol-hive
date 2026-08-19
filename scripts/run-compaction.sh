@@ -39,9 +39,16 @@ fi
 
 # Merge current files
 if [ "$GITHUB_ACTIONS" == "true" ]; then
-  cat "$WORKTREE"/*.jsonl > events.jsonl 2>/dev/null || true
+  if [ -f "$WORKTREE/events.jsonl" ]; then
+    mv "$WORKTREE/events.jsonl" "$WORKTREE/events-0000000000-base.jsonl"
+  fi
+  cat "$WORKTREE"/events-*.jsonl > events.jsonl 2>/dev/null || true
 else
-  cat *.jsonl > events.jsonl 2>/dev/null || true
+  if [ -f events.jsonl ]; then
+    mv events.jsonl events-0000000000-base.jsonl
+  fi
+  cat events-*.jsonl > events.jsonl 2>/dev/null || true
+  rm -f events-0000000000-base.jsonl events-*.jsonl 2>/dev/null || true
 fi
 
 # Run compactor

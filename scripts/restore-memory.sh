@@ -26,10 +26,19 @@ if [ "$GITHUB_ACTIONS" == "true" ]; then
   done
 fi
 
-# Extract all files instantly and concatenate
+# Extract all files instantly
 git archive origin/memory 2>/dev/null | tar -x || true
 
-cat *.jsonl > events.jsonl 2>/dev/null || touch events.jsonl
+# Properly merge base and deltas in chronological order
+if [ -f events.jsonl ]; then
+  mv events.jsonl events-0000000000-base.jsonl
+fi
+
+# Concatenate all events-*.jsonl files (base comes first due to 000 prefix)
+cat events-*.jsonl > events.jsonl 2>/dev/null || touch events.jsonl
+
+# Clean up delta files from workspace
+rm -f events-*.jsonl
 
 LINES=$(wc -l < events.jsonl | cut -d' ' -f1)
 SIZE=$(du -h events.jsonl | cut -f1)
