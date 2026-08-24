@@ -1,9 +1,9 @@
 /**
- * Spec 019 coverage tests — Wire SocialManager in Assembly & Example Scenes
- * ==========================================================================
- * PR #78 is a **spec-only PR** that introduces the specification document
- * `docs/specs/019-wire-social-manager.md` (23 requirements, 24 acceptance
- * criteria). No implementation code is included in this PR.
+ * Spec 019 coverage tests — Phase 4 Validation Scene (Coffee Shop)
+ * =================================================================
+ * PR #77 is a **spec-only PR** that introduces the specification document
+ * `docs/specs/019-validation-scene-coffee-shop.md` (24 requirements, 25
+ * acceptance criteria). No implementation code is included in this PR.
  *
  * This file serves two purposes:
  *
@@ -11,16 +11,22 @@
  *    exists, is well-formed, has the correct number of requirements and
  *    acceptance criteria, and that `docs/specs/INDEX.md` is updated.
  *
- * 2. **AC test scaffolds** — `it.todo()` stubs for each of the 24 acceptance
+ * 2. **AC test scaffolds** — `it.todo()` stubs for each of the 25 acceptance
  *    criteria. These are pending tests that will be activated (converted to
  *    real tests) when the implementation PR lands. They serve as a verifiable
  *    checklist ensuring no AC is forgotten during implementation.
  *
+ * Additionally, this file verifies that all existing subsystems the spec
+ * references as "already existing" are present in the codebase. The spec
+ * explicitly states "No new types or subsystems — purely integration assembly
+ * using existing implementations from specs 005–018", so confirming their
+ * presence validates the spec's assumptions.
+ *
  * Coverage summary:
- *   - AC-1 through AC-24: all scaffolded as `it.todo`
+ *   - AC-1 through AC-25: all scaffolded as `it.todo`
  *   - Spec document structure: 8 active tests
- *   - INDEX.md update: 3 active tests
- *   - Existing scaffolding verification: 7 active tests
+ *   - INDEX.md update: 2 active tests
+ *   - Existing scaffolding verification: 12 active tests
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
@@ -29,7 +35,7 @@ import { join, resolve } from 'node:path';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const REPO_ROOT = resolve(__dirname, '../../..');
-const SPEC_PATH = join(REPO_ROOT, 'docs/specs/019-wire-social-manager.md');
+const SPEC_PATH = join(REPO_ROOT, 'docs/specs/019-validation-scene-coffee-shop.md');
 const INDEX_PATH = join(REPO_ROOT, 'docs/specs/INDEX.md');
 
 function readFile(path: string): string {
@@ -43,50 +49,52 @@ function fileExists(path: string): boolean {
 // ─── Spec Document Validation ───────────────────────────────────────────────
 
 describe('Spec 019 — Document structure', () => {
-  it('spec file exists at docs/specs/019-wire-social-manager.md', () => {
+  it('spec file exists at docs/specs/019-validation-scene-coffee-shop.md', () => {
     expect(fileExists(SPEC_PATH)).toBe(true);
   });
 
   it('spec file has the correct title', () => {
     const content = readFile(SPEC_PATH);
     expect(content).toContain(
-      '# Feature: Wire SocialManager in Assembly & Example Scenes',
+      '# Feature: Phase 4 Validation Scene — "Coffee Shop" Comprehensive Integration Example',
     );
   });
 
-  it('spec file contains 23 requirements', () => {
+  it('spec file contains 24 requirements in the Requirements section', () => {
     const content = readFile(SPEC_PATH);
     // Requirements are numbered items in the "## Requirements" section.
+    // They start at "### Scene Definition" and end before "## Acceptance Criteria".
     const reqSection = content.split('## Requirements')[1]?.split('## Acceptance Criteria')[0];
     expect(reqSection).toBeDefined();
     const reqMatches = reqSection!.match(/^\d+\.\s\*\*/gm);
     expect(reqMatches).not.toBeNull();
-    expect(reqMatches!.length).toBe(23);
+    expect(reqMatches!.length).toBe(24);
   });
 
-  it('spec file contains exactly 24 acceptance criteria', () => {
+  it('spec file contains exactly 25 acceptance criteria', () => {
     const content = readFile(SPEC_PATH);
-    const acMatches = content.match(/- \[ \] \*\*AC-\d+\*\*:/g);
+    const acMatches = content.match(/- \[ \] AC-\d+:/g);
     expect(acMatches).not.toBeNull();
-    expect(acMatches!.length).toBe(24);
+    expect(acMatches!.length).toBe(25);
   });
 
-  it('spec file references the correct architecture sections (§3, §6, §8, §9)', () => {
+  it('spec file references the correct architecture sections (§1, §2, §4, §6, §8, §11)', () => {
     const content = readFile(SPEC_PATH);
-    expect(content).toContain('§3');
+    expect(content).toContain('§1');
+    expect(content).toContain('§2');
+    expect(content).toContain('§4');
     expect(content).toContain('§6');
     expect(content).toContain('§8');
-    expect(content).toContain('§9');
+    expect(content).toContain('§11');
   });
 
-  it('spec file references the correct issue (#73)', () => {
+  it('spec file references the correct issue (#74)', () => {
     const content = readFile(SPEC_PATH);
-    expect(content).toContain('#73');
+    expect(content).toContain('#74');
   });
 
-  it('spec file lists the correct packages: engine, examples', () => {
+  it('spec file references the examples package', () => {
     const content = readFile(SPEC_PATH);
-    expect(content).toContain('`engine`');
     expect(content).toContain('`examples`');
   });
 
@@ -99,115 +107,180 @@ describe('Spec 019 — Document structure', () => {
 // ─── INDEX.md Validation ────────────────────────────────────────────────────
 
 describe('Spec 019 — INDEX.md update', () => {
-  it('INDEX.md contains spec 019 row', () => {
+  it('INDEX.md contains spec 019 row with correct title and status', () => {
     const content = readFile(INDEX_PATH);
     expect(content).toContain('019');
-    expect(content).toContain('Wire SocialManager');
+    expect(content).toContain('Phase 4 Validation Scene');
+    expect(content).toContain('Coffee Shop');
+    // Status should be Drafted (📝)
+    expect(content).toContain('📝 Drafted');
   });
 
-  it('INDEX.md marks spec 019 as 📝 Drafted', () => {
+  it('INDEX.md references issue #74 for spec 019', () => {
     const content = readFile(INDEX_PATH);
-    // Find the line containing "019" and verify it includes "Drafted"
-    const lines = content.split('\n');
-    const spec019Line = lines.find((l) => l.includes('019') && l.includes('Wire SocialManager'));
-    expect(spec019Line).toBeDefined();
-    expect(spec019Line).toContain('📝 Drafted');
-  });
-
-  it('INDEX.md updates spec count summary to at least 21', () => {
-    const content = readFile(INDEX_PATH);
-    expect(content).toContain('Total specs:');
-    expect(content).toMatch(/Total specs:\s+2[0-9]/);
+    expect(content).toContain('#74');
   });
 });
 
 // ─── Existing Scaffolding Verification ──────────────────────────────────────
 //
-// These tests verify that the existing types and classes the spec references
-// as "already existing" (from spec 018) are present in the codebase. The spec
-// explicitly depends on these — confirming their presence validates the spec's
-// assumptions.
+// The spec explicitly states "No new types or subsystems — purely integration
+// assembly using existing implementations from specs 005–018". These tests
+// verify that all subsystems the spec depends on are already present in the
+// codebase. This validates the spec's core assumption.
 
-describe('Spec 019 — Existing scaffolding verification', () => {
-  it('SocialManager already exists in engine social package', () => {
-    const socialManagerPath = join(REPO_ROOT, 'packages/engine/src/social/social-manager.ts');
-    expect(fileExists(socialManagerPath)).toBe(true);
-    const content = readFile(socialManagerPath);
-    expect(content).toContain('export class SocialManager');
-    // Must have constructor accepting AgentManager
-    expect(content).toContain('constructor');
-    // Must implement SocialActionBridge methods
-    expect(content).toContain('queueMessage');
-    expect(content).toContain('getAgentsInRoom');
-    expect(content).toContain('getRelationships');
-    expect(content).toContain('updateRelationship');
+describe('Spec 019 — Existing scaffolding: shared types', () => {
+  it('CompoundAction, ObjectDependency, ObjectStateRule, CrossObjectStateChange, AffordanceCondition already exist in shared', () => {
+    const affordanceTypesPath = join(REPO_ROOT, 'packages/shared/src/types/affordance.ts');
+    expect(fileExists(affordanceTypesPath)).toBe(true);
+    const content = readFile(affordanceTypesPath);
+    expect(content).toContain('CompoundAction');
+    expect(content).toContain('ObjectDependency');
+    expect(content).toContain('ObjectStateRule');
+    expect(content).toContain('CrossObjectStateChange');
+    expect(content).toContain('AffordanceCondition');
   });
 
-  it('MessageQueue already exists in engine social package', () => {
-    const messageQueuePath = join(REPO_ROOT, 'packages/engine/src/social/message-queue.ts');
-    expect(fileExists(messageQueuePath)).toBe(true);
-    const content = readFile(messageQueuePath);
-    expect(content).toContain('export class MessageQueue');
-    expect(content).toContain('enqueue');
-    expect(content).toContain('dequeue');
+  it('SmartObject includes stateRules, compoundActions, and dependencies fields', () => {
+    const affordanceTypesPath = join(REPO_ROOT, 'packages/shared/src/types/affordance.ts');
+    const content = readFile(affordanceTypesPath);
+    expect(content).toContain('stateRules');
+    expect(content).toContain('compoundActions');
+    expect(content).toContain('dependencies');
   });
 
-  it('SocialManager and MessageQueue are exported from engine index', () => {
-    const engineIndexPath = join(REPO_ROOT, 'packages/engine/src/index.ts');
-    expect(fileExists(engineIndexPath)).toBe(true);
-    const content = readFile(engineIndexPath);
-    expect(content).toContain('social/message-queue');
-    expect(content).toContain('social/social-manager');
+  it('Affordance includes stepGroup, stepOrder, and conditions fields', () => {
+    const affordanceTypesPath = join(REPO_ROOT, 'packages/shared/src/types/affordance.ts');
+    const content = readFile(affordanceTypesPath);
+    expect(content).toContain('stepGroup');
+    expect(content).toContain('stepOrder');
+    expect(content).toContain('conditions');
   });
 
-  it('PerceptionDataProviderImpl already has setSocialManager method', () => {
-    const perceptionPath = join(REPO_ROOT, 'packages/engine/src/agents/perception/index.ts');
-    expect(fileExists(perceptionPath)).toBe(true);
-    const content = readFile(perceptionPath);
-    expect(content).toContain('setSocialManager');
-    expect(content).toContain('getAgentsInRoom');
-    expect(content).toContain('dequeueSocialMessages');
-    expect(content).toContain('getRelationships');
+  it('AffordanceResult includes crossObjectStateChanges field', () => {
+    const affordanceTypesPath = join(REPO_ROOT, 'packages/shared/src/types/affordance.ts');
+    const content = readFile(affordanceTypesPath);
+    expect(content).toContain('crossObjectStateChanges');
   });
+});
 
-  it('CognitiveToolExecutorImpl already has socialBridge option in cognition', () => {
-    const executorPath = join(REPO_ROOT, 'packages/cognition/src/tools/cognitive-tool-executor.ts');
-    expect(fileExists(executorPath)).toBe(true);
-    const content = readFile(executorPath);
-    expect(content).toContain('socialBridge');
-    expect(content).toContain('SocialActionBridge');
-    // Social tool methods: executeTalkTo, executeObserveAgent, executeHelp, executeIgnore
-    expect(content).toContain('executeTalkTo');
-    expect(content).toContain('executeObserveAgent');
-    expect(content).toContain('executeHelp');
-    expect(content).toContain('executeIgnore');
-  });
-
-  it('OpenAICompatibleLLMClient already exists in cognition', () => {
-    // The class is defined in openai-client.ts and re-exported from llm/index.ts
-    const clientPath = join(REPO_ROOT, 'packages/cognition/src/llm/openai-client.ts');
-    expect(fileExists(clientPath)).toBe(true);
-    const content = readFile(clientPath);
-    expect(content).toContain('export class OpenAICompatibleLLMClient');
-    expect(content).toContain('cognitiveToolExecutor');
-
-    // Verify it is re-exported from the llm barrel
-    const llmIndexPath = join(REPO_ROOT, 'packages/cognition/src/llm/index.ts');
-    expect(fileExists(llmIndexPath)).toBe(true);
-    const indexContent = readFile(llmIndexPath);
-    expect(indexContent).toContain('OpenAICompatibleLLMClient');
-  });
-
-  it('EngineCore and AssembledEngine interfaces exist in assembly.ts', () => {
+describe('Spec 019 — Existing scaffolding: engine subsystems', () => {
+  it('createEngineCore, assembleGameLoop, and loadScene already exist in engine assembly', () => {
     const assemblyPath = join(REPO_ROOT, 'packages/engine/src/assembly.ts');
     expect(fileExists(assemblyPath)).toBe(true);
     const content = readFile(assemblyPath);
-    expect(content).toContain('export interface EngineCore');
-    expect(content).toContain('export interface AssembledEngine');
     expect(content).toContain('export function createEngineCore');
-    expect(content).toContain('export function createEngine');
     expect(content).toContain('export function assembleGameLoop');
     expect(content).toContain('export function loadScene');
+  });
+
+  it('ObjectStateSystem already exists as an EngineSystem', () => {
+    const objectStatePath = join(REPO_ROOT, 'packages/engine/src/systems/object-state.ts');
+    expect(fileExists(objectStatePath)).toBe(true);
+    const content = readFile(objectStatePath);
+    expect(content).toContain('ObjectStateSystem');
+    expect(content).toContain('update(tick: GameTick): void');
+  });
+
+  it('DriveDecaySystem already exists as an EngineSystem', () => {
+    const driveDecayPath = join(REPO_ROOT, 'packages/engine/src/systems/drive-decay.ts');
+    expect(fileExists(driveDecayPath)).toBe(true);
+    const content = readFile(driveDecayPath);
+    expect(content).toContain('DriveDecaySystem');
+  });
+
+  it('AutoSaveSystem already exists as an EngineSystem', () => {
+    const autoSavePath = join(REPO_ROOT, 'packages/engine/src/systems/auto-save.ts');
+    expect(fileExists(autoSavePath)).toBe(true);
+    const content = readFile(autoSavePath);
+    expect(content).toContain('AutoSaveSystem');
+  });
+
+  it('MemoryMaintenanceSystem already exists as an EngineSystem', () => {
+    const memMaintPath = join(REPO_ROOT, 'packages/engine/src/systems/memory-maintenance.ts');
+    expect(fileExists(memMaintPath)).toBe(true);
+    const content = readFile(memMaintPath);
+    expect(content).toContain('MemoryMaintenanceSystem');
+  });
+
+  it('EnginePersistenceImpl already exists in engine', () => {
+    const persistencePath = join(REPO_ROOT, 'packages/engine/src/persistence/engine-persistence.ts');
+    expect(fileExists(persistencePath)).toBe(true);
+    const content = readFile(persistencePath);
+    expect(content).toContain('EnginePersistenceImpl');
+  });
+
+  it('SocialManager already exists in engine', () => {
+    const socialPath = join(REPO_ROOT, 'packages/engine/src/social/social-manager.ts');
+    expect(fileExists(socialPath)).toBe(true);
+    const content = readFile(socialPath);
+    expect(content).toContain('SocialManager');
+  });
+});
+
+describe('Spec 019 — Existing scaffolding: cognition subsystems', () => {
+  it('OpenAICompatibleLLMClient already exists in cognition', () => {
+    const llmPath = join(REPO_ROOT, 'packages/cognition/src/llm/openai-client.ts');
+    expect(fileExists(llmPath)).toBe(true);
+    const content = readFile(llmPath);
+    expect(content).toContain('OpenAICompatibleLLMClient');
+  });
+
+  it('CognitiveToolExecutorImpl already exists in cognition', () => {
+    const toolsPath = join(REPO_ROOT, 'packages/cognition/src/tools/cognitive-tool-executor.ts');
+    expect(fileExists(toolsPath)).toBe(true);
+    const content = readFile(toolsPath);
+    expect(content).toContain('CognitiveToolExecutorImpl');
+  });
+
+  it('GuardrailEngineImpl already exists in cognition', () => {
+    const guardrailsPath = join(REPO_ROOT, 'packages/cognition/src/guardrails/index.ts');
+    expect(fileExists(guardrailsPath)).toBe(true);
+    const content = readFile(guardrailsPath);
+    expect(content).toContain('GuardrailEngineImpl');
+  });
+});
+
+describe('Spec 019 — Existing scaffolding: memory subsystems', () => {
+  it('InMemoryVectorStore, MemoryDecayService, and ReflectionLoop already exist in memory', () => {
+    const vectorStorePath = join(
+      REPO_ROOT,
+      'packages/memory/src/store/in-memory-vector-store.ts',
+    );
+    expect(fileExists(vectorStorePath)).toBe(true);
+    const vsContent = readFile(vectorStorePath);
+    expect(vsContent).toContain('InMemoryVectorStore');
+
+    const decayPath = join(
+      REPO_ROOT,
+      'packages/memory/src/retrieval/memory-decay-service.ts',
+    );
+    expect(fileExists(decayPath)).toBe(true);
+    const decayContent = readFile(decayPath);
+    expect(decayContent).toContain('MemoryDecayService');
+
+    const reflectionPath = join(
+      REPO_ROOT,
+      'packages/memory/src/reflection/reflection-loop.ts',
+    );
+    expect(fileExists(reflectionPath)).toBe(true);
+    const reflContent = readFile(reflectionPath);
+    expect(reflContent).toContain('ReflectionLoop');
+  });
+});
+
+describe('Spec 019 — Existing scaffolding: example scenes', () => {
+  it('existing scene-helpers.ts, morning-routine.ts, and office-day.ts exist in examples', () => {
+    expect(fileExists(join(REPO_ROOT, 'examples/scene-helpers.ts'))).toBe(true);
+    expect(fileExists(join(REPO_ROOT, 'examples/morning-routine.ts'))).toBe(true);
+    expect(fileExists(join(REPO_ROOT, 'examples/office-day.ts'))).toBe(true);
+    expect(fileExists(join(REPO_ROOT, 'examples/minimal-scene.ts'))).toBe(true);
+  });
+
+  it('scene-helpers.ts exports registerAffordanceHandlers', () => {
+    const helpersPath = join(REPO_ROOT, 'examples/scene-helpers.ts');
+    const content = readFile(helpersPath);
+    expect(content).toContain('export function registerAffordanceHandlers');
   });
 });
 
@@ -218,116 +291,115 @@ describe('Spec 019 — Existing scaffolding verification', () => {
 // assertions. This ensures every AC is tracked and none are forgotten.
 
 describe('Spec 019 — Acceptance Criteria scaffolds (pending implementation)', () => {
-  // ── Engine Layer ACs (AC-1 through AC-6) ──────────────────────────────────
+  // ── Scene Definition ACs (AC-1 through AC-4) ─────────────────────────────
 
   it.todo(
-    'AC-1: createEngineCore(config) returns an EngineCore object with a socialManager field that is an instance of SocialManager (not undefined). (Req 1, 3, 4)',
+    'AC-1: The scene defines ≥4 rooms (kitchen, living_room, bathroom, garden) forming a connected graph (every room reachable from every other room). Room connections: kitchen ↔ living_room, living_room ↔ bathroom, living_room ↔ garden, kitchen ↔ garden. (Req 1)',
   );
 
   it.todo(
-    'AC-2: After createEngineCore(config), core.bridges.perception.getAgentsInRoom(roomId, agentId) returns non-empty results when other agents are in the same room. Specifically: spawn agents A and B in room "kitchen", then getAgentsInRoom("kitchen", "agent-a") returns a summary containing B\'s agentId. (Req 2)',
+    'AC-2: The scene defines ≥3 agents (Alice, Bob, Carol) with distinct drive profiles where each agent\'s lowest drive is different (energy=15 for Alice, social=15 for Bob, curiosity=15 for Carol). (Req 2)',
   );
 
   it.todo(
-    'AC-3: The EngineCore interface in assembly.ts includes socialManager: SocialManager as a non-optional field. (Req 3)',
+    'AC-3: The scene defines ≥6 non-doorway smart objects (Coffee Machine, Sink, Bookshelf, Sofa, Toilet, Garden Bench, Flower Bed = 7 objects). (Req 3)',
   );
 
   it.todo(
-    'AC-4: The AssembledEngine interface in assembly.ts includes socialManager: SocialManager as a non-optional field. (Req 5)',
+    'AC-4: The Coffee Machine declares a CompoundAction with ≥3 steps (add_water → brew_coffee → pour_cup) and the affordances have matching stepGroup/stepOrder fields. (Req 3)',
+  );
+
+  // ── Object State & Conditions ACs (AC-5 through AC-8) ────────────────────
+
+  it.todo(
+    'AC-5: At least 3 objects declare stateRules (Coffee Machine water_level, Sink water_supply, Flower Bed bloom_count) and the ObjectStateSystem is registered and active. (Req 3, Req 12)',
   );
 
   it.todo(
-    'AC-5: createEngine(config, orchestrator) returns an AssembledEngine with a non-undefined socialManager field. (Req 6)',
+    'AC-6: The brew_coffee affordance has structured conditions: [{ field: \'water_level\', operator: \'>\', value: 0 }, { field: \'bean_count\', operator: \'>\', value: 0 }] that are evaluated at perception time (filtered when conditions fail). (Req 3)',
   );
 
   it.todo(
-    'AC-6: assembly.ts imports SocialManager from ./social/social-manager.js. (Req 7)',
-  );
-
-  // ── Minimal Scene AC (AC-7) ───────────────────────────────────────────────
-
-  it.todo(
-    'AC-7: When USE_REAL_LLM=true, examples/minimal-scene.ts constructs CognitiveToolExecutorImpl with socialBridge: core.socialManager (in addition to the existing stateDataProvider). (Req 8)',
-  );
-
-  // ── Morning Routine ACs (AC-8 through AC-11) ──────────────────────────────
-
-  it.todo(
-    'AC-8: When USE_REAL_LLM=true, examples/morning-routine.ts constructs an OpenAICompatibleLLMClient with a CognitiveToolExecutorImpl wired with socialBridge: core.socialManager and stateDataProvider: core.bridges.reflect. (Req 9, 10)',
+    'AC-7: The Coffee Machine declares an ObjectDependency linking add_water to the Sink\'s refill_pitcher (requiresObjectId, requiresAffordance, description). (Req 3)',
   );
 
   it.todo(
-    'AC-9: When USE_REAL_LLM is not set, examples/morning-routine.ts uses the existing MorningRoutineMockLLMClient (no behavior change). (Req 9)',
+    'AC-8: The refill_pitcher handler returns crossObjectStateChanges: [{ objectId: \'coffee-1\', statePatch: { water_level: 5 } }] that update the Coffee Machine\'s water_level. (Req 17)',
+  );
+
+  // ── Engine Assembly ACs (AC-9 through AC-16) ─────────────────────────────
+
+  it.todo(
+    'AC-9: When USE_REAL_LLM=true, the engine uses OpenAICompatibleLLMClient configured from environment variables (LLM_BASE_URL, LLM_MODEL, LLM_API_KEY, LLM_REASONING_EFFORT, LLM_MAX_TOOL_CALL_ITERATIONS). Falls back to CoffeeShopMockLLMClient when not set. (Req 5)',
   );
 
   it.todo(
-    'AC-10: buildMorningRoutineEngine() returns an AssembledEngine with a non-undefined socialManager field. (Req 12)',
+    'AC-10: When USE_REAL_EMBEDDINGS=true, the engine uses OnnxEmbeddingProvider for the memory store and AffordanceClassifierImpl for affordance pruning. Falls back to MockEmbeddingProvider and mock classifier when not set. (Req 6, Req 7)',
   );
 
   it.todo(
-    'AC-11: The MorningRoutineMockLLMClient.selectAffordance() method, when drive === \'social\' and room === \'living_room\', returns \'observe\' instead of \'watch_tv\'. (Req 13)',
-  );
-
-  // ── Office Day ACs (AC-12 through AC-14) ──────────────────────────────────
-
-  it.todo(
-    'AC-12: When USE_REAL_LLM=true, examples/office-day.ts constructs an OpenAICompatibleLLMClient with a CognitiveToolExecutorImpl wired with socialBridge: core.socialManager and stateDataProvider: core.bridges.reflect. (Req 14, 15)',
+    'AC-11: A SocialManager is constructed wrapping the AgentManagerImpl and passed as socialBridge to the CognitiveToolExecutorImpl. Enables agent-to-agent perception, talk_to, observe_agent, help, and ignore cognitive tools. (Req 8, Req 9)',
   );
 
   it.todo(
-    'AC-13: When USE_REAL_LLM is not set, examples/office-day.ts uses the existing OfficeDayMockLLMClient (no behavior change). (Req 14)',
+    'AC-12: The CognitiveToolExecutorImpl is wired with stateDataProvider (core.bridges.reflect) and socialBridge (SocialManager) and passed to the LLM client. (Req 9)',
   );
 
   it.todo(
-    'AC-14: buildOfficeDayEngine() returns an AssembledEngine with a non-undefined socialManager field. (Req 16)',
-  );
-
-  // ── Assembly Wiring Tests ACs (AC-15 through AC-18) ───────────────────────
-
-  it.todo(
-    'AC-15: A test in packages/engine/tests/assembly.test.ts verifies that createEngineCore(config).socialManager is an instance of SocialManager. (Req 18)',
+    'AC-13: GuardrailEngineImpl is constructed with { affordanceMasking: true, contextualForcing: true, planValidation: true } and passed to the PPER orchestrator. (Req 10)',
   );
 
   it.todo(
-    'AC-16: A test verifies that after createEngineCore(config) + spawning two agents in the same room, core.bridges.perception.getAgentsInRoom(roomId, agentA) returns a non-empty array containing agent B\'s summary. (Req 19)',
+    'AC-14: EnginePersistenceImpl is available on core.persistence (requires VectorStore provided to createEngineCore) and AutoSaveSystem is registered with a 30-second interval (default), configurable via USE_AUTOSAVE and SAVE_FILE_PATH. (Req 11)',
   );
 
   it.todo(
-    'AC-17: A test verifies that createEngine(config, orchestrator).socialManager is not undefined. (Req 20)',
+    'AC-15: MemoryDecayService and ReflectionLoop are wired (requires real VectorStore) and MemoryMaintenanceSystem is registered as an engine system. Memory decay config configurable via MEMORY_DECAY_RATE and MEMORY_PRUNE_THRESHOLD. (Req 13)',
   );
 
   it.todo(
-    'AC-18: A test verifies that after createEngineCore() + loadScene() with a multi-agent scene, moving two agents to the same room results in getAgentsInRoom() returning the other agent. (Req 21)',
+    'AC-16: Drive decay rate is configurable via DRIVE_DECAY_RATE environment variable, passed to createEngineCore via EngineConfig or DriveSystemImpl. (Req 14)',
   );
 
-  // ── Documentation AC (AC-19) ──────────────────────────────────────────────
+  // ── Affordance Handlers ACs (AC-17 through AC-19) ────────────────────────
 
   it.todo(
-    'AC-19: docs/specs/INDEX.md includes spec 019 with status 📝 Drafted. (Req 23)',
-  );
-
-  // ── Backward Compatibility ACs (AC-20 through AC-21) ──────────────────────
-
-  it.todo(
-    'AC-20: Existing tests in packages/engine/tests/assembly.test.ts that do not reference socialManager continue to compile and pass without modification. (Backward compatibility)',
+    'AC-17: All new affordance handlers (add_water, pour_cup, refill_pitcher, relax, sit_outside, observe_flowers) are registered and return deterministic AffordanceResult values with appropriate driveChanges and newState. (Req 16)',
   );
 
   it.todo(
-    'AC-21: Existing tests that call createEngineCore() without accessing socialManager continue to compile and pass. The socialManager field is additive. (Backward compatibility)',
-  );
-
-  // ── End-to-End Social Interaction ACs (AC-22 through AC-24) ───────────────
-  // These require a running LLM server and are tagged as manual/integration tests.
-
-  it.todo(
-    'AC-22: When USE_REAL_LLM=true with the morning-routine scene, the LLM context includes "Agents present: Bob (...)" when Alice and Bob are in the same room, and the tools array includes talk_to, observe_agent, help, and ignore tool definitions. (Req 9, Issue AC-4) [manual/integration]',
+    'AC-18: New precondition checkers (has_cups checking cup_count > 0, has_water_supply checking water_supply > 0, has_blooms checking bloom_count > 0) are registered. (Req 18)',
   );
 
   it.todo(
-    'AC-23: When USE_REAL_LLM=true with the morning-routine scene, and the LLM calls talk_to with { targetAgentId: "agent-bob", message: "Hi Bob!" }, the message is queued via SocialManager.queueMessage() and appears in Bob\'s next perception socialContext. (Req 9, Issue AC-5) [manual/integration]',
+    'AC-19: Movement handler for garden (go_to_garden) is registered alongside existing destinations. (Req 19)',
+  );
+
+  // ── Entry Point & Observability ACs (AC-20 through AC-23) ────────────────
+
+  it.todo(
+    'AC-20: The entry point runs for SCENE_DURATION_MS (default 300000ms with real LLM, 10000ms with mock LLM) and logs agent state every LOG_INTERVAL_MS (default 10000ms). (Req 20, Req 21)',
   );
 
   it.todo(
-    'AC-24: After a talk_to interaction between Alice and Bob, AgentInternalState.relationships for Alice includes { "agent-bob": { trust: 52, familiarity: 5, lastInteraction: <timestamp> } } and for Bob includes { "agent-alice": { trust: 52, familiarity: 5, lastInteraction: <timestamp> } }. (Req 9, Issue AC-6) [manual/integration]',
+    'AC-21: After simulation, the state is saved to a file and the save summary is logged (agent count, object count, memory node count). (Req 22)',
+  );
+
+  it.todo(
+    'AC-22: The CoffeeShopMockLLMClient selects drive-appropriate affordances including social-aware navigation (navigating toward living_room for social drive, using talk_to when other agents present, navigating toward bookshelf/flower bed for curiosity drive). (Req 23)',
+  );
+
+  it.todo(
+    'AC-23: COFFEE_SHOP_SCENE: SceneDefinition and buildCoffeeShopEngine(): AssembledEngine are exported from the module. (Req 24)',
+  );
+
+  // ── Integration & E2E ACs (AC-24 through AC-25) ──────────────────────────
+
+  it.todo(
+    'AC-24: The scene runs with USE_REAL_LLM=true for ≥5 minutes without crashing and produces observable state changes (agent locations change, drives fluctuate, relationships develop). (Req 20, Req 21)',
+  );
+
+  it.todo(
+    'AC-25: Save/load round-trip works — after saving, loading the state into a fresh engine restores agent drives, locations, object states, and memory nodes. (Req 22)',
   );
 });
