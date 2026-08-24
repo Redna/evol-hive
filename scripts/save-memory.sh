@@ -1,6 +1,5 @@
 #!/bin/bash
-# Save YAAM memory to the memory branch using a git worktree.
-# No branch switching, no API size limits, no checkout conflicts.
+# Save YAAM memory delta to the memory branch using a git worktree.
 set -e
 
 echo "=== Saving YAAM memory ==="
@@ -10,15 +9,21 @@ if [ ! -f events.jsonl ]; then
   exit 0
 fi
 
-LINES=$(wc -l < events.jsonl)
-SIZE=$(du -h events.jsonl | cut -f1)
-echo "events.jsonl: $LINES events, $SIZE"
+START_LINES=$(cat .yaam_start_lines 2>/dev/null || echo "0")
+CURRENT_LINES=$(wc -l < events.jsonl | cut -d' ' -f1)
+NEW_LINES=$((CURRENT_LINES - START_LINES))
 
-# Create a temporary worktree for the memory branch
+if [ "$NEW_LINES" -le 0 ]; then
+  echo "No new events to save."
+  exit 0
+fi
+
+echo "Extracting delta: $NEW_LINES new events."
+
 WORKTREE="/tmp/yaam-memory-worktree"
 rm -rf "$WORKTREE"
 
-# Try to add existing memory branch, or create a new orphan one
+# Create or attach to orphan branch
 if git worktree add "$WORKTREE" memory 2>/dev/null; then
   echo "Using existing memory branch"
 else
@@ -27,36 +32,29 @@ else
   cd "$WORKTREE"
   git checkout --orphan memory
   git reset --hard
-  cd -  # back to main worktree
+  cd - >/dev/null
 fi
 
-# Copy stripped events.jsonl to the worktree
-cp events.jsonl "$WORKTREE/events.jsonl"
+# Create a file containing ONLY the new memories from this agent
+UNIQUE_FILE="events-${GITHUB_RUN_ID:-$(date +%s)}.jsonl"
+tail -n "$NEW_LINES" events.jsonl > "$WORKTREE/$UNIQUE_FILE"
 
-# Commit and push from the worktree
+# Commit and push
 cd "$WORKTREE"
-git add events.jsonl
+git add "$UNIQUE_FILE"
+git commit -m "Update YAAM memory delta (run #${GITHUB_RUN_ID:-local})"
 
-if git diff --cached --quiet; then
-  echo "No changes to events.jsonl — skipping commit."
-else
-  git commit -m "Update YAAM memory (run #${GITHUB_RUN_ID:-local})"
+for i in 1 2 3; do
+  if git push origin memory 2>/dev/null; then
+    echo "Memory pushed successfully."
+    break
+  else
+    echo "Push failed (attempt $i/3) — pulling and retrying..."
+    git pull --rebase origin memory 2>/dev/null || true
+  fi
+done
 
-  # Push with retry (handles concurrent agent pushes)
-  for i in 1 2 3; do
-    if git push origin memory 2>/dev/null; then
-      echo "Memory pushed successfully."
-      break
-    else
-      echo "Push failed (attempt $i/3) — pulling and retrying..."
-      git pull --rebase origin memory 2>/dev/null || true
-    fi
-  done
-fi
-
-cd -  # back to main worktree
-
-# Clean up the worktree
+cd - >/dev/null
 git worktree remove "$WORKTREE" --force 2>/dev/null || rm -rf "$WORKTREE"
 
 echo "Memory save complete."

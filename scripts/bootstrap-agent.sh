@@ -3,6 +3,8 @@
 # Installs Pi, pi-goal, YAAM (with daemon + model), and configures Ollama Cloud.
 set -e
 
+export YAAM_DISABLE_AUTO_COMPACT="true"
+
 echo "=== Installing Pi ==="
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 

@@ -34,7 +34,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [014](014-memory-consolidation-decay-retrieval.md) | Memory Consolidation — Background Reflection, Importance Scoring, Memory Decay, Weighted Retrieval | §11, §6, §9, §2 | 🔍 In Review | [#50](https://github.com/Redna/evol-hive/issues/50) | [#53](https://github.com/Redna/evol-hive/pull/53) | shared, memory, cognition, engine |
 | [015](015-full-cognitive-tools.md) | Full Cognitive Tools — query_memory and update_internal_state as Real Tool Calls | §8, §6, §11 | 🔍 In Review | [#55](https://github.com/Redna/evol-hive/issues/55) | [#60](https://github.com/Redna/evol-hive/pull/60) | cognition, shared, examples |
 | [016](016-cognitive-guardrails.md) | Cognitive Guardrails — Affordance Masking, Contextual Forcing, Plan Validation | §10, §6, §9 | 🔍 In Review | [#54](https://github.com/Redna/evol-hive/issues/54) | [#59](https://github.com/Redna/evol-hive/pull/59) | shared, cognition, engine |
-| [017](017-persistence-save-load-game-state.md) | Persistence — Save/Load Game State and Agent Memory Across Sessions | §2, §3, §6, §11 | 🔍 In Review | [#61](https://github.com/Redna/evol-hive/issues/61) | [#64](https://github.com/Redna/evol-hive/pull/64), [#67](https://github.com/Redna/evol-hive/pull/67) | shared, memory, engine |
+| [017](017-persistence-save-load-game-state.md) | Persistence — Save/Load Game State and Agent Memory Across Sessions | §2, §3, §6, §11 | 📝 Drafted | [#61](https://github.com/Redna/evol-hive/issues/61) | [#64](https://github.com/Redna/evol-hive/pull/64) | shared, memory, engine |
+| [018](018-object-interactions.md) | Object Interactions — Multi-Step Affordances, Object State Changes, Dependencies | §4, §5, §6, §9 | 📝 Drafted | [#63](https://github.com/Redna/evol-hive/issues/63) | — | shared, engine, cognition |
 
 ## Architecture Coverage
 
@@ -43,8 +44,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [§1](../architecture/01-vision.md) | Vision & Philosophy | — | ✅ Documented |
 | [§2](../architecture/02-system-overview.md) | System Overview | 008 (integration tests), 013 (richer scenes), 017 (persistence) | ✅ Documented |
 | [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002 (partial), 008 (multi-agent isolation), 012 (persona), 017 (state serialization) | 📝 Partial — full spec needed |
-| [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001 (partial), 003 (execution), 008 (room scoping), 013 (richer scenes) | 📝 Partial — full spec needed |
-| [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) | 001 (partial), 006 (EmbeddingProvider reuse), 007 (ONNX provider) | 📝 Partial — full spec needed |
+| [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001 (partial), 003 (execution), 008 (room scoping), 013 (richer scenes), 018 (complex interactions) | 📝 Partial — full spec needed |
+| [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) | 001 (partial), 006 (EmbeddingProvider reuse), 007 (ONNX provider), 018 (conditional filtering) | 📝 Partial — full spec needed |
 | [§6](../architecture/06-pper-loop.md) | PPER Loop | 001 (Perceive), 002 (Plan), 003 (Execute), 004 (Reflect), 006 (LLM client), 008 (concurrent cycles), 012 (persona injection), 017 (session continuity) | 🔍 Perceive in review; 🔍 Plan in review; 🔍 Execute in review; 🔍 Reflect in review |
 | [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 002 (partial), 004 (reflectSchema), 006 (OpenAI response_format → superseded), 009 (superseded by 011), 010 (superseded by 011), 011 (tool calling) | 🔍 Spec 011 drafted |
 | [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002 (formulate_plan), 004 (update_internal_state), 011 (cognitive tools as native tool definitions), 015 (full cognitive tool execution) | 🔍 Spec 015 in review |
@@ -55,11 +56,11 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      18
+Total specs:      19
 ✅ Done:          0
 🔨 In Development: 0
-🔍 In Review:     14
-📝 Drafted:       2
+🔍 In Review:     13
+📝 Drafted:       4
 🚫 Blocked:       0
 ⛔ Superseded:    2
 
