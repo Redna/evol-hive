@@ -12,7 +12,12 @@
 /** The four phases of the cognitive loop. */
 export type PPERPhase = 'perceive' | 'plan' | 'execute' | 'reflect';
 
-import type { Affordance, AffordanceResult } from './affordance.js';
+import type {
+  Affordance,
+  AffordanceResult,
+  CompoundAction,
+  ObjectDependency,
+} from './affordance.js';
 import type { AgentInternalState, AgentPlan, PlanStep, AgentProfile } from './agent.js';
 import type { MemoryType } from './memory.js';
 
@@ -42,6 +47,10 @@ export interface PerceptionResult {
   stuck?: boolean;
   /** The agent's profile (including persona fields), populated by PerceptionServiceImpl (spec 012, Req 6). */
   persona?: AgentProfile | null;
+  /** All compound actions defined on objects in the agent's current room (spec 018, Req 10). */
+  compoundActions?: CompoundAction[];
+  /** All dependencies declared by objects in the agent's current room (spec 018, Req 10). */
+  objectDependencies?: ObjectDependency[];
 }
 
 /** Active observation result (Section 6.2) — deep JSON state of a target object. */
@@ -267,6 +276,12 @@ export interface PerceptionDataProvider {
   getObjectsInRoom(roomId: string): SmartObjectSummary[];
   /** Every affordance available in a room (input to the System 0 classifier). */
   getAffordancesInRoom(roomId: string): Affordance[];
+  /** Affordances whose `conditions` (if present) are currently satisfied by the owning object's state (spec 018, Req 11). */
+  getAvailableAffordancesInRoom(roomId: string): Affordance[];
+  /** All compound actions defined on objects in a room (spec 018, Req 12). */
+  getCompoundActionsInRoom(roomId: string): CompoundAction[];
+  /** All dependencies declared by objects in a room (spec 018, Req 12). */
+  getObjectDependenciesInRoom(roomId: string): ObjectDependency[];
   /** Snapshot of the agent's current drive values. */
   getAgentDrives(agentId: string): Record<string, number>;
   /** Semantic label of the agent's primary (most urgent) drive. */

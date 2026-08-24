@@ -42,6 +42,7 @@ import { GameLoopImpl } from './loop/index.js';
 import { DriveDecaySystem } from './systems/drive-decay.js';
 import { PPERScheduler } from './systems/pper-scheduler.js';
 import { MemoryMaintenanceSystem } from './systems/memory-maintenance.js';
+import { ObjectStateSystem } from './systems/object-state.js';
 import type { GameLoop } from './index.js';
 
 /** A no-op MemoryStore used when no real memory subsystem is wired. */
@@ -179,9 +180,10 @@ export function assembleGameLoop(
   const schedulerConfig: PPERSchedulerConfig = defaultPPERSchedulerConfig();
   core.gameLoop.registerSystem(core.spatial); // (1) SpatialSystem
   core.gameLoop.registerSystem(new DriveDecaySystem(core.agentManager, core.driveSystem)); // (2) DriveDecaySystem
-  core.gameLoop.registerSystem(new PPERScheduler(core.agentManager, orchestrator, schedulerConfig)); // (3) PPERScheduler
+  core.gameLoop.registerSystem(new ObjectStateSystem(core.smartObjectRegistry)); // (3) ObjectStateSystem (spec 018)
+  core.gameLoop.registerSystem(new PPERScheduler(core.agentManager, orchestrator, schedulerConfig)); // (4) PPERScheduler
 
-  // (4) MemoryMaintenanceSystem — only when a decay service is provided (spec 014, Req 17/18).
+  // (5) MemoryMaintenanceSystem — only when a decay service is provided (spec 014, Req 17/18).
   if (memoryMaintenance?.memoryDecayService) {
     const decayConfig = memoryMaintenance.decayConfig ?? defaultMemoryDecayConfig;
     core.gameLoop.registerSystem(

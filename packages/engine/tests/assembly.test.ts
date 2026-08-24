@@ -43,14 +43,14 @@ class FakeOrchestrator implements PPEROrchestratorPort {
 }
 
 describe('Engine assembly factory (AC-11)', () => {
-  it('createEngine wires all subsystems and registers systems in order: SpatialSystem → DriveDecaySystem → PPERScheduler', () => {
+  it('createEngine wires all subsystems and registers systems in order: SpatialSystem → DriveDecaySystem → ObjectStateSystem → PPERScheduler', () => {
     const config = makeConfig();
     const orch = new FakeOrchestrator();
     const engine = createEngine(config, orch);
 
     // Inspect the registered systems order via the game loop.
     const names = engine.gameLoop.systemNames();
-    expect(names).toEqual(['spatial', 'drive-decay', 'pper-scheduler']);
+    expect(names).toEqual(['spatial', 'drive-decay', 'object-state', 'pper-scheduler']);
   });
 
   it('createEngine exposes agentManager, sceneManager, and bridges', () => {
@@ -88,6 +88,11 @@ describe('Engine assembly factory (AC-11)', () => {
 
     const orch = new FakeOrchestrator();
     const loop = assembleGameLoop(core, orch);
-    expect(loop.systemNames()).toEqual(['spatial', 'drive-decay', 'pper-scheduler']);
+    expect(loop.systemNames()).toEqual([
+      'spatial',
+      'drive-decay',
+      'object-state',
+      'pper-scheduler',
+    ]);
   });
 });

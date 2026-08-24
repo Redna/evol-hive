@@ -79,6 +79,13 @@ export class PhysicsSystemImpl implements PhysicsSystem {
       this.smartObjectRegistry.updateState(objectId, result.newState);
     }
 
+    // 6. On success, apply cross-object state changes (spec 018, Req 19).
+    if (result.success && result.crossObjectStateChanges) {
+      for (const change of result.crossObjectStateChanges) {
+        this.smartObjectRegistry.applyStatePatch(change.objectId, change.statePatch);
+      }
+    }
+
     return result;
   }
 }
