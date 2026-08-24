@@ -392,6 +392,35 @@ fi
 echo "  ✅ Code PR merged"
 
 # ============================================================
+# PHASE 6: MEMORY COMPACTION
+# ============================================================
+# After all agents have saved their deltas to the memory branch,
+# run compaction to merge all deltas into a single base file.
+# This acquires a lock on the memory branch so that any agents that
+# start during compaction will wait in restore-memory.sh.
+echo ""
+echo "--- Phase 6: Memory Compaction ---"
+
+# Fetch the latest memory branch
+git fetch origin memory:refs/remotes/origin/memory 2>/dev/null || true
+
+# Count delta files on the memory branch
+DELTA_COUNT=$(git ls-tree origin/memory --name-only 2>/dev/null | grep -c 'events-.*\.jsonl' || echo "0")
+
+if [ "$DELTA_COUNT" -gt 0 ]; then
+  echo "  Found $DELTA_COUNT delta file(s) on memory branch. Running compaction..."
+
+  # Run compaction — this acquires a lock, merges deltas, compacts, and releases the lock
+  # Any agent that starts during compaction will wait in restore-memory.sh
+  # Any agent that finishes during compaction will wait in save-memory.sh
+  bash scripts/run-compaction.sh 2>&1 || {
+    echo "  ⚠️ Compaction failed — deltas will accumulate until next compaction run."
+  }
+else
+  echo "  No delta files to compact. Memory branch is clean."
+fi
+
+# ============================================================
 # DONE
 # ============================================================
 echo ""

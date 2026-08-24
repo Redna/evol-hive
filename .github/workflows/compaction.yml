@@ -1,0 +1,57 @@
+name: Memory Compaction
+
+on:
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force compaction even if no delta files"
+        required: false
+        default: "false"
+        type: string
+  # Run on schedule — every 6 hours
+  schedule:
+    - cron: "0 */6 * * *"
+
+jobs:
+  compact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Run Memory Compaction
+        env:
+          GITHUB_ACTIONS: "true"
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bash scripts/run-compaction.sh
+
+      - name: Report
+        if: always()
+        run: |
+          echo "## Memory Compaction Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f events.jsonl ]; then
+            LINES=$(wc -l < events.jsonl | cut -d' ' -f1)
+            SIZE=$(du -h events.jsonl | cut -f1)
+            echo "- Events: $LINES" >> $GITHUB_STEP_SUMMARY
+            echo "- Size: $SIZE" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- No events.jsonl found" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,5 +1,7 @@
 #!/bin/bash
 # Compaction job: squashes all jsonl files into a single events.jsonl
+# Acquires a lock on the memory branch so that parallel agents wait
+# in restore-memory.sh and save-memory.sh before proceeding.
 set -e
 
 echo "=== Starting Compaction ==="
@@ -17,6 +19,25 @@ touch yaam-compaction.lock
 WORKTREE="/tmp/yaam-compaction-worktree"
 rm -rf "$WORKTREE"
 
+# ── Cleanup function (always releases lock, even on failure) ────────────────
+cleanup() {
+  local exit_code=$?
+  if [ "$GITHUB_ACTIONS" == "true" ] && [ -d "$WORKTREE" ]; then
+    # Try to release the remote lock
+    cd "$WORKTREE" 2>/dev/null && {
+      git rm -f yaam-compaction.lock 2>/dev/null || true
+      git commit -m "Release compaction lock (cleanup)" 2>/dev/null || true
+      git push origin memory 2>/dev/null || true
+    }
+    cd - >/dev/null 2>/dev/null
+    git worktree remove "$WORKTREE" --force 2>/dev/null || rm -rf "$WORKTREE"
+  fi
+  rm -f yaam-compaction.lock
+  rm -f events-0000000000-base.jsonl events-*.jsonl 2>/dev/null || true
+  exit $exit_code
+}
+trap cleanup EXIT
+
 if [ "$GITHUB_ACTIONS" == "true" ]; then
   git worktree add "$WORKTREE" memory 2>/dev/null || {
     echo "Memory branch doesn't exist yet."
@@ -29,15 +50,14 @@ if [ "$GITHUB_ACTIONS" == "true" ]; then
   git add yaam-compaction.lock
   git commit -m "Acquire compaction lock"
   git push origin memory || {
-    echo "Failed to acquire remote lock. Exiting."
+    echo "Failed to acquire remote lock — another compaction may be running. Exiting."
     cd - >/dev/null
-    rm -rf "$WORKTREE" yaam-compaction.lock
     exit 1
   }
   cd - >/dev/null
 fi
 
-# Merge current files
+# ── Merge all delta files into a single events.jsonl ────────────────────────
 if [ "$GITHUB_ACTIONS" == "true" ]; then
   if [ -f "$WORKTREE/events.jsonl" ]; then
     mv "$WORKTREE/events.jsonl" "$WORKTREE/events-0000000000-base.jsonl"
@@ -51,11 +71,16 @@ else
   rm -f events-0000000000-base.jsonl events-*.jsonl 2>/dev/null || true
 fi
 
-# Run compactor
+# ── Run compactor (deduplicate UPSERT_NODE events, keep latest per node ID) ──
+echo "Compacting events..."
 node scripts/compact.js events.jsonl events-compacted.jsonl
 
 mv events-compacted.jsonl events.jsonl
 
+COMPACTED_LINES=$(wc -l < events.jsonl | cut -d' ' -f1)
+echo "Compacted to $COMPACTED_LINES events."
+
+# ── Push compacted memory and release lock ──────────────────────────────────
 if [ "$GITHUB_ACTIONS" == "true" ]; then
   cd "$WORKTREE"
   # Clean up old tracking files
@@ -65,10 +90,10 @@ if [ "$GITHUB_ACTIONS" == "true" ]; then
   git add events.jsonl
   # Release lock
   git rm -f yaam-compaction.lock 2>/dev/null || true
-  git commit -m "Release compaction lock and push compacted memory"
+  git commit -m "Compaction complete ($COMPACTED_LINES events) — lock released"
   git push origin memory
   cd - >/dev/null
-  git worktree remove "$WORKTREE" --force
+  git worktree remove "$WORKTREE" --force 2>/dev/null
 fi
 
 rm -f yaam-compaction.lock

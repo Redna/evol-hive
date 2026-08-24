@@ -20,6 +20,23 @@ fi
 
 echo "Extracting delta: $NEW_LINES new events."
 
+# ── Compaction lock check (distributed safety) ──────────────────────────────
+# Wait if a compaction is running on the memory branch before pushing our
+# delta. This prevents a race where compaction rewrites the base while we
+# push our delta, which could cause a rebase conflict or data loss.
+if [ "$GITHUB_ACTIONS" == "true" ]; then
+  while git ls-tree origin/memory 2>/dev/null | grep -q "yaam-compaction.lock"; do
+    echo "Compaction in progress on memory branch. Waiting 15s before saving..."
+    sleep 15
+    git fetch origin memory:refs/remotes/origin/memory 2>/dev/null || true
+  done
+else
+  while [ -f "yaam-compaction.lock" ]; do
+    echo "Local compaction in progress. Waiting 10s before saving..."
+    sleep 10
+  done
+fi
+
 WORKTREE="/tmp/yaam-memory-worktree"
 rm -rf "$WORKTREE"
 
