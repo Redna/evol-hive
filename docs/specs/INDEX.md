@@ -37,7 +37,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [017](017-persistence-save-load-game-state.md) | Persistence — Save/Load Game State and Agent Memory Across Sessions | §2, §3, §6, §11 | ✅ Done | [#61](https://github.com/Redna/evol-hive/issues/61) | [#67](https://github.com/Redna/evol-hive/pull/67) | shared, memory, engine |
 | [018](018-object-interactions.md) | Object Interactions — Multi-Step Affordances, Object State Changes, Dependencies | §4, §5, §6, §9 | ✅ Done | [#63](https://github.com/Redna/evol-hive/issues/63) | [#69](https://github.com/Redna/evol-hive/pull/69) | shared, engine, cognition |
 | [018](018-multi-agent-social.md) | Multi-Agent Social — Agent-to-Agent Perception, Communication, Relationships | §3, §6, §8 | ✅ Done | [#62](https://github.com/Redna/evol-hive/issues/62) | [#70](https://github.com/Redna/evol-hive/pull/70) | shared, engine, cognition |
-| [019](019-validation-scene-coffee-shop.md) | Phase 4 Validation Scene — "Coffee Shop" Comprehensive Integration Example | §1, §2, §4, §6, §8, §11 | 📝 Drafted | [#74](https://github.com/Redna/evol-hive/issues/74) | — | examples |
+| [019](019-affordance-as-tools.md) | Affordance-as-Tools — Replace `choose_action` with Per-Affordance Tool Definitions | §4, §6, §7, §8, §10 | 📝 Drafted | [#71](https://github.com/Redna/evol-hive/issues/71) | — | shared, cognition, examples |
 
 ## Architecture Coverage
 
@@ -46,25 +46,26 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [§1](../architecture/01-vision.md) | Vision & Philosophy | — | ✅ Documented |
 | [§2](../architecture/02-system-overview.md) | System Overview | 008, 013, 017 | ✅ Documented |
 | [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002, 008, 012, 017 | ✅ Implemented |
-| [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001, 003, 008, 013, 018 | ✅ Implemented |
+| [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001, 003, 008, 013, 018, 019 | ✅ Implemented |
 | [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) | 001, 006, 007, 018 | ✅ Implemented |
 | [§6](../architecture/06-pper-loop.md) | PPER Loop | 001-004, 006, 008, 012, 017 | ✅ Implemented |
-| [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 011 (tool calling) | ✅ Implemented |
+| [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 011 (tool calling), 019 (affordance-as-tools) | ✅ Implemented |
 | [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002, 011, 015 | ✅ Implemented |
 | [§9](../architecture/09-engine-routing.md) | Engine Routing | 002, 003, 004, 006, 008, 009 | ✅ Implemented |
-| [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | 016 | ✅ Implemented |
+| [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | 016, 019 | ✅ Implemented |
 | [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 004, 007, 014, 017 | ✅ Implemented |
 
 ## Spec Status Summary
 
 ```
-Total specs:      20
+Total specs:      21
 ✅ Done:          17
 🔨 In Development: 0
 🔍 In Review:      0
-📝 Drafted:        0
+📝 Drafted:        1
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
 Architecture sections fully implemented: 11/11
 ```
+| [019](019-configurable-drive-decay-rate.md) | Configurable Drive Decay Rate | §3, §6, §9 | 📝 Drafted | [#72](https://github.com/Redna/evol-hive/issues/72) | — | shared, engine, examples |
