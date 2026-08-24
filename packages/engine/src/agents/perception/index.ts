@@ -11,14 +11,16 @@ import type {
   Affordance,
   AgentProfile,
   AgentInternalState,
-  CompoundAction,
-  ObjectDependency,
+  AgentSummary,
+  Relationship,
   SmartObjectSummary,
+  SocialMessage,
   PerceptionDataProvider,
 } from '@evol-hive/shared';
 import type { AgentManager, DriveSystem } from '../index.js';
 import type { SmartObjectRegistry } from '../../world/index.js';
 import type { SystemFeedbackStore } from '../feedback/index.js';
+import type { SocialManager } from '../../social/social-manager.js';
 
 /** Constructor options for {@link PerceptionDataProviderImpl}. */
 export interface PerceptionDataProviderOptions {
@@ -37,6 +39,7 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
   private readonly smartObjectRegistry: SmartObjectRegistry;
   private readonly driveSystem: DriveSystem;
   private readonly feedbackStore: SystemFeedbackStore;
+  private socialManager: SocialManager | undefined;
 
   constructor(
     agentManager: AgentManager,
@@ -63,21 +66,6 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
     return this.smartObjectRegistry.getAffordancesInRoom(roomId);
   }
 
-  /** Affordances whose `conditions` (if present) are currently satisfied (spec 018, Req 22). */
-  getAvailableAffordancesInRoom(roomId: string): Affordance[] {
-    return this.smartObjectRegistry.getAvailableAffordancesInRoom(roomId);
-  }
-
-  /** All compound actions in a room (spec 018, Req 22). */
-  getCompoundActionsInRoom(roomId: string): CompoundAction[] {
-    return this.smartObjectRegistry.getCompoundActionsInRoom(roomId);
-  }
-
-  /** All object dependencies in a room (spec 018, Req 22). */
-  getObjectDependenciesInRoom(roomId: string): ObjectDependency[] {
-    return this.smartObjectRegistry.getObjectDependenciesInRoom(roomId);
-  }
-
   getAgentDrives(agentId: string): Record<string, number> {
     const state = this.agentManager.getState(agentId);
     if (!state) return {};
@@ -100,6 +88,25 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
 
   getAgentState(agentId: string): AgentInternalState | null {
     return this.agentManager.getState(agentId);
+  }
+
+  // ── Social perception methods (spec 018, Req 21) ───────────────────────────
+
+  /** Inject the SocialManager for social perception queries (spec 018, Req 21). */
+  setSocialManager(socialManager: SocialManager): void {
+    this.socialManager = socialManager;
+  }
+
+  getAgentsInRoom(roomId: string, excludingAgentId: string): AgentSummary[] {
+    return this.socialManager?.getAgentsInRoom(roomId, excludingAgentId) ?? [];
+  }
+
+  dequeueSocialMessages(agentId: string): SocialMessage[] {
+    return this.socialManager?.dequeueSocialMessages(agentId) ?? [];
+  }
+
+  getRelationships(agentId: string): Record<string, Relationship> {
+    return this.socialManager?.getRelationships(agentId) ?? {};
   }
 }
 

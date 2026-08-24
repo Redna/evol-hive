@@ -7,9 +7,6 @@
  */
 
 import type {
-  Affordance,
-  CompoundAction,
-  ObjectDependency,
   PassivePerception,
   PerceptionResult,
   PerceptionDataProvider,
@@ -37,12 +34,18 @@ export class PassivePerceptionAssembler {
     const systemFeedback = this.provider.getSystemFeedback(agentId);
     const associativeMemories = this.provider.getAssociativeMemories?.(agentId);
 
+    // Social context (spec 018, Req 32).
+    const agentsPresent = this.provider.getAgentsInRoom?.(roomId, agentId);
+    const socialContext = this.provider.dequeueSocialMessages?.(agentId);
+
     const passive: PassivePerception = {
       roomId,
       objectsPresent,
       drives,
       ...(systemFeedback !== undefined ? { systemFeedback } : {}),
       ...(associativeMemories !== undefined ? { associativeMemories } : {}),
+      ...(agentsPresent !== undefined && agentsPresent.length > 0 ? { agentsPresent } : {}),
+      ...(socialContext !== undefined && socialContext.length > 0 ? { socialContext } : {}),
     };
     return passive;
   }
@@ -70,16 +73,7 @@ export class PerceptionServiceImpl {
   async perceive(agentId: string): Promise<PerceptionResult> {
     const passive = this.assembler.buildPassivePerception(agentId);
     const primaryDriveLabel = this.options.provider.getPrimaryDriveLabel(agentId);
-
-    // Use getAvailableAffordancesInRoom when available (spec 018, Req 23),
-    // falling back to getAffordancesInRoom for backward compatibility.
-    const provider = this.options.provider as PerceptionDataProvider;
-    let allAffordances: Affordance[];
-    if (typeof provider.getAvailableAffordancesInRoom === 'function') {
-      allAffordances = provider.getAvailableAffordancesInRoom(passive.roomId);
-    } else {
-      allAffordances = provider.getAffordancesInRoom(passive.roomId);
-    }
+    const allAffordances = this.options.provider.getAffordancesInRoom(passive.roomId);
     const prunedAffordances = await this.options.classifier.prune(
       primaryDriveLabel,
       allAffordances,
@@ -90,6 +84,7 @@ export class PerceptionServiceImpl {
     // Persona population (spec 012, Req 11): call getAgentProfile gracefully.
     let persona: import('@evol-hive/shared').AgentProfile | null | undefined;
     try {
+      const provider = this.options.provider;
       if (typeof provider.getAgentProfile === 'function') {
         persona = provider.getAgentProfile(agentId);
       } else {
@@ -99,24 +94,18 @@ export class PerceptionServiceImpl {
       persona = undefined;
     }
 
-    // Compound actions & dependencies (spec 018, Req 24): graceful fallback to empty.
-    let compoundActions: CompoundAction[] | undefined;
-    let objectDependencies: ObjectDependency[] | undefined;
+    // Relationship population (spec 018, Req 37).
+    let relationships: Record<string, import('@evol-hive/shared').Relationship> | undefined;
     try {
-      if (typeof provider.getCompoundActionsInRoom === 'function') {
-        const actions = provider.getCompoundActionsInRoom(passive.roomId);
-        if (actions.length > 0) compoundActions = actions;
+      const provider = this.options.provider;
+      if (typeof provider.getRelationships === 'function') {
+        const rels = provider.getRelationships(agentId);
+        if (rels !== undefined && Object.keys(rels).length > 0) {
+          relationships = rels;
+        }
       }
     } catch {
-      // no-op
-    }
-    try {
-      if (typeof provider.getObjectDependenciesInRoom === 'function') {
-        const deps = provider.getObjectDependenciesInRoom(passive.roomId);
-        if (deps.length > 0) objectDependencies = deps;
-      }
-    } catch {
-      // no-op
+      relationships = undefined;
     }
 
     // Affordance masking (spec 016, Req 8): after classifier pruning, if a
@@ -143,8 +132,7 @@ export class PerceptionServiceImpl {
       primaryDriveLabel,
       ...(stuck ? { stuck } : {}),
       ...(persona !== undefined ? { persona } : {}),
-      ...(compoundActions ? { compoundActions } : {}),
-      ...(objectDependencies ? { objectDependencies } : {}),
+      ...(relationships !== undefined ? { relationships } : {}),
     };
   }
 }

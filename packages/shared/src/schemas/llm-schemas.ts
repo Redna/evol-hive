@@ -222,3 +222,106 @@ export const updateInternalStateTool: ToolDefinition = {
     parameters: updateInternalStateSchema,
   },
 };
+
+// ─── Social Tool Schemas (spec 018, Req 13) ─────────────────────────────────
+
+/** Schema for the talk_to social tool (spec 018, Req 13). */
+export const talkToSchema = {
+  type: 'object',
+  properties: {
+    targetAgentId: {
+      type: 'string',
+      description: 'The ID of the agent to send the message to.',
+    },
+    message: {
+      type: 'string',
+      description: 'The message content to send to the target agent.',
+    },
+  },
+  required: ['targetAgentId', 'message'],
+  additionalProperties: false,
+} as const;
+
+/** Schema for the observe_agent social tool (spec 018, Req 13). */
+export const observeAgentSchema = {
+  type: 'object',
+  properties: {
+    targetAgentId: {
+      type: 'string',
+      description: 'The ID of the agent to observe.',
+    },
+  },
+  required: ['targetAgentId'],
+  additionalProperties: false,
+} as const;
+
+/** Schema for the help social tool (spec 018, Req 13). */
+export const helpSchema = {
+  type: 'object',
+  properties: {
+    targetAgentId: {
+      type: 'string',
+      description: 'The ID of the agent to help.',
+    },
+  },
+  required: ['targetAgentId'],
+  additionalProperties: false,
+} as const;
+
+/** Schema for the ignore social tool (spec 018, Req 13). */
+export const ignoreSchema = {
+  type: 'object',
+  properties: {
+    targetAgentId: {
+      type: 'string',
+      description: 'The ID of the agent to ignore.',
+    },
+  },
+  required: ['targetAgentId'],
+  additionalProperties: false,
+} as const;
+
+// ─── Social Tool Definitions (spec 018, Req 14) ─────────────────────────────
+
+/** Tool definition for the talk_to social cognitive tool (spec 018, Req 14). */
+export const talkToTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'talk_to',
+    description:
+      'Send a message to another agent in the same room. The message will appear in their next perception tick.',
+    parameters: talkToSchema,
+  },
+};
+
+/** Tool definition for the observe_agent social cognitive tool (spec 018, Req 14). */
+export const observeAgentTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'observe_agent',
+    description:
+      'Observe another agent in the same room. Returns their current activity, drives, and state.',
+    parameters: observeAgentSchema,
+  },
+};
+
+/** Tool definition for the help social cognitive tool (spec 018, Req 14). */
+export const helpTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'help',
+    description:
+      'Help another agent in the same room. Boosts their primary drive and your social drive.',
+    parameters: helpSchema,
+  },
+};
+
+/** Tool definition for the ignore social cognitive tool (spec 018, Req 14). */
+export const ignoreTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'ignore',
+    description: 'Choose to ignore another agent in the same room. Signals social disengagement.',
+    parameters: ignoreSchema,
+  },
+};

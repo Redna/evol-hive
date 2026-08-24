@@ -12,13 +12,14 @@
 /** The four phases of the cognitive loop. */
 export type PPERPhase = 'perceive' | 'plan' | 'execute' | 'reflect';
 
+import type { Affordance, AffordanceResult } from './affordance.js';
 import type {
-  Affordance,
-  AffordanceResult,
-  CompoundAction,
-  ObjectDependency,
-} from './affordance.js';
-import type { AgentInternalState, AgentPlan, PlanStep, AgentProfile } from './agent.js';
+  AgentInternalState,
+  AgentPlan,
+  PlanStep,
+  AgentProfile,
+  Relationship,
+} from './agent.js';
 import type { MemoryType } from './memory.js';
 
 /** Passive perception data (Section 6.1) — high-level object presence. */
@@ -33,6 +34,16 @@ export interface PassivePerception {
   systemFeedback?: string;
   /** Associative memories auto-injected by Track 1 (Section 11.1). */
   associativeMemories?: MemorySnippet[];
+  /**
+   * Other agents present in the same room (spec 018, Req 5). Excludes the
+   * perceiving agent. `undefined` when no other agents are present.
+   */
+  agentsPresent?: AgentSummary[];
+  /**
+   * Pending social messages for this agent (spec 018, Req 6). Dequeued
+   * (consumed) when read. `undefined` when no messages are pending.
+   */
+  socialContext?: SocialMessage[];
 }
 
 /** The bundled output of the Perceive phase (Section 6.1). */
@@ -47,10 +58,13 @@ export interface PerceptionResult {
   stuck?: boolean;
   /** The agent's profile (including persona fields), populated by PerceptionServiceImpl (spec 012, Req 6). */
   persona?: AgentProfile | null;
-  /** All compound actions defined on objects in the agent's current room (spec 018, Req 10). */
-  compoundActions?: CompoundAction[];
-  /** All dependencies declared by objects in the agent's current room (spec 018, Req 10). */
-  objectDependencies?: ObjectDependency[];
+  /**
+   * Structured relationship map for the agent (spec 018, Req 36). Populated
+   * by `PerceptionServiceImpl` via `provider.getRelationships`. `undefined`
+   * when the provider does not implement `getRelationships` or the agent has
+   * no relationships.
+   */
+  relationships?: Record<string, Relationship>;
 }
 
 /** Active observation result (Section 6.2) — deep JSON state of a target object. */
@@ -109,7 +123,14 @@ export interface ToolDefinition {
 // Cognitive Tools — Internal Affordances (Section 8)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type CognitiveToolName = 'formulate_plan' | 'query_memory' | 'update_internal_state';
+export type CognitiveToolName =
+  | 'formulate_plan'
+  | 'query_memory'
+  | 'update_internal_state'
+  | 'talk_to'
+  | 'observe_agent'
+  | 'help'
+  | 'ignore';
 
 /** A cognitive tool the LLM can invoke instead of a physical action. */
 export interface CognitiveTool {
@@ -134,6 +155,68 @@ export interface QueryMemoryResult {
 export interface UpdateStateResult {
   newGoal?: string;
   driveOverrides?: Partial<Record<string, number>>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Multi-Agent Social Types (spec 018)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A compact summary of another agent for passive perception (spec 018, Req 1).
+ * `currentActivity` is derived from the agent's state: `"thinking"` when
+ * `isThinking` is true, `"working on: <plan.description>"` when the agent
+ * has an active plan, `"idle"` otherwise.
+ */
+export interface AgentSummary {
+  agentId: string;
+  name: string;
+  currentActivity: string;
+  isThinking: boolean;
+}
+
+/**
+ * A queued social message from one agent to another (spec 018, Req 2).
+ * `fromName` is included so the perceiving agent knows the sender without
+ * an additional lookup.
+ */
+export interface SocialMessage {
+  fromAgentId: string;
+  fromName: string;
+  content: string;
+  timestamp: number;
+}
+
+/**
+ * The result of executing a social cognitive tool (spec 018, Req 4).
+ * Sent back to the LLM as the tool result content.
+ */
+export interface SocialToolResult {
+  success: boolean;
+  message: string;
+  relationshipUpdated: boolean;
+  /** Present only for observe_agent: the observed agent's details. */
+  observedAgent?: {
+    name: string;
+    currentActivity: string;
+    isThinking: boolean;
+    drives: Record<string, number>;
+  };
+}
+
+/**
+ * Bridge interface (defined in `shared`) for social action execution
+ * (spec 018, Req 10). The engine implements this (via `SocialManager`);
+ * cognition consumes it (via `CognitiveToolExecutorImpl`).
+ */
+export interface SocialActionBridge {
+  /** Queue a social message for the target agent. */
+  queueMessage(fromAgentId: string, toAgentId: string, content: string): void;
+  /** Update the structured relationship between two agents. */
+  updateRelationship(agentId: string, otherAgentId: string, updates: Partial<Relationship>): void;
+  /** Get a summary of an agent, or `null` if the agent does not exist. */
+  getAgentSummary(agentId: string): AgentSummary | null;
+  /** Get an agent's drives as a flat record. Returns `{}` if not found. */
+  getAgentDrives(agentId: string): Record<string, number>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,6 +279,14 @@ export interface CognitiveToolExecutor {
     newGoal?: string,
     driveOverrides?: Partial<Record<string, number>>,
   ): Promise<UpdateStateToolResult>;
+  /** Execute talk_to: queue a message and update relationships (spec 018, Req 11). */
+  executeTalkTo(agentId: string, targetAgentId: string, message: string): Promise<SocialToolResult>;
+  /** Execute observe_agent: return the target agent's state (spec 018, Req 11). */
+  executeObserveAgent(agentId: string, targetAgentId: string): Promise<SocialToolResult>;
+  /** Execute help: boost the target's primary drive and the helper's social drive (spec 018, Req 11). */
+  executeHelp(agentId: string, targetAgentId: string): Promise<SocialToolResult>;
+  /** Execute ignore: degrade the relationship and social drive (spec 018, Req 11). */
+  executeIgnore(agentId: string, targetAgentId: string): Promise<SocialToolResult>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -276,12 +367,6 @@ export interface PerceptionDataProvider {
   getObjectsInRoom(roomId: string): SmartObjectSummary[];
   /** Every affordance available in a room (input to the System 0 classifier). */
   getAffordancesInRoom(roomId: string): Affordance[];
-  /** Affordances whose `conditions` (if present) are currently satisfied by the owning object's state (spec 018, Req 11). */
-  getAvailableAffordancesInRoom(roomId: string): Affordance[];
-  /** All compound actions defined on objects in a room (spec 018, Req 12). */
-  getCompoundActionsInRoom(roomId: string): CompoundAction[];
-  /** All dependencies declared by objects in a room (spec 018, Req 12). */
-  getObjectDependenciesInRoom(roomId: string): ObjectDependency[];
   /** Snapshot of the agent's current drive values. */
   getAgentDrives(agentId: string): Record<string, number>;
   /** Semantic label of the agent's primary (most urgent) drive. */
@@ -294,6 +379,12 @@ export interface PerceptionDataProvider {
   getAgentProfile(agentId: string): AgentProfile | null;
   /** The agent's current internal state, or `null` if the agent does not exist (spec 016, Req 8). */
   getAgentState?(agentId: string): AgentInternalState | null;
+  /** Other agents in the same room, excluding the given agent (spec 018, Req 9). */
+  getAgentsInRoom?(roomId: string, excludingAgentId: string): AgentSummary[];
+  /** Dequeue pending social messages for the agent (spec 018, Req 9). */
+  dequeueSocialMessages?(agentId: string): SocialMessage[];
+  /** The agent's structured relationship map (spec 018, Req 9). */
+  getRelationships?(agentId: string): Record<string, Relationship>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

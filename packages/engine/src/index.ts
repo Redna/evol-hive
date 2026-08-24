@@ -93,5 +93,9 @@ export * from './systems/drive-decay.js';
 export * from './systems/memory-maintenance.js';
 export * from './systems/object-state.js';
 
+// Social (agent-to-agent perception, communication, relationships) — spec 018
+export * from './social/message-queue.js';
+export * from './social/social-manager.js';
+
 // Engine assembly factory — spec 005
 export * from './assembly.js';

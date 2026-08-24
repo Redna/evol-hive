@@ -150,8 +150,15 @@ export type ChatMessage =
     }
   | { role: 'tool'; content: string; tool_call_id: string };
 
-/** The set of cognitive tool names executed mid-loop (spec 015, Req 14). */
-const COGNITIVE_TOOL_NAMES = new Set<string>(['query_memory', 'update_internal_state']);
+/** The set of cognitive tool names executed mid-loop (spec 015, Req 14; spec 018, Req 29). */
+const COGNITIVE_TOOL_NAMES = new Set<string>([
+  'query_memory',
+  'update_internal_state',
+  'talk_to',
+  'observe_agent',
+  'help',
+  'ignore',
+]);
 
 interface ConsolidatedMemoryItem {
   content: string;
@@ -407,6 +414,23 @@ export class OpenAICompatibleLLMClient {
           const query = typeof args['query'] === 'string' ? (args['query'] as string) : '';
           const topK = typeof args['topK'] === 'number' ? (args['topK'] as number) : 5;
           result = await executor.executeQueryMemory(agentId, query, topK);
+        } else if (toolName === 'talk_to') {
+          const targetAgentId =
+            typeof args['targetAgentId'] === 'string' ? (args['targetAgentId'] as string) : '';
+          const message = typeof args['message'] === 'string' ? (args['message'] as string) : '';
+          result = await executor.executeTalkTo(agentId, targetAgentId, message);
+        } else if (toolName === 'observe_agent') {
+          const targetAgentId =
+            typeof args['targetAgentId'] === 'string' ? (args['targetAgentId'] as string) : '';
+          result = await executor.executeObserveAgent(agentId, targetAgentId);
+        } else if (toolName === 'help') {
+          const targetAgentId =
+            typeof args['targetAgentId'] === 'string' ? (args['targetAgentId'] as string) : '';
+          result = await executor.executeHelp(agentId, targetAgentId);
+        } else if (toolName === 'ignore') {
+          const targetAgentId =
+            typeof args['targetAgentId'] === 'string' ? (args['targetAgentId'] as string) : '';
+          result = await executor.executeIgnore(agentId, targetAgentId);
         } else {
           // update_internal_state
           const newGoal =

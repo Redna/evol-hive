@@ -17,6 +17,8 @@ import type {
   CognitiveToolExecutor,
   QueryMemoryToolResult,
   UpdateStateToolResult,
+  SocialActionBridge,
+  SocialToolResult,
 } from '@evol-hive/shared';
 import type { MemoryInjector } from '@evol-hive/memory';
 
@@ -26,6 +28,10 @@ export interface CognitiveToolExecutorOptions {
   memoryInjector?: MemoryInjector;
   /** Optional state data provider for goal/drive updates (update_internal_state). */
   stateDataProvider?: CognitiveToolDataProvider;
+  /** Optional social bridge for agent-to-agent social tools (spec 018, Req 24). */
+  socialBridge?: SocialActionBridge;
+  /** Optional current simulation tick for relationship timestamps (spec 018, Req 41). */
+  currentTick?: number;
 }
 
 /**
@@ -40,10 +46,14 @@ export interface CognitiveToolExecutorOptions {
 export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
   private readonly memoryInjector: MemoryInjector | undefined;
   private readonly stateDataProvider: CognitiveToolDataProvider | undefined;
+  private readonly socialBridge: SocialActionBridge | undefined;
+  private readonly currentTick: number;
 
   constructor(options: CognitiveToolExecutorOptions = {}) {
     this.memoryInjector = options.memoryInjector;
     this.stateDataProvider = options.stateDataProvider;
+    this.socialBridge = options.socialBridge;
+    this.currentTick = options.currentTick ?? Date.now();
   }
 
   async executeQueryMemory(
@@ -131,6 +141,175 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       drivesUpdated,
       message: messageParts.join(' '),
     };
+  }
+
+  // ── Social cognitive tool methods (spec 018, Req 25–28) ─────────────────────
+
+  async executeTalkTo(
+    agentId: string,
+    targetAgentId: string,
+    message: string,
+  ): Promise<SocialToolResult> {
+    if (this.socialBridge === undefined) {
+      return {
+        success: false,
+        message: 'Social actions not available.',
+        relationshipUpdated: false,
+      };
+    }
+    try {
+      this.socialBridge.queueMessage(agentId, targetAgentId, message);
+      this.socialBridge.updateRelationship(agentId, targetAgentId, {
+        familiarity: 5,
+        trust: 2,
+        lastInteraction: this.currentTick,
+      });
+      this.socialBridge.updateRelationship(targetAgentId, agentId, {
+        familiarity: 5,
+        trust: 2,
+        lastInteraction: this.currentTick,
+      });
+      if (this.stateDataProvider !== undefined) {
+        this.stateDataProvider.applyDriveChanges(agentId, { social: 10 });
+      }
+      const targetName = this.socialBridge.getAgentSummary(targetAgentId)?.name ?? targetAgentId;
+      return {
+        success: true,
+        message: `Message sent to ${targetName}.`,
+        relationshipUpdated: true,
+      };
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      return {
+        success: false,
+        message: `Failed to send message: ${errMsg}.`,
+        relationshipUpdated: false,
+      };
+    }
+  }
+
+  async executeObserveAgent(agentId: string, targetAgentId: string): Promise<SocialToolResult> {
+    if (this.socialBridge === undefined) {
+      return {
+        success: false,
+        message: 'Social actions not available.',
+        relationshipUpdated: false,
+      };
+    }
+    try {
+      const summary = this.socialBridge.getAgentSummary(targetAgentId);
+      if (summary === null) {
+        return { success: false, message: 'Agent not found.', relationshipUpdated: false };
+      }
+      const drives = this.socialBridge.getAgentDrives(targetAgentId);
+      this.socialBridge.updateRelationship(agentId, targetAgentId, {
+        familiarity: 1,
+        lastInteraction: this.currentTick,
+      });
+      return {
+        success: true,
+        message: `Observed ${summary.name}.`,
+        relationshipUpdated: true,
+        observedAgent: {
+          name: summary.name,
+          currentActivity: summary.currentActivity,
+          isThinking: summary.isThinking,
+          drives,
+        },
+      };
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      return {
+        success: false,
+        message: `Failed to observe agent: ${errMsg}.`,
+        relationshipUpdated: false,
+      };
+    }
+  }
+
+  async executeHelp(agentId: string, targetAgentId: string): Promise<SocialToolResult> {
+    if (this.socialBridge === undefined) {
+      return {
+        success: false,
+        message: 'Social actions not available.',
+        relationshipUpdated: false,
+      };
+    }
+    try {
+      this.socialBridge.updateRelationship(agentId, targetAgentId, {
+        familiarity: 10,
+        trust: 5,
+        lastInteraction: this.currentTick,
+      });
+      this.socialBridge.updateRelationship(targetAgentId, agentId, {
+        familiarity: 10,
+        trust: 5,
+        lastInteraction: this.currentTick,
+      });
+      if (this.stateDataProvider !== undefined) {
+        this.stateDataProvider.applyDriveChanges(agentId, { social: 15 });
+      }
+      // Determine target's primary drive (lowest value) and boost it by 10.
+      const targetDrives = this.socialBridge.getAgentDrives(targetAgentId);
+      let primaryDrive: string | undefined;
+      let lowestValue = Infinity;
+      for (const [name, value] of Object.entries(targetDrives)) {
+        if (value < lowestValue) {
+          lowestValue = value;
+          primaryDrive = name;
+        }
+      }
+      if (primaryDrive !== undefined && this.stateDataProvider !== undefined) {
+        this.stateDataProvider.applyDriveChanges(targetAgentId, { [primaryDrive]: 10 });
+      }
+      const targetName = this.socialBridge.getAgentSummary(targetAgentId)?.name ?? targetAgentId;
+      const driveLabel = primaryDrive ?? 'primary';
+      return {
+        success: true,
+        message: `You helped ${targetName}. Their ${driveLabel} improved.`,
+        relationshipUpdated: true,
+      };
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      return {
+        success: false,
+        message: `Failed to help agent: ${errMsg}.`,
+        relationshipUpdated: false,
+      };
+    }
+  }
+
+  async executeIgnore(agentId: string, targetAgentId: string): Promise<SocialToolResult> {
+    if (this.socialBridge === undefined) {
+      return {
+        success: false,
+        message: 'Social actions not available.',
+        relationshipUpdated: false,
+      };
+    }
+    try {
+      this.socialBridge.updateRelationship(agentId, targetAgentId, {
+        familiarity: -2,
+        trust: -1,
+        lastInteraction: this.currentTick,
+      });
+      if (this.stateDataProvider !== undefined) {
+        this.stateDataProvider.applyDriveChanges(agentId, { social: -5 });
+      }
+      const targetName = this.socialBridge.getAgentSummary(targetAgentId)?.name ?? targetAgentId;
+      return {
+        success: true,
+        message: `You chose to ignore ${targetName}.`,
+        relationshipUpdated: true,
+      };
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      return {
+        success: false,
+        message: `Failed to ignore agent: ${errMsg}.`,
+        relationshipUpdated: false,
+      };
+    }
   }
 }
 
