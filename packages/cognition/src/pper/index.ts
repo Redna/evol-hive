@@ -10,6 +10,8 @@ import type {
   PassivePerception,
   PerceptionResult,
   PerceptionDataProvider,
+  CompoundAction,
+  ObjectDependency,
 } from '@evol-hive/shared';
 import type { AffordanceClassifier } from '../classifier/index.js';
 import type { GuardrailEngine } from '../index.js';
@@ -73,7 +75,10 @@ export class PerceptionServiceImpl {
   async perceive(agentId: string): Promise<PerceptionResult> {
     const passive = this.assembler.buildPassivePerception(agentId);
     const primaryDriveLabel = this.options.provider.getPrimaryDriveLabel(agentId);
-    const allAffordances = this.options.provider.getAffordancesInRoom(passive.roomId);
+    const allAffordances =
+      typeof this.options.provider.getAvailableAffordancesInRoom === 'function'
+        ? this.options.provider.getAvailableAffordancesInRoom(passive.roomId)
+        : this.options.provider.getAffordancesInRoom(passive.roomId);
     const prunedAffordances = await this.options.classifier.prune(
       primaryDriveLabel,
       allAffordances,
@@ -108,6 +113,24 @@ export class PerceptionServiceImpl {
       relationships = undefined;
     }
 
+    // Compound actions and object dependencies (spec 018, Req 10).
+    let compoundActions: CompoundAction[] | undefined;
+    let objectDependencies: ObjectDependency[] | undefined;
+    try {
+      const provider = this.options.provider;
+      if (typeof provider.getCompoundActionsInRoom === 'function') {
+        const actions = provider.getCompoundActionsInRoom(passive.roomId);
+        if (actions.length > 0) compoundActions = actions;
+      }
+      if (typeof provider.getObjectDependenciesInRoom === 'function') {
+        const deps = provider.getObjectDependenciesInRoom(passive.roomId);
+        if (deps.length > 0) objectDependencies = deps;
+      }
+    } catch {
+      compoundActions = undefined;
+      objectDependencies = undefined;
+    }
+
     // Affordance masking (spec 016, Req 8): after classifier pruning, if a
     // guardrail engine is present, mask physical affordances when the agent
     // has no plan. Cognitive tools are never masked (handled by the builder).
@@ -133,6 +156,8 @@ export class PerceptionServiceImpl {
       ...(stuck ? { stuck } : {}),
       ...(persona !== undefined ? { persona } : {}),
       ...(relationships !== undefined ? { relationships } : {}),
+      ...(compoundActions ? { compoundActions } : {}),
+      ...(objectDependencies ? { objectDependencies } : {}),
     };
   }
 }

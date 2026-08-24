@@ -97,5 +97,24 @@ export * from './systems/object-state.js';
 export * from './social/message-queue.js';
 export * from './social/social-manager.js';
 
+// ── Persistence (spec 017) ───────────────────────────────────────────────
+export interface EnginePersistence {
+  /** Serialize the full game state to a SaveState object. */
+  save(): Promise<import('@evol-hive/shared').SaveState>;
+  /** Restore the full game state from a SaveState object. */
+  load(state: import('@evol-hive/shared').SaveState): Promise<void>;
+  /** Serialize the full game state to a JSON string. */
+  saveToString(): Promise<string>;
+  /** Restore the full game state from a JSON string. */
+  loadFromString(json: string): Promise<void>;
+  /** Serialize the full game state to a file on disk. */
+  saveToFile(path: string): Promise<void>;
+  /** Restore the full game state from a file on disk. */
+  loadFromFile(path: string): Promise<void>;
+}
+
+// Persistence implementation (spec 017)
+export * from './persistence/index.js';
+
 // Engine assembly factory — spec 005
 export * from './assembly.js';

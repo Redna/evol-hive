@@ -18,13 +18,19 @@
 import type {
   EngineConfig,
   MemoryDecayConfig,
+  AutoSaveConfig,
   PPEROrchestratorPort,
   PPERSchedulerConfig,
   Room,
   SceneDefinition,
 } from '@evol-hive/shared';
 import { defaultPPERSchedulerConfig, defaultMemoryDecayConfig } from '@evol-hive/shared';
-import type { MemoryStore, MemoryDecayService, ReflectionLoop } from '@evol-hive/memory';
+import type {
+  MemoryStore,
+  MemoryDecayService,
+  ReflectionLoop,
+  VectorStore,
+} from '@evol-hive/memory';
 import type { MemoryNode, MemoryEntryInput } from '@evol-hive/shared';
 import { AgentManagerImpl } from './agents/state/index.js';
 import { DriveSystemImpl } from './agents/drives/index.js';
@@ -43,7 +49,9 @@ import { DriveDecaySystem } from './systems/drive-decay.js';
 import { PPERScheduler } from './systems/pper-scheduler.js';
 import { MemoryMaintenanceSystem } from './systems/memory-maintenance.js';
 import { ObjectStateSystem } from './systems/object-state.js';
-import type { GameLoop } from './index.js';
+import { AutoSaveSystem } from './systems/auto-save.js';
+import { EnginePersistenceImpl } from './persistence/index.js';
+import type { GameLoop, EnginePersistence } from './index.js';
 
 /** A no-op MemoryStore used when no real memory subsystem is wired. */
 class NullMemoryStore implements MemoryStore {
@@ -99,12 +107,17 @@ export interface EngineCore {
   reflectionLoop?: ReflectionLoop;
   /** Optional memory decay config (spec 014, Req 18). */
   memoryMaintenanceConfig?: MemoryDecayConfig;
+  /** Optional persistence implementation (spec 017, Req 17). Set when a VectorStore is provided. */
+  persistence?: EnginePersistenceImpl;
+  /** Optional auto-save configuration (spec 017, Req 17). */
+  autoSaveConfig?: AutoSaveConfig;
 }
 
 /** Build all engine subsystems and bridges (no spec-mandated systems registered yet). */
 export function createEngineCore(
   config: EngineConfig,
   memoryStore: MemoryStore = new NullMemoryStore(),
+  vectorStore?: VectorStore,
 ): EngineCore {
   const agentManager = new AgentManagerImpl();
   const driveSystem = new DriveSystemImpl(agentManager);
@@ -151,6 +164,18 @@ export function createEngineCore(
   const gameLoop = new GameLoopImpl(config);
   clock.bind(gameLoop);
 
+  // Persistence (spec 017, Req 17) — constructed when a VectorStore is provided.
+  const persistence =
+    vectorStore !== undefined
+      ? new EnginePersistenceImpl({
+          gameLoop,
+          agentManager,
+          smartObjectRegistry,
+          sceneManager,
+          vectorStore,
+        })
+      : undefined;
+
   return {
     gameLoop,
     agentManager,
@@ -164,6 +189,7 @@ export function createEngineCore(
     feedbackStore,
     bridges,
     clock: clock,
+    ...(persistence !== undefined ? { persistence } : {}),
   };
 }
 
@@ -175,6 +201,9 @@ export function assembleGameLoop(
     memoryDecayService: MemoryDecayService;
     reflectionLoop?: ReflectionLoop;
     decayConfig?: MemoryDecayConfig;
+  },
+  autoSave?: {
+    config: AutoSaveConfig;
   },
 ): GameLoop {
   const schedulerConfig: PPERSchedulerConfig = defaultPPERSchedulerConfig();
@@ -197,6 +226,19 @@ export function assembleGameLoop(
       }),
     );
   }
+
+  // (6) AutoSaveSystem — last priority, only when enabled and persistence is available (spec 017, Req 18).
+  if (autoSave?.config.enabled) {
+    if (core.persistence) {
+      core.gameLoop.registerSystem(
+        new AutoSaveSystem({ persistence: core.persistence, config: autoSave.config }),
+      );
+    } else {
+      console.warn(
+        '[assembleGameLoop] auto-save enabled but no persistence (VectorStore) available — auto-save not registered.',
+      );
+    }
+  }
   return core.gameLoop;
 }
 
@@ -208,6 +250,8 @@ export interface AssembledEngine {
   smartObjectRegistry: SmartObjectRegistryImpl;
   affordanceRegistry: AffordanceRegistryImpl;
   bridges: EngineCore['bridges'];
+  /** Optional persistence (spec 017, Req 19). */
+  persistence?: EnginePersistence;
 }
 
 /** Build the full engine (core + registered systems) in one call. */
@@ -215,8 +259,9 @@ export function createEngine(
   config: EngineConfig,
   orchestrator: PPEROrchestratorPort,
   memoryStore?: MemoryStore,
+  vectorStore?: VectorStore,
 ): AssembledEngine {
-  const core = createEngineCore(config, memoryStore);
+  const core = createEngineCore(config, memoryStore, vectorStore);
   assembleGameLoop(core, orchestrator);
   return {
     gameLoop: core.gameLoop,
@@ -225,6 +270,7 @@ export function createEngine(
     smartObjectRegistry: core.smartObjectRegistry,
     affordanceRegistry: core.affordanceRegistry,
     bridges: core.bridges,
+    ...(core.persistence !== undefined ? { persistence: core.persistence } : {}),
   };
 }
 

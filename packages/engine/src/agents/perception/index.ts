@@ -12,6 +12,8 @@ import type {
   AgentProfile,
   AgentInternalState,
   AgentSummary,
+  CompoundAction,
+  ObjectDependency,
   Relationship,
   SmartObjectSummary,
   SocialMessage,
@@ -64,6 +66,23 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
 
   getAffordancesInRoom(roomId: string): Affordance[] {
     return this.smartObjectRegistry.getAffordancesInRoom(roomId);
+  }
+
+  // ── Object interaction methods (spec 018, Req 22) ─────────────────────────
+
+  /** Only affordances whose conditions are currently met (spec 018, Req 22). */
+  getAvailableAffordancesInRoom(roomId: string): Affordance[] {
+    return this.smartObjectRegistry.getAvailableAffordancesInRoom(roomId);
+  }
+
+  /** All compound actions in a room (spec 018, Req 22). */
+  getCompoundActionsInRoom(roomId: string): CompoundAction[] {
+    return this.smartObjectRegistry.getCompoundActionsInRoom(roomId);
+  }
+
+  /** All object dependencies in a room (spec 018, Req 22). */
+  getObjectDependenciesInRoom(roomId: string): ObjectDependency[] {
+    return this.smartObjectRegistry.getObjectDependenciesInRoom(roomId);
   }
 
   getAgentDrives(agentId: string): Record<string, number> {
