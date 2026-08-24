@@ -94,6 +94,19 @@ export class InMemoryVectorStore implements VectorStore {
     }
     return result;
   }
+
+  async exportAll(): Promise<MemoryNode[]> {
+    // Copies (including the embedding array) so mutating a returned node does
+    // not affect the store (spec 017, Req 11 / AC-11).
+    return [...this.nodes.values()].map((n) => ({ ...n, embedding: [...n.embedding] }));
+  }
+
+  async importAll(nodes: MemoryNode[]): Promise<void> {
+    this.nodes.clear();
+    for (const node of nodes) {
+      this.nodes.set(node.id, { ...node, embedding: [...node.embedding] });
+    }
+  }
 }
 
 export {};

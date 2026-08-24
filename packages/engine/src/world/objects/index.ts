@@ -5,8 +5,15 @@
  * object CRUD, room queries, and affordance aggregation for the Perceive phase.
  */
 
-import type { Affordance, SmartObject, SmartObjectSummary } from '@evol-hive/shared';
+import type {
+  Affordance,
+  CompoundAction,
+  ObjectDependency,
+  SmartObject,
+  SmartObjectSummary,
+} from '@evol-hive/shared';
 import type { SmartObjectRegistry } from '../index.js';
+import { evaluateConditions } from '../affordances/index.js';
 
 /** Concrete SmartObjectRegistry backed by an in-memory map. */
 export class SmartObjectRegistryImpl implements SmartObjectRegistry {
@@ -45,11 +52,84 @@ export class SmartObjectRegistryImpl implements SmartObjectRegistry {
     return result;
   }
 
+  /**
+   * Returns only affordances whose `conditions` (if present) are currently
+   * satisfied by the owning object's state (spec 018, Req 14). Affordances
+   * without `conditions` are always included.
+   */
+  getAvailableAffordancesInRoom(roomId: string): Affordance[] {
+    const result: Affordance[] = [];
+    for (const object of this.getByRoom(roomId)) {
+      for (const affordance of object.affordances) {
+        if (!affordance.conditions || affordance.conditions.length === 0) {
+          result.push(affordance);
+        } else if (evaluateConditions(object.state, affordance.conditions)) {
+          result.push(affordance);
+        }
+      }
+    }
+    return result;
+  }
+
+  /** Collects all `compoundActions` from objects in a room, flattened (spec 018, Req 15). */
+  getCompoundActionsInRoom(roomId: string): CompoundAction[] {
+    const result: CompoundAction[] = [];
+    for (const object of this.getByRoom(roomId)) {
+      if (object.compoundActions) {
+        result.push(...object.compoundActions);
+      }
+    }
+    return result;
+  }
+
+  /** Collects all `dependencies` from objects in a room, flattened (spec 018, Req 16). */
+  getObjectDependenciesInRoom(roomId: string): ObjectDependency[] {
+    const result: ObjectDependency[] = [];
+    for (const object of this.getByRoom(roomId)) {
+      if (object.dependencies) {
+        result.push(...object.dependencies);
+      }
+    }
+    return result;
+  }
+
+  /** Returns all registered smart objects (spec 018, Req 21). */
+  getAll(): SmartObject[] {
+    return Array.from(this.objects.values());
+  }
+
+  /**
+   * Performs a shallow merge of `patch` into the object's existing `state`
+   * (spec 018, Req 17). No-op if the object does not exist.
+   */
+  applyStatePatch(objectId: string, patch: Record<string, unknown>): void {
+    const object = this.objects.get(objectId);
+    if (object) {
+      this.objects.set(objectId, {
+        ...object,
+        state: { ...object.state, ...patch },
+      });
+    }
+  }
+
   updateState(objectId: string, newState: Record<string, unknown>): void {
     const object = this.objects.get(objectId);
     if (object) {
       this.objects.set(objectId, { ...object, state: newState });
     }
+  }
+
+  /** Return all objects as an array, including their current runtime state (spec 017, Req 15 / AC-28). */
+  getAllObjects(): SmartObject[] {
+    return [...this.objects.values()];
+  }
+
+  /**
+   * Remove every registered object (spec 017). Used by `EnginePersistenceImpl.load()`
+   * to make the restore destructive — a full snapshot replacement.
+   */
+  clear(): void {
+    this.objects.clear();
   }
 }
 

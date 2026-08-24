@@ -7,12 +7,72 @@
  * external I/O inside handlers (Req 23).
  */
 
-import type { Affordance } from '@evol-hive/shared';
+import type { Affordance, AffordanceCondition } from '@evol-hive/shared';
 import type { AffordanceRegistry, AffordanceHandler } from '../index.js';
 import type { SmartObjectRegistry } from '../index.js';
 
 /** A deterministic precondition checker that evaluates against a smart object's `state`. */
 export type PreconditionChecker = (objectState: Record<string, unknown>) => boolean;
+
+/**
+ * Evaluate a set of `AffordanceCondition`s against a smart object's `state`
+ * (spec 018, Req 13). Returns `true` only if all conditions pass. If a field is
+ * missing from `state`, that condition fails. Handles type coercion for numeric
+ * comparisons.
+ */
+export function evaluateConditions(
+  state: Record<string, unknown>,
+  conditions: AffordanceCondition[],
+): boolean {
+  for (const condition of conditions) {
+    const fieldValue = state[condition.field];
+    // Missing field = condition fails.
+    if (fieldValue === undefined) return false;
+    if (!evaluateSingleCondition(fieldValue, condition.operator, condition.value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function evaluateSingleCondition(
+  fieldValue: unknown,
+  operator: AffordanceCondition['operator'],
+  conditionValue: number | string | boolean,
+): boolean {
+  // Numeric comparison when both are numbers.
+  if (typeof fieldValue === 'number' && typeof conditionValue === 'number') {
+    switch (operator) {
+      case '>':
+        return fieldValue > conditionValue;
+      case '<':
+        return fieldValue < conditionValue;
+      case '>=':
+        return fieldValue >= conditionValue;
+      case '<=':
+        return fieldValue <= conditionValue;
+      case '==':
+        return fieldValue === conditionValue;
+      case '!=':
+        return fieldValue !== conditionValue;
+    }
+  }
+  // Otherwise compare as-is (string, boolean).
+  switch (operator) {
+    case '>':
+      return String(fieldValue) > String(conditionValue);
+    case '<':
+      return String(fieldValue) < String(conditionValue);
+    case '>=':
+      return String(fieldValue) >= String(conditionValue);
+    case '<=':
+      return String(fieldValue) <= String(conditionValue);
+    case '==':
+      return fieldValue === conditionValue;
+    case '!=':
+      return fieldValue !== conditionValue;
+  }
+}
 
 /**
  * Concrete AffordanceRegistry backed by in-memory maps for handlers and

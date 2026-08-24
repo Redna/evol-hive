@@ -19,8 +19,18 @@ export interface SmartObjectRegistry {
   getObjectsInRoom(roomId: string): import('@evol-hive/shared').SmartObjectSummary[];
   /** Get all affordances available in a room (for classifier pruning). */
   getAffordancesInRoom(roomId: string): import('@evol-hive/shared').Affordance[];
+  /** Affordances whose `conditions` (if present) are currently satisfied (spec 018, Req 14). */
+  getAvailableAffordancesInRoom(roomId: string): import('@evol-hive/shared').Affordance[];
+  /** All compound actions defined on objects in a room (spec 018, Req 15). */
+  getCompoundActionsInRoom(roomId: string): import('@evol-hive/shared').CompoundAction[];
+  /** All dependencies declared by objects in a room (spec 018, Req 16). */
+  getObjectDependenciesInRoom(roomId: string): import('@evol-hive/shared').ObjectDependency[];
+  /** Returns all registered smart objects (spec 018, Req 21). */
+  getAll(): import('@evol-hive/shared').SmartObject[];
   /** Update an object's state (after affordance execution). */
   updateState(objectId: string, newState: Record<string, unknown>): void;
+  /** Shallow-merge a state patch into an object's state (spec 018, Req 17). No-op if object doesn't exist. */
+  applyStatePatch(objectId: string, patch: Record<string, unknown>): void;
 }
 
 // ── Affordance Registry ───────────────────────────────────────────────────────

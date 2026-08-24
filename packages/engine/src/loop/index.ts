@@ -61,6 +61,29 @@ export class GameLoopImpl implements GameLoop {
     return this.currentGameTick;
   }
 
+  /**
+   * Restore the deterministic loop state from a save (spec 017, Req 15).
+   * Sets the internal `tickNumber` and `simulationTime` and updates
+   * `currentGameTick`. The loop should not be running when this is called —
+   * the caller (`EnginePersistenceImpl.load()`) stops the loop first. If the
+   * loop is running, a warning is logged and the state is restored anyway
+   * (defensive).
+   */
+  restoreState(tickNumber: number, simulationTime: number): void {
+    if (this.running) {
+      console.warn(
+        '[GameLoopImpl] restoreState called while the loop is running — stop the loop before loading.',
+      );
+    }
+    this.tickNumber = tickNumber;
+    this.simulationTime = simulationTime;
+    this.currentGameTick = {
+      tickNumber: this.tickNumber,
+      simulationTime: this.simulationTime,
+      deltaSeconds: this.deltaSeconds,
+    };
+  }
+
   /** Schedule the next frame via setTimeout (deterministic & test-friendly). */
   private scheduleNextFrame(): void {
     if (!this.running) return;
