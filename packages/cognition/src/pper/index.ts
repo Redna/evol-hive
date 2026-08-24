@@ -34,12 +34,18 @@ export class PassivePerceptionAssembler {
     const systemFeedback = this.provider.getSystemFeedback(agentId);
     const associativeMemories = this.provider.getAssociativeMemories?.(agentId);
 
+    // Social context (spec 018, Req 32).
+    const agentsPresent = this.provider.getAgentsInRoom?.(roomId, agentId);
+    const socialContext = this.provider.dequeueSocialMessages?.(agentId);
+
     const passive: PassivePerception = {
       roomId,
       objectsPresent,
       drives,
       ...(systemFeedback !== undefined ? { systemFeedback } : {}),
       ...(associativeMemories !== undefined ? { associativeMemories } : {}),
+      ...(agentsPresent !== undefined && agentsPresent.length > 0 ? { agentsPresent } : {}),
+      ...(socialContext !== undefined && socialContext.length > 0 ? { socialContext } : {}),
     };
     return passive;
   }
@@ -88,6 +94,20 @@ export class PerceptionServiceImpl {
       persona = undefined;
     }
 
+    // Relationship population (spec 018, Req 37).
+    let relationships: Record<string, import('@evol-hive/shared').Relationship> | undefined;
+    try {
+      const provider = this.options.provider;
+      if (typeof provider.getRelationships === 'function') {
+        const rels = provider.getRelationships(agentId);
+        if (rels !== undefined && Object.keys(rels).length > 0) {
+          relationships = rels;
+        }
+      }
+    } catch {
+      relationships = undefined;
+    }
+
     // Affordance masking (spec 016, Req 8): after classifier pruning, if a
     // guardrail engine is present, mask physical affordances when the agent
     // has no plan. Cognitive tools are never masked (handled by the builder).
@@ -112,6 +132,7 @@ export class PerceptionServiceImpl {
       primaryDriveLabel,
       ...(stuck ? { stuck } : {}),
       ...(persona !== undefined ? { persona } : {}),
+      ...(relationships !== undefined ? { relationships } : {}),
     };
   }
 }

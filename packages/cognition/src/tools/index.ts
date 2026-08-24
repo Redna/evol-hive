@@ -57,6 +57,74 @@ export const defaultCognitiveTools: CognitiveTool[] = [
       additionalProperties: false,
     },
   },
+  // ── Social cognitive tools (spec 018, Req 15) ────────────────────────────
+  {
+    name: 'talk_to',
+    description:
+      'Send a message to another agent in the same room. The message will appear in their next perception tick.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        targetAgentId: {
+          type: 'string',
+          description: 'The ID of the agent to send the message to.',
+        },
+        message: {
+          type: 'string',
+          description: 'The message content to send to the target agent.',
+        },
+      },
+      required: ['targetAgentId', 'message'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'observe_agent',
+    description:
+      'Observe another agent in the same room. Returns their current activity, drives, and state.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        targetAgentId: {
+          type: 'string',
+          description: 'The ID of the agent to observe.',
+        },
+      },
+      required: ['targetAgentId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'help',
+    description:
+      'Help another agent in the same room. Boosts their primary drive and your social drive.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        targetAgentId: {
+          type: 'string',
+          description: 'The ID of the agent to help.',
+        },
+      },
+      required: ['targetAgentId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'ignore',
+    description: 'Choose to ignore another agent in the same room. Signals social disengagement.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        targetAgentId: {
+          type: 'string',
+          description: 'The ID of the agent to ignore.',
+        },
+      },
+      required: ['targetAgentId'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 /**

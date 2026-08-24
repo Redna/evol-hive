@@ -44,6 +44,25 @@ export interface AgentInternalState {
   location: string; // room/scene ID
   /** Timestamp of last perception tick (spatial debouncing). */
   lastPerceptionTick: number;
+  /**
+   * Structured relationship map (spec 018, Req 7). Keyed by other agent ID.
+   * Seeded at spawn from `AgentProfile.relationships`; updated by social
+   * interactions. `undefined` when the agent has no relationships.
+   */
+  relationships?: Record<string, Relationship>;
+}
+
+/**
+ * Structured relationship data between two agents (spec 018, Req 3).
+ * Trust and familiarity are clamped to 0–100.
+ */
+export interface Relationship {
+  /** 0–100, 50 = neutral. */
+  trust: number;
+  /** 0–100, 0 = strangers. */
+  familiarity: number;
+  /** Simulation timestamp of the most recent social interaction. */
+  lastInteraction: number;
 }
 
 /** Metadata describing an agent's identity and personality. */

@@ -19,6 +19,12 @@ export interface Affordance {
   preconditions: string[];
   /** Drive impacts applied on success (e.g., { energy: +20 }). */
   effects: Partial<Record<string, number>>;
+  /**
+   * Reserved for future use when social affordances target other agents
+   * (spec 018, Req 8). Not populated by the current implementation — social
+   * actions are cognitive tools, not physical affordances.
+   */
+  targetAgentId?: string;
 }
 
 /** A smart object in the game world that exposes affordances. */

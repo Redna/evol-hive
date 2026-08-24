@@ -32,6 +32,16 @@ export class AgentManagerImpl implements AgentManager {
       location: '',
       lastPerceptionTick: 0,
     };
+
+    // Seed structured relationships from profile.relationships (spec 018, Req 22).
+    if (profile.relationships !== undefined && Object.keys(profile.relationships).length > 0) {
+      const relationships: Record<string, import('@evol-hive/shared').Relationship> = {};
+      for (const key of Object.keys(profile.relationships)) {
+        relationships[key] = { trust: 50, familiarity: 0, lastInteraction: 0 };
+      }
+      state.relationships = relationships;
+    }
+
     this.agents.set(profile.id, state);
     this.profiles.set(profile.id, profile);
     return state;

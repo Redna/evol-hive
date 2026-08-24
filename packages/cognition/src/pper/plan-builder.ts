@@ -9,11 +9,15 @@
  * present and non-null, the system prompt starts with the persona text.
  */
 
-import type { AgentProfile, PerceptionResult } from '@evol-hive/shared';
+import type { AgentProfile, PerceptionResult, Relationship } from '@evol-hive/shared';
 import {
   formulatePlanTool,
   queryMemoryTool,
   updateInternalStateTool,
+  talkToTool,
+  observeAgentTool,
+  helpTool,
+  ignoreTool,
   formatPersona,
   GUARDRAIL_FORCING_DIRECTIVE,
 } from '@evol-hive/shared';
@@ -54,6 +58,40 @@ export class PlanBuilderImpl implements PlanBuilder {
       `Drives: ${driveSummary}`,
     ];
 
+    // ── Social context (spec 018, Req 38) ────────────────────────────────────
+    const hasAgentsPresent =
+      passive.agentsPresent !== undefined && passive.agentsPresent.length > 0;
+
+    if (hasAgentsPresent) {
+      const agentsStr = passive
+        .agentsPresent!.map((a) => `${a.name} (${a.currentActivity})`)
+        .join(', ');
+      contextLines.push(`Agents present: ${agentsStr}`);
+    }
+
+    if (passive.socialContext !== undefined && passive.socialContext.length > 0) {
+      for (const msg of passive.socialContext) {
+        contextLines.push(`Message from ${msg.fromName}: "${msg.content}"`);
+      }
+    }
+
+    // Relationship context (spec 018, Req 35).
+    if (hasAgentsPresent && perceptionResult.relationships !== undefined) {
+      for (const agent of passive.agentsPresent!) {
+        const rel = perceptionResult.relationships[agent.agentId];
+        if (rel !== undefined) {
+          contextLines.push(...buildRelationshipContextLines(agent.name, rel));
+        }
+      }
+    }
+
+    // Social drive prompt hint (spec 018, Req 39).
+    if (hasAgentsPresent && primaryDriveLabel.toLowerCase().includes('social')) {
+      contextLines.push(
+        'You feel a strong need for social interaction. Consider using talk_to or help to engage with other agents in the room.',
+      );
+    }
+
     // Append system feedback (prior action failures) per §9.2.
     if (passive.systemFeedback !== undefined) {
       contextLines.push(`System feedback: ${passive.systemFeedback}`);
@@ -71,7 +109,7 @@ export class PlanBuilderImpl implements PlanBuilder {
       perceptionContext: contextLines.join('\n'),
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
-      tools: [formulatePlanTool, queryMemoryTool, updateInternalStateTool],
+      tools: buildPlanTools(hasAgentsPresent),
     };
   }
 }
@@ -103,6 +141,49 @@ function formatDrives(drives: Record<string, number>): string {
   return Object.entries(drives)
     .map(([name, value]) => `${name}=${value}`)
     .join(', ');
+}
+
+/**
+ * Build tool definitions for the Plan phase, including social tools when agents are present
+ * (spec 018, Req 38).
+ */
+function buildPlanTools(hasAgentsPresent: boolean) {
+  const base = [formulatePlanTool, queryMemoryTool, updateInternalStateTool];
+  if (hasAgentsPresent) {
+    return [...base, talkToTool, observeAgentTool, helpTool, ignoreTool];
+  }
+  return base;
+}
+
+/**
+ * Build relationship context lines from trust and familiarity values
+ * (spec 018, Req 35).
+ */
+function buildRelationshipContextLines(name: string, rel: Relationship): string[] {
+  const lines: string[] = [];
+  const { trust, familiarity } = rel;
+
+  if (trust > 70) {
+    lines.push(`You trust ${name} deeply`);
+  } else if (trust >= 55) {
+    lines.push(`You know ${name} well and trust them`);
+  } else if (trust > 45) {
+    lines.push(`You are neutral about ${name}`);
+  } else if (trust >= 30) {
+    lines.push(`You distrust ${name}`);
+  } else {
+    lines.push(`You deeply distrust ${name}`);
+  }
+
+  if (familiarity > 60) {
+    lines.push(`You know ${name} very well`);
+  } else if (familiarity >= 30) {
+    lines.push(`You know ${name} somewhat`);
+  } else {
+    lines.push(`You barely know ${name}`);
+  }
+
+  return lines;
 }
 
 export {};

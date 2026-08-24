@@ -11,12 +11,16 @@ import type {
   Affordance,
   AgentProfile,
   AgentInternalState,
+  AgentSummary,
+  Relationship,
   SmartObjectSummary,
+  SocialMessage,
   PerceptionDataProvider,
 } from '@evol-hive/shared';
 import type { AgentManager, DriveSystem } from '../index.js';
 import type { SmartObjectRegistry } from '../../world/index.js';
 import type { SystemFeedbackStore } from '../feedback/index.js';
+import type { SocialManager } from '../../social/social-manager.js';
 
 /** Constructor options for {@link PerceptionDataProviderImpl}. */
 export interface PerceptionDataProviderOptions {
@@ -35,6 +39,7 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
   private readonly smartObjectRegistry: SmartObjectRegistry;
   private readonly driveSystem: DriveSystem;
   private readonly feedbackStore: SystemFeedbackStore;
+  private socialManager: SocialManager | undefined;
 
   constructor(
     agentManager: AgentManager,
@@ -83,6 +88,25 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
 
   getAgentState(agentId: string): AgentInternalState | null {
     return this.agentManager.getState(agentId);
+  }
+
+  // ── Social perception methods (spec 018, Req 21) ───────────────────────────
+
+  /** Inject the SocialManager for social perception queries (spec 018, Req 21). */
+  setSocialManager(socialManager: SocialManager): void {
+    this.socialManager = socialManager;
+  }
+
+  getAgentsInRoom(roomId: string, excludingAgentId: string): AgentSummary[] {
+    return this.socialManager?.getAgentsInRoom(roomId, excludingAgentId) ?? [];
+  }
+
+  dequeueSocialMessages(agentId: string): SocialMessage[] {
+    return this.socialManager?.dequeueSocialMessages(agentId) ?? [];
+  }
+
+  getRelationships(agentId: string): Record<string, Relationship> {
+    return this.socialManager?.getRelationships(agentId) ?? {};
   }
 }
 
