@@ -139,3 +139,27 @@ describe('AC-26: all individual flags false but guardrailsEnabled true', () => {
     });
   });
 });
+
+// ─── Spec 019: driveDecayRate env var (AC-8) ────────────────────────────────
+
+describe('AC-8: loadEngineConfig reads ENGINE_DRIVE_DECAY_RATE', () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('defaults to 0.1 when ENGINE_DRIVE_DECAY_RATE is unset', async () => {
+    delete process.env['ENGINE_DRIVE_DECAY_RATE'];
+    const { loadEngineConfig } = await import('../../../config/engine.config.js');
+    const config = loadEngineConfig();
+    expect(config.driveDecayRate).toBe(0.1);
+  });
+
+  it('reads ENGINE_DRIVE_DECAY_RATE=0.5 from env', async () => {
+    process.env['ENGINE_DRIVE_DECAY_RATE'] = '0.5';
+    const { loadEngineConfig } = await import('../../../config/engine.config.js');
+    const config = loadEngineConfig();
+    expect(config.driveDecayRate).toBe(0.5);
+  });
+});
