@@ -73,6 +73,27 @@ export interface LLMConcurrencyManager {
   activeCount: number;
 }
 
+// ── Persistence (spec 017) ──────────────────────────────────────────────────
+
+/**
+ * Public save/load API for the engine (spec 017, Req 13). All methods are
+ * `async` because the `VectorStore` methods are async.
+ */
+export interface EnginePersistence {
+  /** Serialize the full game state to a `SaveState` object. */
+  save(): Promise<import('@evol-hive/shared').SaveState>;
+  /** Restore the full game state from a `SaveState` object. */
+  load(state: import('@evol-hive/shared').SaveState): Promise<void>;
+  /** Serialize the full game state to a JSON string. */
+  saveToString(): Promise<string>;
+  /** Restore the full game state from a JSON string. */
+  loadFromString(json: string): Promise<void>;
+  /** Serialize the full game state to a file on disk. */
+  saveToFile(path: string): Promise<void>;
+  /** Restore the full game state from a file on disk. */
+  loadFromFile(path: string): Promise<void>;
+}
+
 // ── Re-exports ────────────────────────────────────────────────────────────────
 
 // Engine core
@@ -91,6 +112,10 @@ export * from './agents/index.js';
 export * from './systems/pper-scheduler.js';
 export * from './systems/drive-decay.js';
 export * from './systems/memory-maintenance.js';
+export * from './systems/auto-save.js';
+
+// Persistence (save/load game state) — spec 017
+export * from './persistence/index.js';
 
 // Engine assembly factory — spec 005
 export * from './assembly.js';
