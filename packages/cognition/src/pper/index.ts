@@ -7,6 +7,9 @@
  */
 
 import type {
+  Affordance,
+  CompoundAction,
+  ObjectDependency,
   PassivePerception,
   PerceptionResult,
   PerceptionDataProvider,
@@ -67,7 +70,16 @@ export class PerceptionServiceImpl {
   async perceive(agentId: string): Promise<PerceptionResult> {
     const passive = this.assembler.buildPassivePerception(agentId);
     const primaryDriveLabel = this.options.provider.getPrimaryDriveLabel(agentId);
-    const allAffordances = this.options.provider.getAffordancesInRoom(passive.roomId);
+
+    // Use getAvailableAffordancesInRoom when available (spec 018, Req 23),
+    // falling back to getAffordancesInRoom for backward compatibility.
+    const provider = this.options.provider as PerceptionDataProvider;
+    let allAffordances: Affordance[];
+    if (typeof provider.getAvailableAffordancesInRoom === 'function') {
+      allAffordances = provider.getAvailableAffordancesInRoom(passive.roomId);
+    } else {
+      allAffordances = provider.getAffordancesInRoom(passive.roomId);
+    }
     const prunedAffordances = await this.options.classifier.prune(
       primaryDriveLabel,
       allAffordances,
@@ -78,7 +90,6 @@ export class PerceptionServiceImpl {
     // Persona population (spec 012, Req 11): call getAgentProfile gracefully.
     let persona: import('@evol-hive/shared').AgentProfile | null | undefined;
     try {
-      const provider = this.options.provider;
       if (typeof provider.getAgentProfile === 'function') {
         persona = provider.getAgentProfile(agentId);
       } else {
@@ -86,6 +97,26 @@ export class PerceptionServiceImpl {
       }
     } catch {
       persona = undefined;
+    }
+
+    // Compound actions & dependencies (spec 018, Req 24): graceful fallback to empty.
+    let compoundActions: CompoundAction[] | undefined;
+    let objectDependencies: ObjectDependency[] | undefined;
+    try {
+      if (typeof provider.getCompoundActionsInRoom === 'function') {
+        const actions = provider.getCompoundActionsInRoom(passive.roomId);
+        if (actions.length > 0) compoundActions = actions;
+      }
+    } catch {
+      // no-op
+    }
+    try {
+      if (typeof provider.getObjectDependenciesInRoom === 'function') {
+        const deps = provider.getObjectDependenciesInRoom(passive.roomId);
+        if (deps.length > 0) objectDependencies = deps;
+      }
+    } catch {
+      // no-op
     }
 
     // Affordance masking (spec 016, Req 8): after classifier pruning, if a
@@ -112,6 +143,8 @@ export class PerceptionServiceImpl {
       primaryDriveLabel,
       ...(stuck ? { stuck } : {}),
       ...(persona !== undefined ? { persona } : {}),
+      ...(compoundActions ? { compoundActions } : {}),
+      ...(objectDependencies ? { objectDependencies } : {}),
     };
   }
 }

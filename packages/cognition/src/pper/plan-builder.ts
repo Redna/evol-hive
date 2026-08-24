@@ -66,6 +66,20 @@ export class PlanBuilderImpl implements PlanBuilder {
       );
     }
 
+    // Compound actions in LLM context (spec 018, Req 25).
+    if (perceptionResult.compoundActions && perceptionResult.compoundActions.length > 0) {
+      const summary = perceptionResult.compoundActions
+        .map((ca) => `${ca.label} (${ca.steps.length} steps)`)
+        .join(', ');
+      contextLines.push(`Multi-step actions available: ${summary}`);
+    }
+
+    // Object dependencies in LLM context (spec 018, Req 26).
+    if (perceptionResult.objectDependencies && perceptionResult.objectDependencies.length > 0) {
+      const summary = perceptionResult.objectDependencies.map((dep) => dep.description).join(', ');
+      contextLines.push(`Object dependencies: ${summary}`);
+    }
+
     return {
       systemPrompt,
       perceptionContext: contextLines.join('\n'),

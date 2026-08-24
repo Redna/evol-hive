@@ -16,7 +16,6 @@
  */
 
 import type {
-  AutoSaveConfig,
   EngineConfig,
   MemoryDecayConfig,
   PPEROrchestratorPort,
@@ -25,12 +24,7 @@ import type {
   SceneDefinition,
 } from '@evol-hive/shared';
 import { defaultPPERSchedulerConfig, defaultMemoryDecayConfig } from '@evol-hive/shared';
-import type {
-  MemoryStore,
-  MemoryDecayService,
-  ReflectionLoop,
-  VectorStore,
-} from '@evol-hive/memory';
+import type { MemoryStore, MemoryDecayService, ReflectionLoop } from '@evol-hive/memory';
 import type { MemoryNode, MemoryEntryInput } from '@evol-hive/shared';
 import { AgentManagerImpl } from './agents/state/index.js';
 import { DriveSystemImpl } from './agents/drives/index.js';
@@ -48,8 +42,7 @@ import { GameLoopImpl } from './loop/index.js';
 import { DriveDecaySystem } from './systems/drive-decay.js';
 import { PPERScheduler } from './systems/pper-scheduler.js';
 import { MemoryMaintenanceSystem } from './systems/memory-maintenance.js';
-import { AutoSaveSystem } from './systems/auto-save.js';
-import { EnginePersistenceImpl } from './persistence/engine-persistence.js';
+import { ObjectStateSystem } from './systems/object-state.js';
 import type { GameLoop } from './index.js';
 
 /** A no-op MemoryStore used when no real memory subsystem is wired. */
@@ -106,17 +99,12 @@ export interface EngineCore {
   reflectionLoop?: ReflectionLoop;
   /** Optional memory decay config (spec 014, Req 18). */
   memoryMaintenanceConfig?: MemoryDecayConfig;
-  /** Optional persistence (save/load) facade (spec 017, Req 17). Set when a `VectorStore` is provided. */
-  persistence?: EnginePersistenceImpl;
-  /** Optional auto-save config (spec 017, Req 17). */
-  autoSaveConfig?: AutoSaveConfig;
 }
 
 /** Build all engine subsystems and bridges (no spec-mandated systems registered yet). */
 export function createEngineCore(
   config: EngineConfig,
   memoryStore: MemoryStore = new NullMemoryStore(),
-  vectorStore?: VectorStore,
 ): EngineCore {
   const agentManager = new AgentManagerImpl();
   const driveSystem = new DriveSystemImpl(agentManager);
@@ -163,19 +151,6 @@ export function createEngineCore(
   const gameLoop = new GameLoopImpl(config);
   clock.bind(gameLoop);
 
-  // Persistence facade — only constructed when a VectorStore is available
-  // (spec 017, Req 17). Without a VectorStore, save/load is unavailable.
-  const persistence =
-    vectorStore !== undefined
-      ? new EnginePersistenceImpl({
-          gameLoop,
-          agentManager,
-          smartObjectRegistry,
-          sceneManager,
-          vectorStore,
-        })
-      : undefined;
-
   return {
     gameLoop,
     agentManager,
@@ -189,7 +164,6 @@ export function createEngineCore(
     feedbackStore,
     bridges,
     clock: clock,
-    ...(persistence !== undefined ? { persistence } : {}),
   };
 }
 
@@ -202,14 +176,14 @@ export function assembleGameLoop(
     reflectionLoop?: ReflectionLoop;
     decayConfig?: MemoryDecayConfig;
   },
-  autoSave?: { config: AutoSaveConfig },
 ): GameLoop {
   const schedulerConfig: PPERSchedulerConfig = defaultPPERSchedulerConfig();
   core.gameLoop.registerSystem(core.spatial); // (1) SpatialSystem
   core.gameLoop.registerSystem(new DriveDecaySystem(core.agentManager, core.driveSystem)); // (2) DriveDecaySystem
-  core.gameLoop.registerSystem(new PPERScheduler(core.agentManager, orchestrator, schedulerConfig)); // (3) PPERScheduler
+  core.gameLoop.registerSystem(new ObjectStateSystem(core.smartObjectRegistry)); // (3) ObjectStateSystem (spec 018)
+  core.gameLoop.registerSystem(new PPERScheduler(core.agentManager, orchestrator, schedulerConfig)); // (4) PPERScheduler
 
-  // (4) MemoryMaintenanceSystem — only when a decay service is provided (spec 014, Req 17/18).
+  // (5) MemoryMaintenanceSystem — only when a decay service is provided (spec 014, Req 17/18).
   if (memoryMaintenance?.memoryDecayService) {
     const decayConfig = memoryMaintenance.decayConfig ?? defaultMemoryDecayConfig;
     core.gameLoop.registerSystem(
@@ -223,21 +197,6 @@ export function assembleGameLoop(
       }),
     );
   }
-
-  // (last) AutoSaveSystem — only when enabled AND a persistence facade exists
-  // (spec 017, Req 18). When auto-save is enabled but persistence is missing,
-  // log a warning and skip registration.
-  if (autoSave?.config.enabled) {
-    if (core.persistence) {
-      core.gameLoop.registerSystem(
-        new AutoSaveSystem({ persistence: core.persistence, config: autoSave.config }),
-      );
-    } else {
-      console.warn(
-        '[assembleGameLoop] auto-save is enabled but no VectorStore/persistence is available — auto-save will not run.',
-      );
-    }
-  }
   return core.gameLoop;
 }
 
@@ -249,8 +208,6 @@ export interface AssembledEngine {
   smartObjectRegistry: SmartObjectRegistryImpl;
   affordanceRegistry: AffordanceRegistryImpl;
   bridges: EngineCore['bridges'];
-  /** Optional persistence facade (spec 017, Req 19). Set when a `VectorStore` is provided. */
-  persistence?: EnginePersistenceImpl;
 }
 
 /** Build the full engine (core + registered systems) in one call. */
@@ -258,9 +215,8 @@ export function createEngine(
   config: EngineConfig,
   orchestrator: PPEROrchestratorPort,
   memoryStore?: MemoryStore,
-  vectorStore?: VectorStore,
 ): AssembledEngine {
-  const core = createEngineCore(config, memoryStore, vectorStore);
+  const core = createEngineCore(config, memoryStore);
   assembleGameLoop(core, orchestrator);
   return {
     gameLoop: core.gameLoop,
@@ -269,7 +225,6 @@ export function createEngine(
     smartObjectRegistry: core.smartObjectRegistry,
     affordanceRegistry: core.affordanceRegistry,
     bridges: core.bridges,
-    ...(core.persistence !== undefined ? { persistence: core.persistence } : {}),
   };
 }
 

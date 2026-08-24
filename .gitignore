@@ -42,3 +42,4 @@ events.jsonl
 
 # ONNX model files (downloaded by scripts/download-embedding-model.sh, not committed)
 models/
+.yaam_start_lines
