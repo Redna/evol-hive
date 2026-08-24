@@ -67,3 +67,4 @@ Total specs:      20
 
 Architecture sections fully implemented: 11/11
 ```
+| [019](019-configurable-drive-decay-rate.md) | Configurable Drive Decay Rate | §3, §6, §9 | 📝 Drafted | [#72](https://github.com/Redna/evol-hive/issues/72) | — | shared, engine, examples |
