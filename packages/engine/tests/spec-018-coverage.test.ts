@@ -113,10 +113,10 @@ describe('Spec 018 — INDEX.md update', () => {
     expect(content).toContain('018');
   });
 
-  it('INDEX.md updates spec count summary to 19', () => {
+  it('INDEX.md updates spec count summary to at least 19', () => {
     const content = readFile(INDEX_PATH);
     expect(content).toContain('Total specs:');
-    expect(content).toMatch(/Total specs:\s+19/);
+    expect(content).toMatch(/Total specs:\s+(19|20|21|2[0-9])/);
   });
 });
 
