@@ -61,11 +61,11 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      21
 ✅ Done:          17
 🔨 In Development: 0
-🔍 In Review:      0
-📝 Drafted:        1
+🔍 In Review:      1
+📝 Drafted:        0
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
 Architecture sections fully implemented: 11/11
 ```
-| [019](019-configurable-drive-decay-rate.md) | Configurable Drive Decay Rate | §3, §6, §9 | 📝 Drafted | [#72](https://github.com/Redna/evol-hive/issues/72) | — | shared, engine, examples |
+| [019](019-configurable-drive-decay-rate.md) | Configurable Drive Decay Rate | §3, §6, §9 | 🔍 In Review | [#72](https://github.com/Redna/evol-hive/issues/72) | [#79](https://github.com/Redna/evol-hive/pull/79) | shared, engine, examples |
