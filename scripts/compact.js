@@ -1,5 +1,5 @@
 const fs = require('fs');
-const path = require('path');
+const readline = require('readline');
 
 const inputFile = process.argv[2] || 'events.jsonl';
 const outputFile = process.argv[3] || 'events-compacted.jsonl';
@@ -9,11 +9,18 @@ async function compact() {
         console.log("No input file found.");
         return;
     }
-    const lines = fs.readFileSync(inputFile, 'utf-8').split('\n').filter(l => l.trim());
+
     const nodes = new Map();
     const other = [];
 
-    for (const line of lines) {
+    const fileStream = fs.createReadStream(inputFile);
+    const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity
+    });
+
+    for await (const line of rl) {
+        if (!line.trim()) continue;
         try {
             const event = JSON.parse(line);
             if (event.event_type === 'UPSERT_NODE') {
@@ -23,7 +30,9 @@ async function compact() {
             } else {
                 other.push(line);
             }
-        } catch (e) {}
+        } catch (e) {
+            // Ignore malformed lines
+        }
     }
 
     const out = fs.createWriteStream(outputFile);
@@ -35,4 +44,5 @@ async function compact() {
     }
     out.end();
 }
-compact();
+
+compact().catch(console.error);
