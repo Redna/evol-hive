@@ -299,6 +299,7 @@ export function buildMinimalEngine(): AssembledEngine {
   const cognitiveToolExecutor = useRealLLM
     ? new CognitiveToolExecutorImpl({
         stateDataProvider: core.bridges.reflect,
+        socialBridge: core.socialManager,
       })
     : undefined;
 

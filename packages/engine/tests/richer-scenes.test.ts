@@ -771,9 +771,11 @@ describe('AC-23 / AC-33: MorningRoutineMockLLMClient drive prioritization', () =
     );
     const bobTarget = bobPlan.steps[0]!.targetAffordance!;
     // No social affordance in living_room → must be a non-energy affordance
-    // (watch_tv, read_book, or a go_to_* movement).
+    // (observe, read_book, or a go_to_* movement). The mock LLM returns
+    // 'observe' for social drive in living_room (spec 019, Req 13).
     expect(bobTarget).not.toBe('brew_coffee');
     expect([
+      'observe',
       'watch_tv',
       'read_book',
       'go_to_living_room',
