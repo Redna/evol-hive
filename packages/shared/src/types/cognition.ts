@@ -55,8 +55,23 @@ export interface PassivePerception {
 export interface PerceptionResult {
   /** Passive perception snapshot of the agent's surroundings. */
   passive: PassivePerception;
-  /** Top-K affordances retained by the System 0 classifier. */
+  /**
+   * Top-K affordances retained by the System 0 classifier. **Unmasked** —
+   * this is the classifier output before guardrail masking. Used by the Plan
+   * builder to construct affordance tool definitions (spec 020, Req 2).
+   */
   prunedAffordances: Affordance[];
+  /**
+   * Masked affordances — the output of `GuardrailEngineImpl.maskAffordances`
+   * (spec 016, Req 8; spec 020, Req 1). Used by the Perception/Action-choice
+   * builder to construct the `availableAffordances` and `tools` in the
+   * `LLMContextPayload`. When no guardrail engine is configured, this field is
+   * `undefined` and consumers fall back to `prunedAffordances`. When a guardrail
+   * is present but masking is disabled (`affordanceMasking === false`), this
+   * field equals `prunedAffordances` (masking returns unchanged — spec 016,
+   * Req 6). When masking is active and the agent has no plan, this field is `[]`.
+   */
+  maskedAffordances?: Affordance[];
   /** Semantic label of the agent's primary drive (e.g. "low energy, need to restore energy"). */
   primaryDriveLabel: string;
   /** True when no actionable affordances are available in the room (spec 008, Req 5.2). */

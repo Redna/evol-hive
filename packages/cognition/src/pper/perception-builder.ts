@@ -48,7 +48,7 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     perceptionResult: PerceptionResult,
     guardrailOptions?: PerceptionBuilderGuardrailOptions,
   ): LLMContextPayload {
-    const { passive, prunedAffordances, primaryDriveLabel, persona } = perceptionResult;
+    const { passive, primaryDriveLabel, persona } = perceptionResult;
     const objectNames = passive.objectsPresent.map((o) => o.name);
     const driveSummary = formatDrives(passive.drives);
 
@@ -103,7 +103,7 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       );
     }
 
-    // Guardrail options (spec 016, Req 10).
+    // Guardrail options (spec 016, Req 10; spec 020, Req 4).
     const hasPlan = guardrailOptions?.hasPlan ?? true;
     const forcingEnabled = guardrailOptions?.forcingEnabled ?? false;
     const maskingEnabled = guardrailOptions?.maskingEnabled ?? false;
@@ -112,10 +112,19 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     // Build tool definitions: affordance tools + cognitive tools (excluding formulate_plan).
     // Affordances are now registered as individual tools (spec 019) — the LLM
     // calls the affordance tool directly instead of choose_action.
+    //
+    // Spec 020, Req 4: the Perception/Action-choice builder reads the masked
+    // affordances (`maskedAffordances`) — falling back to `prunedAffordances`
+    // when no guardrail was applied (no `maskedAffordances` field). The
+    // `noPlan && maskingEnabled` check is retained as defense-in-depth: it
+    // handles the case where `maskedAffordances` is `undefined` (no guardrail
+    // configured) but the builder is invoked with `maskingEnabled: true`.
+    const sourceAffordances =
+      perceptionResult.maskedAffordances ?? perceptionResult.prunedAffordances;
     // When no plan and masking enabled, hide ALL affordance tools — only cognitive
     // tools remain, and ALL cognitive tools (including formulate_plan) are available so the
     // agent can create a plan (spec 016, Req 10: cognitive tools are never masked).
-    const availableAffordances = noPlan && maskingEnabled ? [] : prunedAffordances;
+    const availableAffordances = noPlan && maskingEnabled ? [] : sourceAffordances;
     let tools;
     if (noPlan && maskingEnabled) {
       tools = cognitiveToolsToToolDefinitions(defaultCognitiveTools);
