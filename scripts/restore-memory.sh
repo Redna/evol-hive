@@ -26,7 +26,8 @@ if [ "$GITHUB_ACTIONS" == "true" ]; then
   done
 fi
 
-# Extract all files instantly
+# Extract all files instantly — remove existing events files first to avoid tar conflicts
+rm -f events.jsonl events-*.jsonl 2>/dev/null || true
 git archive origin/memory 2>/dev/null | tar -x || true
 
 if [ -f events.jsonl.gz ]; then
