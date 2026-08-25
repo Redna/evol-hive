@@ -65,7 +65,10 @@ fi
 
 # ── Merge all delta files into a single events.jsonl ────────────────────────
 if [ "$GITHUB_ACTIONS" == "true" ]; then
-  if [ -f "$WORKTREE/events.jsonl" ]; then
+  if [ -f "$WORKTREE/events.jsonl.gz" ]; then
+    cp "$WORKTREE/events.jsonl.gz" "$WORKTREE/events-0000000000-base.jsonl.gz"
+    gunzip -f "$WORKTREE/events-0000000000-base.jsonl.gz"
+  elif [ -f "$WORKTREE/events.jsonl" ]; then
     mv "$WORKTREE/events.jsonl" "$WORKTREE/events-0000000000-base.jsonl"
   fi
   cat "$WORKTREE"/events-*.jsonl > events.jsonl 2>/dev/null || true
@@ -86,20 +89,22 @@ mv events-compacted.jsonl events.jsonl
 COMPACTED_LINES=$(wc -l < events.jsonl | cut -d' ' -f1)
 echo "Compacted to $COMPACTED_LINES events."
 
+# Compress the compacted base to stay under GitHub's 100MB file limit
+gzip -k -f events.jsonl
+
 # ── Push compacted memory and release lock ──────────────────────────────────
 if [ "$GITHUB_ACTIONS" == "true" ]; then
   cd "$WORKTREE"
   # Clean up old tracking files
-  git rm -f *.jsonl 2>/dev/null || true
+  git rm -f *.jsonl *.jsonl.gz 2>/dev/null || true
   # Add the new compacted file
-  cp "$ORIG_DIR/events.jsonl" .
-  git add events.jsonl
+  cp "$ORIG_DIR/events.jsonl.gz" .
+  git add events.jsonl.gz
   # Release lock
   git rm -f yaam-compaction.lock 2>/dev/null || true
   git commit -m "Compaction complete ($COMPACTED_LINES events) — lock released"
   git push origin memory
   cd - >/dev/null
-  git worktree remove "$WORKTREE" --force 2>/dev/null
 fi
 
 rm -f yaam-compaction.lock

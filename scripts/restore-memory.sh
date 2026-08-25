@@ -29,6 +29,10 @@ fi
 # Extract all files instantly
 git archive origin/memory 2>/dev/null | tar -x || true
 
+if [ -f events.jsonl.gz ]; then
+  gunzip events.jsonl.gz
+fi
+
 # Properly merge base and deltas in chronological order
 if [ -f events.jsonl ]; then
   mv events.jsonl events-0000000000-base.jsonl
