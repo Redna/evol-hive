@@ -1,5 +1,19 @@
 {
   "name": "evol-hive-examples",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@evol-hive/shared": "workspace:*",
+    "@evol-hive/engine": "workspace:*",
+    "@evol-hive/cognition": "workspace:*",
+    "@evol-hive/memory": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
 }

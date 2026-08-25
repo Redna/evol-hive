@@ -38,6 +38,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [018](018-object-interactions.md) | Object Interactions — Multi-Step Affordances, Object State Changes, Dependencies | §4, §5, §6, §9 | ✅ Done | [#63](https://github.com/Redna/evol-hive/issues/63) | [#69](https://github.com/Redna/evol-hive/pull/69) | shared, engine, cognition |
 | [018](018-multi-agent-social.md) | Multi-Agent Social — Agent-to-Agent Perception, Communication, Relationships | §3, §6, §8 | ✅ Done | [#62](https://github.com/Redna/evol-hive/issues/62) | [#70](https://github.com/Redna/evol-hive/pull/70) | shared, engine, cognition |
 | [019](019-affordance-as-tools.md) | Affordance-as-Tools — Replace `choose_action` with Per-Affordance Tool Definitions | §4, §6, §7, §8, §10 | 📝 Drafted | [#71](https://github.com/Redna/evol-hive/issues/71) | — | shared, cognition, examples |
+| [019](019-validation-scene-coffee-shop.md) | Phase 4 Validation Scene — Coffee Shop Comprehensive Integration Example | §1, §2, §4, §6, §8, §11 | 🔍 In Review | [#74](https://github.com/Redna/evol-hive/issues/74) | — | examples |
 
 ## Architecture Coverage
 
@@ -58,14 +59,15 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      21
+Total specs:      22
 ✅ Done:          17
 🔨 In Development: 0
-🔍 In Review:      0
-📝 Drafted:        1
+🔍 In Review:      1
+📝 Drafted:        2
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
 Architecture sections fully implemented: 11/11
 ```
 | [019](019-configurable-drive-decay-rate.md) | Configurable Drive Decay Rate | §3, §6, §9 | 📝 Drafted | [#72](https://github.com/Redna/evol-hive/issues/72) | — | shared, engine, examples |
+| [019](019-wire-social-manager.md) | Wire SocialManager in Assembly & Example Scenes | §3, §6, §8 | 📝 Drafted | [#73](https://github.com/Redna/evol-hive/issues/73) | — | shared, engine, examples |
