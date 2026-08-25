@@ -56,6 +56,10 @@ fi
 UNIQUE_FILE="events-${GITHUB_RUN_ID:-$(date +%s)}.jsonl"
 tail -n "$NEW_LINES" events.jsonl > "$WORKTREE/$UNIQUE_FILE"
 
+# Ensure git identity is set (required for committing to memory branch)
+git config user.email "evol-hive-agent[bot]@users.noreply.github.com" 2>/dev/null || true
+git config user.name "evol-hive-agent[bot]" 2>/dev/null || true
+
 # Commit and push
 cd "$WORKTREE"
 git add "$UNIQUE_FILE"
