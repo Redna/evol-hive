@@ -1,0 +1,7 @@
+{
+  "name": "feature-020-masking-leak-fix",
+  "description": "Fix affordance masking leak from Perceive phase into Plan phase. Separate unmasked (prunedAffordances) and masked (maskedAffordances) affordances in PerceptionResult so the Plan phase always sees affordance tool definitions.",
+  "createdAt": "2026-08-26T00:00:00Z",
+  "specIssue": 83,
+  "specFile": "docs/specs/020-affordance-masking-leak-fix.md"
+}
