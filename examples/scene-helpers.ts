@@ -153,8 +153,9 @@ export function registerAffordanceHandlers(core: EngineCore): void {
   });
 
   // ── go_to_* movement handlers (Req 17) ─────────────────────────────────────
-  // Register a handler for every go_to_<roomId> affordance used by either scene.
+  // Register a handler for every go_to_<roomId> affordance used by any scene.
   // The handler teleports the agent to the target room via sceneManager.moveAgent.
+  // 'garden' is included for the Coffee Shop scene (spec 019, Req 19).
   const movementDestinations = [
     'bedroom',
     'bathroom',
@@ -163,6 +164,7 @@ export function registerAffordanceHandlers(core: EngineCore): void {
     'office',
     'break_room',
     'meeting_room',
+    'garden',
   ];
   for (const dest of movementDestinations) {
     const affordanceId = `go_to_${dest}`;
@@ -171,4 +173,84 @@ export function registerAffordanceHandlers(core: EngineCore): void {
       return { success: true };
     });
   }
+}
+
+/**
+ * Register affordance handlers and precondition checkers specific to the
+ * Coffee Shop scene (spec 019, Req 16–18). Must be called after
+ * `registerAffordanceHandlers(core)` and `loadScene(core, scene)` so the
+ * SmartObjectRegistry and SceneManager are populated.
+ *
+ * Handlers are deterministic closures — no LLM calls, no randomness.
+ */
+export function registerCoffeeShopHandlers(core: EngineCore): void {
+  const { affordanceRegistry } = core;
+
+  // ── Precondition checkers (Req 18) ────────────────────────────────────────
+  affordanceRegistry.registerPreconditionChecker('has_cups', (state) => {
+    return (state['cup_count'] as number) > 0;
+  });
+  affordanceRegistry.registerPreconditionChecker('has_water_supply', (state) => {
+    return (state['water_supply'] as number) > 0;
+  });
+  affordanceRegistry.registerPreconditionChecker('has_blooms', (state) => {
+    return (state['bloom_count'] as number) > 0;
+  });
+
+  // ── add_water (Coffee Machine — compound action step 1, Req 16) ───────────
+  // Water is replenished via the Sink's `refill_pitcher` cross-object effect.
+  // This step confirms the water addition; no state change needed.
+  affordanceRegistry.registerHandler('add_water', async (_objectId, _agentId, state) => {
+    return { success: true, newState: state };
+  });
+
+  // ── pour_cup (Coffee Machine — compound action step 3, Req 16) ────────────
+  // Pours brewed coffee into a cup; decrements cup_count.
+  affordanceRegistry.registerHandler('pour_cup', async (_objectId, _agentId, state) => {
+    const cups = (state['cup_count'] as number) ?? 0;
+    if (cups <= 0) {
+      return { success: false, failureReason: 'No cups left' };
+    }
+    const newState = { ...state, cup_count: cups - 1 };
+    return { success: true, newState, driveChanges: { comfort: 5 } };
+  });
+
+  // ── refill_pitcher (Sink — cross-object state change, Req 17) ──────────────
+  // Fills a pitcher from the sink and refills the Coffee Machine's water via
+  // crossObjectStateChanges (spec 018, Req 8).
+  affordanceRegistry.registerHandler('refill_pitcher', async (_objectId, _agentId, state) => {
+    const supply = (state['water_supply'] as number) ?? 0;
+    if (supply <= 0) {
+      return { success: false, failureReason: 'Sink has no water supply' };
+    }
+    const newState = { ...state, water_supply: supply - 1 };
+    return {
+      success: true,
+      newState,
+      crossObjectStateChanges: [{ objectId: 'coffee-1', statePatch: { water_level: 5 } }],
+    };
+  });
+
+  // ── relax (Sofa — Req 16) ─────────────────────────────────────────────────
+  affordanceRegistry.registerHandler('relax', async (_objectId, _agentId, state) => {
+    return { success: true, newState: state, driveChanges: { comfort: 20, energy: 5 } };
+  });
+
+  // ── sit_outside (Garden Bench — Req 16) ───────────────────────────────────
+  affordanceRegistry.registerHandler('sit_outside', async (_objectId, _agentId, state) => {
+    return {
+      success: true,
+      newState: state,
+      driveChanges: { comfort: 15, curiosity: 5, energy: 3 },
+    };
+  });
+
+  // ── observe_flowers (Flower Bed — Req 16) ─────────────────────────────────
+  affordanceRegistry.registerHandler('observe_flowers', async (_objectId, _agentId, state) => {
+    return {
+      success: true,
+      newState: state,
+      driveChanges: { curiosity: 10, comfort: 5 },
+    };
+  });
 }
