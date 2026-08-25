@@ -37,7 +37,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [017](017-persistence-save-load-game-state.md) | Persistence — Save/Load Game State and Agent Memory Across Sessions | §2, §3, §6, §11 | ✅ Done | [#61](https://github.com/Redna/evol-hive/issues/61) | [#67](https://github.com/Redna/evol-hive/pull/67) | shared, memory, engine |
 | [018](018-object-interactions.md) | Object Interactions — Multi-Step Affordances, Object State Changes, Dependencies | §4, §5, §6, §9 | ✅ Done | [#63](https://github.com/Redna/evol-hive/issues/63) | [#69](https://github.com/Redna/evol-hive/pull/69) | shared, engine, cognition |
 | [018](018-multi-agent-social.md) | Multi-Agent Social — Agent-to-Agent Perception, Communication, Relationships | §3, §6, §8 | ✅ Done | [#62](https://github.com/Redna/evol-hive/issues/62) | [#70](https://github.com/Redna/evol-hive/pull/70) | shared, engine, cognition |
-| [019](019-affordance-as-tools.md) | Affordance-as-Tools — Replace `choose_action` with Per-Affordance Tool Definitions | §4, §6, §7, §8, §10 | 🔍 In Review | [#71](https://github.com/Redna/evol-hive/issues/71) | — | shared, cognition, examples |
+| [019](019-affordance-as-tools.md) | Affordance-as-Tools — Replace `choose_action` with Per-Affordance Tool Definitions | §4, §6, §7, §8, §10 | ✅ Done | [#71](https://github.com/Redna/evol-hive/issues/71) | — | shared, cognition, examples |
 
 ## Architecture Coverage
 
@@ -68,4 +68,7 @@ Total specs:      21
 
 Architecture sections fully implemented: 11/11
 ```
-| [019](019-configurable-drive-decay-rate.md) | Configurable Drive Decay Rate | §3, §6, §9 | 🔍 In Review | [#72](https://github.com/Redna/evol-hive/issues/72) | [#79](https://github.com/Redna/evol-hive/pull/79) | shared, engine, examples |
+| [019](019-configurable-drive-decay-rate.md) | Configurable Drive Decay Rate | §3, §6, §9 | ✅ Done | [#72](https://github.com/Redna/evol-hive/issues/72) | [#79](https://github.com/Redna/evol-hive/pull/79) | shared, engine, examples |
+| [019](019-wire-social-manager.md) | Wire SocialManager in Assembly & Example Scenes | §3, §6, §8 | ✅ Done | [#73](https://github.com/Redna/evol-hive/issues/73) | [#81](https://github.com/Redna/evol-hive/pull/81) | engine, cognition, examples |
+| [019](019-validation-scene-coffee-shop.md) | Phase 4 Validation Scene — Coffee Shop | §1, §2, §3, §4, §6, §8, §11 | ✅ Done | [#74](https://github.com/Redna/evol-hive/issues/74) | [#82](https://github.com/Redna/evol-hive/pull/82) | shared, engine, cognition, memory, examples |
+| [019](019-affordance-as-tools.md) | Affordance-as-Tools — Replace `choose_action` with Per-Affordance Tool Definitions | §4, §6, §7, §8, §10 | ✅ Done | [#71](https://github.com/Redna/evol-hive/issues/71) | [#80](https://github.com/Redna/evol-hive/pull/80) | shared, cognition, examples |
