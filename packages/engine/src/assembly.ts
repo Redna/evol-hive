@@ -51,6 +51,7 @@ import { MemoryMaintenanceSystem } from './systems/memory-maintenance.js';
 import { ObjectStateSystem } from './systems/object-state.js';
 import { AutoSaveSystem } from './systems/auto-save.js';
 import { EnginePersistenceImpl } from './persistence/index.js';
+import { SocialManager } from './social/social-manager.js';
 import type { GameLoop, EnginePersistence } from './index.js';
 
 /** A no-op MemoryStore used when no real memory subsystem is wired. */
@@ -111,6 +112,8 @@ export interface EngineCore {
   persistence?: EnginePersistenceImpl;
   /** Optional auto-save configuration (spec 017, Req 17). */
   autoSaveConfig?: AutoSaveConfig;
+  /** Social manager — always created (spec 019, Req 3). */
+  socialManager: SocialManager;
 }
 
 /** Build all engine subsystems and bridges (no spec-mandated systems registered yet). */
@@ -134,6 +137,9 @@ export function createEngineCore(
   });
   const sceneManager = new SceneManagerImpl(agentManager, new Map());
   const feedbackStore = new SystemFeedbackStore();
+
+  // SocialManager (spec 019, Req 1) — always created; depends only on AgentManager.
+  const socialManager = new SocialManager(agentManager);
 
   const bridges = {
     perception: new PerceptionDataProviderImpl(
@@ -160,6 +166,10 @@ export function createEngineCore(
       clockFn,
     ),
   };
+
+  // Wire the SocialManager into the perception provider (spec 019, Req 2) so
+  // getAgentsInRoom / dequeueSocialMessages / getRelationships delegate to it.
+  bridges.perception.setSocialManager(socialManager);
 
   const gameLoop = new GameLoopImpl(config);
   clock.bind(gameLoop);
@@ -190,6 +200,7 @@ export function createEngineCore(
     bridges,
     clock: clock,
     ...(persistence !== undefined ? { persistence } : {}),
+    socialManager,
   };
 }
 
@@ -252,6 +263,8 @@ export interface AssembledEngine {
   bridges: EngineCore['bridges'];
   /** Optional persistence (spec 017, Req 19). */
   persistence?: EnginePersistence;
+  /** Social manager (spec 019, Req 5). */
+  socialManager: SocialManager;
 }
 
 /** Build the full engine (core + registered systems) in one call. */
@@ -271,6 +284,7 @@ export function createEngine(
     affordanceRegistry: core.affordanceRegistry,
     bridges: core.bridges,
     ...(core.persistence !== undefined ? { persistence: core.persistence } : {}),
+    socialManager: core.socialManager,
   };
 }
 

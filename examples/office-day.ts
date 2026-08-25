@@ -23,7 +23,12 @@ import type {
   ReflectionResult,
 } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
-import { createPPEROrchestrator, GuardrailEngineImpl } from '@evol-hive/cognition';
+import {
+  createPPEROrchestrator,
+  GuardrailEngineImpl,
+  OpenAICompatibleLLMClient,
+  CognitiveToolExecutorImpl,
+} from '@evol-hive/cognition';
 import type { AffordanceClassifier } from '@evol-hive/cognition';
 import type {
   EmbeddingProvider as MemEmbeddingProvider,
@@ -376,7 +381,39 @@ export function buildOfficeDayEngine(): AssembledEngine {
   loadScene(core, OFFICE_DAY_SCENE);
   registerAffordanceHandlers(core);
 
-  const llmClient: LLMClient = new OfficeDayMockLLMClient();
+  // LLM client — real OpenAI-compatible LLM when USE_REAL_LLM=true (spec 019, Req 14),
+  // otherwise the drive-aware mock LLM (backward compatible).
+  const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
+  const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'none'
+    | undefined;
+  const maxToolCallIterationsEnv = process.env['LLM_MAX_TOOL_CALL_ITERATIONS'];
+  const maxToolCallIterations =
+    maxToolCallIterationsEnv !== undefined ? Number(maxToolCallIterationsEnv) : undefined;
+
+  let llmClient: LLMClient;
+  if (useRealLLM) {
+    const cognitiveToolExecutor = new CognitiveToolExecutorImpl({
+      stateDataProvider: core.bridges.reflect,
+      socialBridge: core.socialManager,
+    });
+    llmClient = new OpenAICompatibleLLMClient({
+      baseUrl: process.env['LLM_BASE_URL'] ?? 'http://localhost:11434/v1',
+      model: process.env['LLM_MODEL'] ?? 'llama3.1',
+      ...(process.env['LLM_API_KEY'] !== undefined
+        ? { apiKey: process.env['LLM_API_KEY'] }
+        : {}),
+      ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
+      cognitiveToolExecutor,
+      ...(maxToolCallIterations !== undefined ? { maxToolCallIterations } : {}),
+    });
+  } else {
+    llmClient = new OfficeDayMockLLMClient();
+  }
+
   const classifier: AffordanceClassifier = makeMockClassifier();
 
   const guardrail =
@@ -403,6 +440,7 @@ export function buildOfficeDayEngine(): AssembledEngine {
     smartObjectRegistry: core.smartObjectRegistry,
     affordanceRegistry: core.affordanceRegistry,
     bridges: core.bridges,
+    socialManager: core.socialManager,
   };
 }
 
