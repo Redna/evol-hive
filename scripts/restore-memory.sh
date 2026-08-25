@@ -27,11 +27,12 @@ if [ "$GITHUB_ACTIONS" == "true" ]; then
 fi
 
 # Extract all files instantly — remove existing events files first to avoid tar conflicts
-rm -f events.jsonl events-*.jsonl 2>/dev/null || true
-git archive origin/memory 2>/dev/null | tar -x || true
+rm -f events.jsonl events-*.jsonl events.jsonl.gz 2>/dev/null || true
+git archive --format=tar origin/memory 2>/dev/null | tar -x || true
 
 if [ -f events.jsonl.gz ]; then
-  gunzip events.jsonl.gz
+  rm -f events.jsonl 2>/dev/null || true
+  gunzip -f events.jsonl.gz 2>/dev/null || true
 fi
 
 # Properly merge base and deltas in chronological order
