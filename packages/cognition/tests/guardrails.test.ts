@@ -379,28 +379,31 @@ describe('PerceptionBuilderImpl — contextual forcing + tool masking (AC-18, AC
     expect(payload.availableAffordances).toEqual([]);
   });
 
-  it('tools include chooseActionTool when hasPlan is true', () => {
+  it('tools include affordance tools when hasPlan is true', () => {
     const builder = new PerceptionBuilderImpl();
     const payload = builder.build(makePerceptionResult(true), {
       hasPlan: true,
       maskingEnabled: true,
     });
-    expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(false);
+    expect(payload.tools.some((t) => t.function.name === 'brew_coffee')).toBe(true);
   });
 
-  it('tools include chooseActionTool when masking is disabled and no plan', () => {
+  it('tools include affordance tools when masking is disabled and no plan', () => {
     const builder = new PerceptionBuilderImpl();
     const payload = builder.build(makePerceptionResult(false), {
       hasPlan: false,
       maskingEnabled: false,
     });
-    expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(false);
+    expect(payload.tools.some((t) => t.function.name === 'brew_coffee')).toBe(true);
   });
 
-  it('backward compat: no options — tools include chooseActionTool', () => {
+  it('backward compat: no options — tools include affordance tools', () => {
     const builder = new PerceptionBuilderImpl();
     const payload = builder.build(makePerceptionResult(false));
-    expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(false);
+    expect(payload.tools.some((t) => t.function.name === 'brew_coffee')).toBe(true);
   });
 });
 

@@ -162,6 +162,66 @@ export const reflectSchema = {
 // tool and returns `tool_calls[0].function.arguments` as valid JSON.
 
 import type { ToolDefinition } from '../types/cognition.js';
+import type { Affordance } from '../types/affordance.js';
+
+// ─── Affordance-as-Tools helpers (spec 019, Req 1-5) ──────────────────────────
+
+/**
+ * Empty parameters schema for affordance tools that take no arguments
+ * (spec 019, Req 5). Affordances that accept arguments in the future can
+ * define their own parameter schemas.
+ */
+export const AFFORDANCE_TOOL_PARAMETERS = {
+  type: 'object',
+  properties: {},
+  additionalProperties: false,
+} as const;
+
+/**
+ * Formats an affordance's `effects` into a human-readable string for the tool
+ * description (spec 019, Req 3).
+ *
+ * Examples:
+ *   `{ energy: 20 }` → `"energy +20"`
+ *   `{ comfort: -5, energy: 10 }` → `"comfort -5, energy +10"`
+ *   `{}` → `"none"`
+ */
+export function formatAffordanceEffects(effects: Partial<Record<string, number>>): string {
+  const entries = Object.entries(effects ?? {});
+  if (entries.length === 0) {
+    return 'none';
+  }
+  return entries.map(([key, value]) => `${key} ${value! >= 0 ? '+' : ''}${value!}`).join(', ');
+}
+
+/**
+ * Converts a single `Affordance` to a `ToolDefinition` (spec 019, Req 1).
+ *
+ * The tool `name` IS the affordance ID — the LLM cannot call a non-existent
+ * tool, so it must use the exact affordance ID. The tool `description` is the
+ * affordance label plus a summary of effects. The `parameters` is the empty
+ * object schema (all affordances are parameterless for now).
+ */
+export function affordanceToToolDefinition(affordance: Affordance): ToolDefinition {
+  const effectsStr = formatAffordanceEffects(affordance.effects);
+  return {
+    type: 'function',
+    function: {
+      name: affordance.id,
+      description: `${affordance.label}. Effects: ${effectsStr}.`,
+      parameters: AFFORDANCE_TOOL_PARAMETERS,
+    },
+  };
+}
+
+/**
+ * Convenience function that maps an array of `Affordance` objects to an array
+ * of `ToolDefinition` objects (spec 019, Req 2). Returns an empty array for
+ * empty input.
+ */
+export function affordancesToToolDefinitions(affordances: Affordance[]): ToolDefinition[] {
+  return affordances.map((a) => affordanceToToolDefinition(a));
+}
 
 /** Tool definition for the Plan phase (spec 011, Req 3). */
 export const formulatePlanTool: ToolDefinition = {
@@ -173,7 +233,14 @@ export const formulatePlanTool: ToolDefinition = {
   },
 };
 
-/** Tool definition for the Execute/Perceive phase (spec 011, Req 3). */
+/**
+ * Tool definition for the Execute/Perceive phase (spec 011, Req 3).
+ *
+ * @deprecated Superseded by per-affordance tool definitions (spec 019).
+ * Affordances are now registered as individual tools whose `name` IS the
+ * affordance ID. This constant remains exported for backward compatibility
+ * during the transition — it is no longer used by any builder.
+ */
 export const chooseActionTool: ToolDefinition = {
   type: 'function',
   function: {

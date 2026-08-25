@@ -192,10 +192,13 @@ describe('PerceptionBuilderImpl.build (AC-18, AC-19)', () => {
     expect(payload.perceptionContext).toContain('Coffee Machine');
     expect(payload.perceptionContext).toContain('Kettle');
     expect(payload.perceptionContext).toContain('energy');
-    // The tools array must include chooseActionTool (AC-24)
+    // The tools array must include affordance tool definitions (spec 019)
     expect(payload.tools).toBeDefined();
     expect(Array.isArray(payload.tools)).toBe(true);
-    expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(true);
+    // chooseActionTool is no longer included (spec 019)
+    expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(false);
+    // Affordance tool definitions are included
+    expect(payload.tools.some((t) => t.function.name === 'brew_coffee')).toBe(true);
     // No responseSchema or schemaHint (AC-24)
     expect((payload as Record<string, unknown>)['responseSchema']).toBeUndefined();
     expect((payload as Record<string, unknown>)['schemaHint']).toBeUndefined();
