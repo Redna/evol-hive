@@ -204,7 +204,10 @@ describe('Spec 019 — Existing scaffolding: engine subsystems', () => {
   });
 
   it('EnginePersistenceImpl already exists in engine', () => {
-    const persistencePath = join(REPO_ROOT, 'packages/engine/src/persistence/engine-persistence.ts');
+    const persistencePath = join(
+      REPO_ROOT,
+      'packages/engine/src/persistence/engine-persistence.ts',
+    );
     expect(fileExists(persistencePath)).toBe(true);
     const content = readFile(persistencePath);
     expect(content).toContain('EnginePersistenceImpl');
@@ -243,26 +246,17 @@ describe('Spec 019 — Existing scaffolding: cognition subsystems', () => {
 
 describe('Spec 019 — Existing scaffolding: memory subsystems', () => {
   it('InMemoryVectorStore, MemoryDecayService, and ReflectionLoop already exist in memory', () => {
-    const vectorStorePath = join(
-      REPO_ROOT,
-      'packages/memory/src/store/in-memory-vector-store.ts',
-    );
+    const vectorStorePath = join(REPO_ROOT, 'packages/memory/src/store/in-memory-vector-store.ts');
     expect(fileExists(vectorStorePath)).toBe(true);
     const vsContent = readFile(vectorStorePath);
     expect(vsContent).toContain('InMemoryVectorStore');
 
-    const decayPath = join(
-      REPO_ROOT,
-      'packages/memory/src/retrieval/memory-decay-service.ts',
-    );
+    const decayPath = join(REPO_ROOT, 'packages/memory/src/retrieval/memory-decay-service.ts');
     expect(fileExists(decayPath)).toBe(true);
     const decayContent = readFile(decayPath);
     expect(decayContent).toContain('MemoryDecayService');
 
-    const reflectionPath = join(
-      REPO_ROOT,
-      'packages/memory/src/reflection/reflection-loop.ts',
-    );
+    const reflectionPath = join(REPO_ROOT, 'packages/memory/src/reflection/reflection-loop.ts');
     expect(fileExists(reflectionPath)).toBe(true);
     const reflContent = readFile(reflectionPath);
     expect(reflContent).toContain('ReflectionLoop');
@@ -298,7 +292,7 @@ describe('Spec 019 — Acceptance Criteria scaffolds (pending implementation)', 
   );
 
   it.todo(
-    'AC-2: The scene defines ≥3 agents (Alice, Bob, Carol) with distinct drive profiles where each agent\'s lowest drive is different (energy=15 for Alice, social=15 for Bob, curiosity=15 for Carol). (Req 2)',
+    "AC-2: The scene defines ≥3 agents (Alice, Bob, Carol) with distinct drive profiles where each agent's lowest drive is different (energy=15 for Alice, social=15 for Bob, curiosity=15 for Carol). (Req 2)",
   );
 
   it.todo(
@@ -316,15 +310,15 @@ describe('Spec 019 — Acceptance Criteria scaffolds (pending implementation)', 
   );
 
   it.todo(
-    'AC-6: The brew_coffee affordance has structured conditions: [{ field: \'water_level\', operator: \'>\', value: 0 }, { field: \'bean_count\', operator: \'>\', value: 0 }] that are evaluated at perception time (filtered when conditions fail). (Req 3)',
+    "AC-6: The brew_coffee affordance has structured conditions: [{ field: 'water_level', operator: '>', value: 0 }, { field: 'bean_count', operator: '>', value: 0 }] that are evaluated at perception time (filtered when conditions fail). (Req 3)",
   );
 
   it.todo(
-    'AC-7: The Coffee Machine declares an ObjectDependency linking add_water to the Sink\'s refill_pitcher (requiresObjectId, requiresAffordance, description). (Req 3)',
+    "AC-7: The Coffee Machine declares an ObjectDependency linking add_water to the Sink's refill_pitcher (requiresObjectId, requiresAffordance, description). (Req 3)",
   );
 
   it.todo(
-    'AC-8: The refill_pitcher handler returns crossObjectStateChanges: [{ objectId: \'coffee-1\', statePatch: { water_level: 5 } }] that update the Coffee Machine\'s water_level. (Req 17)',
+    "AC-8: The refill_pitcher handler returns crossObjectStateChanges: [{ objectId: 'coffee-1', statePatch: { water_level: 5 } }] that update the Coffee Machine's water_level. (Req 17)",
   );
 
   // ── Engine Assembly ACs (AC-9 through AC-16) ─────────────────────────────
