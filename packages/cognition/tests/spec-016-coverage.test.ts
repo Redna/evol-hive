@@ -197,11 +197,11 @@ describe('Spec 016 — Acceptance Criteria scaffolds (pending implementation)', 
   // ── Cognition Layer — Integration ACs (Perceive / Plan / Execute) ────────
 
   it.todo(
-    'AC-15: When agent has no plan and affordance masking is enabled, PerceptionResult.prunedAffordances is an empty array',
+    'AC-15: When agent has no plan and affordance masking is enabled, PerceptionResult.maskedAffordances is an empty array and prunedAffordances retains the unmasked classifier output',
   );
 
   it.todo(
-    'AC-16: When agent has a plan and affordance masking is enabled, PerceptionResult.prunedAffordances is unchanged from classifier output',
+    'AC-16: When agent has a plan and affordance masking is enabled, both PerceptionResult.prunedAffordances and maskedAffordances are unchanged from classifier output (masking is a no-op when a plan exists)',
   );
 
   it.todo(

@@ -246,20 +246,21 @@ function makePerceptionProvider(
 }
 
 describe('PerceptionServiceImpl — affordance masking (AC-15, AC-16)', () => {
-  it('AC-15: prunedAffordances is [] when no plan and masking enabled', async () => {
+  it('AC-15: maskedAffordances is [] when no plan and masking enabled; prunedAffordances retains unmasked classifier output', async () => {
     const state = makeAgentState({ currentPlan: null });
     const provider = makePerceptionProvider(state);
     const guardrail = new GuardrailEngineImpl(allOnConfig);
     const service = new PerceptionServiceImpl({
       provider,
       classifier: makeClassifier(),
-      ...(guardrail !== undefined ? { guardrail } : {}),
+      guardrail,
     });
     const result = await service.perceive(AGENT_ID);
-    expect(result.prunedAffordances).toEqual([]);
+    expect(result.maskedAffordances).toEqual([]);
+    expect(result.prunedAffordances).toEqual(affordances); // UNMASKED — classifier output preserved
   });
 
-  it('AC-16: prunedAffordances is unchanged when agent has a plan and masking enabled', async () => {
+  it('AC-16: both prunedAffordances and maskedAffordances unchanged from classifier output when agent has a plan and masking enabled', async () => {
     const state = makeAgentState({ currentPlan: makePlan('brew_coffee') });
     const provider = makePerceptionProvider(state);
     const guardrail = new GuardrailEngineImpl(allOnConfig);
@@ -269,10 +270,11 @@ describe('PerceptionServiceImpl — affordance masking (AC-15, AC-16)', () => {
       guardrail,
     });
     const result = await service.perceive(AGENT_ID);
-    expect(result.prunedAffordances).toEqual(affordances);
+    expect(result.prunedAffordances).toEqual(affordances); // UNMASKED
+    expect(result.maskedAffordances).toEqual(affordances); // MASKED (no-op when hasPlan)
   });
 
-  it('without guardrail: prunedAffordances unchanged (backward compat)', async () => {
+  it('without guardrail: prunedAffordances unchanged and maskedAffordances is undefined (backward compat)', async () => {
     const state = makeAgentState({ currentPlan: null });
     const provider = makePerceptionProvider(state);
     const service = new PerceptionServiceImpl({
@@ -281,9 +283,10 @@ describe('PerceptionServiceImpl — affordance masking (AC-15, AC-16)', () => {
     });
     const result = await service.perceive(AGENT_ID);
     expect(result.prunedAffordances).toEqual(affordances);
+    expect(result.maskedAffordances).toBeUndefined();
   });
 
-  it('masking disabled: prunedAffordances unchanged even without plan', async () => {
+  it('masking disabled: prunedAffordances and maskedAffordances both equal classifier output when affordanceMasking: false', async () => {
     const state = makeAgentState({ currentPlan: null });
     const provider = makePerceptionProvider(state);
     const guardrail = new GuardrailEngineImpl(allOffConfig);
@@ -294,6 +297,7 @@ describe('PerceptionServiceImpl — affordance masking (AC-15, AC-16)', () => {
     });
     const result = await service.perceive(AGENT_ID);
     expect(result.prunedAffordances).toEqual(affordances);
+    expect(result.maskedAffordances).toEqual(result.prunedAffordances);
   });
 });
 

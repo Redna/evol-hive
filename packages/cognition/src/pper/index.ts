@@ -7,6 +7,7 @@
  */
 
 import type {
+  Affordance,
   PassivePerception,
   PerceptionResult,
   PerceptionDataProvider,
@@ -131,10 +132,14 @@ export class PerceptionServiceImpl {
       objectDependencies = undefined;
     }
 
-    // Affordance masking (spec 016, Req 8): after classifier pruning, if a
-    // guardrail engine is present, mask physical affordances when the agent
-    // has no plan. Cognitive tools are never masked (handled by the builder).
-    let maskedAffordances = prunedAffordances;
+    // Affordance masking (spec 016, Req 8; spec 020, Req 3): after classifier
+    // pruning, if a guardrail engine is present, mask physical affordances when
+    // the agent has no plan. The masked result is stored in `maskedAffordances`
+    // (for the Perception/Action-choice builder); `prunedAffordances` retains the
+    // UNMASKED classifier output for the Plan builder so the LLM can reference
+    // exact affordance IDs in plan steps (spec 020, Req 3, 5). Cognitive tools
+    // are never masked (handled by the builder).
+    let maskedAffordances: Affordance[] | undefined;
     const guardrail = this.options.guardrail;
     if (guardrail !== undefined) {
       let hasPlan = false;
@@ -151,7 +156,8 @@ export class PerceptionServiceImpl {
 
     return {
       passive,
-      prunedAffordances: maskedAffordances,
+      prunedAffordances,
+      ...(maskedAffordances !== undefined ? { maskedAffordances } : {}),
       primaryDriveLabel,
       ...(stuck ? { stuck } : {}),
       ...(persona !== undefined ? { persona } : {}),
