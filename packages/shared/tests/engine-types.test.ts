@@ -3,12 +3,13 @@
  * Covers AC-12 (PPERSchedulerConfig) and AC-13 (SceneDefinition).
  */
 import { describe, it, expect } from 'vitest';
-import { defaultPPERSchedulerConfig } from '../src/index.js';
+import { defaultPPERSchedulerConfig, defaultEngineConfig } from '../src/index.js';
 import type {
   PPERSchedulerConfig,
   PPEROrchestratorPort,
   SceneDefinition,
   PPERPhase,
+  EngineConfig,
 } from '../src/index.js';
 
 describe('PPERSchedulerConfig (AC-12)', () => {
@@ -83,5 +84,38 @@ describe('SceneDefinition (AC-13)', () => {
     expect(scene.objects).toHaveLength(1);
     expect(scene.agents).toHaveLength(1);
     expect(scene.agents[0]?.initialDrives.energy).toBe(20);
+  });
+});
+
+// ─── Spec 019: Configurable Drive Decay Rate ────────────────────────────────
+
+describe('EngineConfig.driveDecayRate (Spec 019, AC-1, AC-2)', () => {
+  it('AC-1: EngineConfig accepts an optional driveDecayRate field', () => {
+    const config: EngineConfig = {
+      fps: 60,
+      spatialDebounceSeconds: 5,
+      maxConcurrentLLM: 8,
+      guardrailsEnabled: true,
+      guardrails: { affordanceMasking: true, contextualForcing: true, planValidation: true },
+      driveDecayRate: 0.25,
+    };
+    expect(config.driveDecayRate).toBe(0.25);
+  });
+
+  it('AC-1: EngineConfig compiles without driveDecayRate (backward compatible)', () => {
+    const config: EngineConfig = {
+      fps: 60,
+      spatialDebounceSeconds: 5,
+      maxConcurrentLLM: 8,
+      guardrailsEnabled: true,
+      guardrails: { affordanceMasking: true, contextualForcing: true, planValidation: true },
+    };
+    // No driveDecayRate key — must still compile and be undefined.
+    expect(config.driveDecayRate).toBeUndefined();
+  });
+
+  it('AC-2: defaultEngineConfig() returns driveDecayRate: 0.1', () => {
+    const config = defaultEngineConfig();
+    expect(config.driveDecayRate).toBe(0.1);
   });
 });

@@ -14,13 +14,20 @@ const DRIVE_KEYS = ['energy', 'hunger', 'social', 'comfort', 'curiosity'] as con
 
 /** Concrete DriveSystem. Optionally wired to an AgentManager for `applyChanges`. */
 export class DriveSystemImpl implements DriveSystem {
-  constructor(private readonly agentManager?: AgentManager) {}
+  /**
+   * @param agentManager Optional — required for `applyChanges`.
+   * @param decayRate Drive-points decays per second (default `0.1`, spec 019, Req 3, AC-3).
+   */
+  constructor(
+    private readonly agentManager?: AgentManager,
+    private readonly decayRate: number = 0.1,
+  ) {}
 
   /** Apply natural drive decay over a time delta (mutates `state.drives` in place). */
   applyDecay(state: AgentInternalState, deltaSeconds: number): void {
     for (const key of DRIVE_KEYS) {
       const current = state.drives[key];
-      state.drives[key] = clampDrive(current - deltaSeconds);
+      state.drives[key] = clampDrive(current - deltaSeconds * this.decayRate);
     }
   }
 
