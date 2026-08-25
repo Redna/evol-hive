@@ -216,26 +216,43 @@ export class OpenAICompatibleLLMClient {
 
   async completeStructured(payload: LLMContextPayload): Promise<LLMActionResponse> {
     const messages = this.buildPayloadMessages(payload);
-    const parsed = await this.requestChat(messages, payload.tools, payload.agentId);
+    const { toolName, args } = await this.requestChat(messages, payload.tools, payload.agentId);
 
-    const reasoning = parsed['reasoning'];
-    const action = parsed['action'];
+    // Affordance tool call (spec 019, Req 10): the tool name IS the action.
+    // Affordance tools are terminal — their name is not a cognitive tool name
+    // and not `choose_action`.
+    if (toolName !== 'choose_action' && !COGNITIVE_TOOL_NAMES.has(toolName)) {
+      const result: LLMActionResponse = {
+        reasoning: '',
+        action: toolName,
+      };
+      if (typeof args === 'object' && args !== null && Object.keys(args).length > 0) {
+        result.actionArgs = args;
+      } else {
+        result.actionArgs = {};
+      }
+      return result;
+    }
+
+    // choose_action backward compatibility (spec 019, Req 10).
+    const reasoning = args['reasoning'];
+    const action = args['action'];
     if (typeof reasoning !== 'string' || typeof action !== 'string') {
       throw new LLMResponseError(
         'LLM response missing required "reasoning" (string) or "action" (string) field.',
-        JSON.stringify(parsed),
+        JSON.stringify(args),
       );
     }
     const result: LLMActionResponse = { reasoning, action };
 
-    if (typeof parsed['actionArgs'] === 'object' && parsed['actionArgs'] !== null) {
-      result.actionArgs = parsed['actionArgs'] as Record<string, unknown>;
+    if (typeof args['actionArgs'] === 'object' && args['actionArgs'] !== null) {
+      result.actionArgs = args['actionArgs'] as Record<string, unknown>;
     }
-    if (typeof parsed['observeTarget'] === 'string') {
-      result.observeTarget = parsed['observeTarget'];
+    if (typeof args['observeTarget'] === 'string') {
+      result.observeTarget = args['observeTarget'];
     }
-    if (typeof parsed['updatedGoal'] === 'string') {
-      result.updatedGoal = parsed['updatedGoal'];
+    if (typeof args['updatedGoal'] === 'string') {
+      result.updatedGoal = args['updatedGoal'];
     }
     return result;
   }
@@ -244,10 +261,10 @@ export class OpenAICompatibleLLMClient {
 
   async completePlan(payload: LLMContextPayload): Promise<FormulatePlanResult> {
     const messages = this.buildPayloadMessages(payload);
-    const parsed = await this.requestChat(messages, payload.tools, payload.agentId);
+    const { args } = await this.requestChat(messages, payload.tools, payload.agentId);
 
-    const description = parsed['description'];
-    const steps = parsed['steps'];
+    const description = args['description'];
+    const steps = args['steps'];
     if (
       typeof description !== 'string' ||
       description.length === 0 ||
@@ -256,23 +273,32 @@ export class OpenAICompatibleLLMClient {
     ) {
       throw new LLMResponseError(
         'LLM plan response missing required "description" (non-empty string) or "steps" (non-empty array).',
-        JSON.stringify(parsed),
+        JSON.stringify(args),
       );
     }
     return {
       description,
       steps: (steps as unknown[]).map((s) => {
+        // String format (spec 019, Req 13): each string is the targetAffordance.
+        if (typeof s === 'string') {
+          return { description: s, targetAffordance: s };
+        }
         const obj = s as Record<string, unknown>;
         // LLMs may use different field names for step items:
         // - description: the step's human-readable description
         // - targetAffordance: the affordance ID to execute
-        // Common aliases: reason→description, action→targetAffordance, affordance→targetAffordance
+        // Common aliases: reason→description, action→targetAffordance, affordance→targetAffordance, tool→targetAffordance
         const step: { description: string; targetAffordance?: string } = {
           description: String(
             obj['description'] ?? obj['reason'] ?? obj['action'] ?? obj['name'] ?? '',
           ),
         };
-        const ta = obj['targetAffordance'] ?? obj['action'] ?? obj['affordance'] ?? obj['target'];
+        const ta =
+          obj['targetAffordance'] ??
+          obj['action'] ??
+          obj['affordance'] ??
+          obj['target'] ??
+          obj['tool'];
         if (typeof ta === 'string') {
           step.targetAffordance = ta;
         }
@@ -285,16 +311,16 @@ export class OpenAICompatibleLLMClient {
 
   async completeReflect(payload: LLMContextPayload): Promise<ReflectLLMResponse> {
     const messages = this.buildPayloadMessages(payload);
-    const parsed = await this.requestChat(messages, payload.tools, payload.agentId);
+    const { args } = await this.requestChat(messages, payload.tools, payload.agentId);
 
     const result: ReflectLLMResponse = {};
-    if (typeof parsed['newGoal'] === 'string') {
-      result.newGoal = parsed['newGoal'];
+    if (typeof args['newGoal'] === 'string') {
+      result.newGoal = args['newGoal'];
     }
-    if (typeof parsed['driveOverrides'] === 'object' && parsed['driveOverrides'] !== null) {
-      result.driveOverrides = parsed['driveOverrides'] as Partial<Record<string, number>>;
+    if (typeof args['driveOverrides'] === 'object' && args['driveOverrides'] !== null) {
+      result.driveOverrides = args['driveOverrides'] as Partial<Record<string, number>>;
     }
-    const memEntry = parsed['memoryEntry'];
+    const memEntry = args['memoryEntry'];
     if (typeof memEntry === 'object' && memEntry !== null) {
       const me = memEntry as Record<string, unknown>;
       const content = me['content'];
@@ -331,8 +357,8 @@ export class OpenAICompatibleLLMClient {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ];
-    const parsed = await this.requestChat(messages, [memoryConsolidationTool]);
-    const result = parsed as unknown as ConsolidationResult;
+    const { args } = await this.requestChat(messages, [memoryConsolidationTool]);
+    const result = args as unknown as ConsolidationResult;
 
     const consolidatedMemories = result.consolidatedMemories ?? [];
     const consolidatedNodeIds = result.consolidatedNodeIds ?? [];
@@ -382,14 +408,14 @@ export class OpenAICompatibleLLMClient {
     messages: ChatMessage[],
     tools: ToolDefinition[],
     agentId?: string,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<{ toolName: string; args: Record<string, unknown> }> {
     const url = `${this.baseUrl}/chat/completions`;
 
     // When the cognitive tool executor is not wired or no agentId is available,
     // fall back to single-request behavior (spec 015, Req 15 step 5).
     if (this.cognitiveToolExecutor === undefined || agentId === undefined) {
-      const { argsStr } = await this.sendRequest(url, messages, tools);
-      return this.parseToolCallArgs(argsStr, url);
+      const { toolName, argsStr } = await this.sendRequest(url, messages, tools);
+      return { toolName, args: this.parseToolCallArgs(argsStr, url) };
     }
 
     // Multi-turn tool call loop (spec 015, Req 15).
@@ -402,7 +428,7 @@ export class OpenAICompatibleLLMClient {
 
       // Terminal tool — parse arguments and return (Req 15 step 3).
       if (!COGNITIVE_TOOL_NAMES.has(toolName)) {
-        return this.parseToolCallArgs(argsStr, url);
+        return { toolName, args: this.parseToolCallArgs(argsStr, url) };
       }
 
       // Cognitive tool — execute mid-loop (Req 15 step 4).
@@ -665,14 +691,12 @@ export class OpenAICompatibleLLMClient {
     ];
   }
 
-  /** Constructs the user message from perception context, affordances, and tools (Req 14). */
+  /** Constructs the user message from perception context and cognitive tools (Req 14, spec 019 Req 9). */
   private buildUserMessage(payload: LLMContextPayload): string {
     const parts: string[] = [payload.perceptionContext];
 
-    if (payload.availableAffordances.length > 0) {
-      const lines = payload.availableAffordances.map((a) => `id: ${a.id}, label: ${a.label}`);
-      parts.push(`Available actions:\n${lines.join('\n')}`);
-    }
+    // The affordance list is now represented as tool definitions (spec 019) —
+    // no longer rendered as text in the user message.
 
     if (payload.cognitiveTools.length > 0) {
       const lines = payload.cognitiveTools.map(

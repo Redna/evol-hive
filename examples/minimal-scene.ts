@@ -87,10 +87,27 @@ export const MINIMAL_SCENE: SceneDefinition = {
   agents: [agent],
 };
 
-// ── Mock LLM client (AC-21) ──────────────────────────────────────────────────
+// ── Mock LLM client (AC-21, spec 019 Req 17) ─────────────────────────────────
 
 export class MockLLMClient implements LLMClient {
-  async completeStructured(_payload: LLMContextPayload): Promise<LLMActionResponse> {
+  async completeStructured(payload: LLMContextPayload): Promise<LLMActionResponse> {
+    // Identify affordance tools (spec 019): tools whose names are not cognitive
+    // tool names and not choose_action.
+    const cognitiveNames = new Set<string>([
+      'query_memory',
+      'update_internal_state',
+      'talk_to',
+      'observe_agent',
+      'help',
+      'ignore',
+      'formulate_plan',
+    ]);
+    const affordanceTool = (payload.tools ?? []).find(
+      (t) => t.function.name !== 'choose_action' && !cognitiveNames.has(t.function.name),
+    );
+    if (affordanceTool) {
+      return { reasoning: '', action: affordanceTool.function.name };
+    }
     return { reasoning: 'I need energy. I will brew coffee.', action: 'brew_coffee' };
   }
 
@@ -101,7 +118,29 @@ export class MockLLMClient implements LLMClient {
     return { agentId: 'agent-1', newMemories: [], consolidatedNodeIds: [] };
   }
 
-  async completePlan(_payload: LLMContextPayload): Promise<FormulatePlanResult> {
+  async completePlan(payload: LLMContextPayload): Promise<FormulatePlanResult> {
+    // Identify affordance tools and use their names as targetAffordance values (spec 019).
+    const cognitiveNames = new Set<string>([
+      'query_memory',
+      'update_internal_state',
+      'talk_to',
+      'observe_agent',
+      'help',
+      'ignore',
+      'formulate_plan',
+    ]);
+    const affordanceTools = (payload.tools ?? []).filter(
+      (t) => t.function.name !== 'choose_action' && !cognitiveNames.has(t.function.name),
+    );
+    if (affordanceTools.length > 0) {
+      return {
+        description: 'Brew coffee to restore energy',
+        steps: affordanceTools.map((t) => ({
+          description: t.function.name,
+          targetAffordance: t.function.name,
+        })),
+      };
+    }
     return {
       description: 'Brew coffee to restore energy',
       steps: [{ description: 'Brew a cup of coffee', targetAffordance: 'brew_coffee' }],

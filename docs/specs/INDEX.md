@@ -37,7 +37,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [017](017-persistence-save-load-game-state.md) | Persistence — Save/Load Game State and Agent Memory Across Sessions | §2, §3, §6, §11 | ✅ Done | [#61](https://github.com/Redna/evol-hive/issues/61) | [#67](https://github.com/Redna/evol-hive/pull/67) | shared, memory, engine |
 | [018](018-object-interactions.md) | Object Interactions — Multi-Step Affordances, Object State Changes, Dependencies | §4, §5, §6, §9 | ✅ Done | [#63](https://github.com/Redna/evol-hive/issues/63) | [#69](https://github.com/Redna/evol-hive/pull/69) | shared, engine, cognition |
 | [018](018-multi-agent-social.md) | Multi-Agent Social — Agent-to-Agent Perception, Communication, Relationships | §3, §6, §8 | ✅ Done | [#62](https://github.com/Redna/evol-hive/issues/62) | [#70](https://github.com/Redna/evol-hive/pull/70) | shared, engine, cognition |
-| [019](019-affordance-as-tools.md) | Affordance-as-Tools — Replace `choose_action` with Per-Affordance Tool Definitions | §4, §6, §7, §8, §10 | 📝 Drafted | [#71](https://github.com/Redna/evol-hive/issues/71) | — | shared, cognition, examples |
+| [019](019-affordance-as-tools.md) | Affordance-as-Tools — Replace `choose_action` with Per-Affordance Tool Definitions | §4, §6, §7, §8, §10 | 🔍 In Review | [#71](https://github.com/Redna/evol-hive/issues/71) | — | shared, cognition, examples |
 
 ## Architecture Coverage
 

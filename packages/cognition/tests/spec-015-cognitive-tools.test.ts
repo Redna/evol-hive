@@ -745,18 +745,27 @@ function makePerceptionResult(): PerceptionResult {
 }
 
 describe('PlanBuilderImpl cognitive tools (AC-29)', () => {
-  it('returns tools: [formulatePlanTool, queryMemoryTool, updateInternalStateTool] (AC-29)', () => {
+  it('returns tools with formulatePlanTool, queryMemoryTool, updateInternalStateTool, and affordance tools (AC-29, spec 019)', () => {
     const builder = new PlanBuilderImpl();
     const payload = builder.build(makePerceptionResult());
-    expect(payload.tools).toEqual([formulatePlanTool, queryMemoryTool, updateInternalStateTool]);
+    expect(payload.tools.some((t) => t.function.name === 'formulate_plan')).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'query_memory')).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'update_internal_state')).toBe(true);
+    // Affordance tools are now included (spec 019)
+    expect(payload.tools.some((t) => t.function.name === 'brew_coffee')).toBe(true);
   });
 });
 
 describe('PerceptionBuilderImpl cognitive tools (AC-30)', () => {
-  it('returns tools: [chooseActionTool, queryMemoryTool, updateInternalStateTool] (AC-30)', () => {
+  it('returns tools with queryMemoryTool, updateInternalStateTool, and affordance tools (AC-30, spec 019)', () => {
     const builder = new PerceptionBuilderImpl();
     const payload = builder.build(makePerceptionResult());
-    expect(payload.tools).toEqual([chooseActionTool, queryMemoryTool, updateInternalStateTool]);
+    // chooseActionTool is no longer included (spec 019)
+    expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(false);
+    expect(payload.tools.some((t) => t.function.name === 'query_memory')).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'update_internal_state')).toBe(true);
+    // Affordance tools are now included (spec 019)
+    expect(payload.tools.some((t) => t.function.name === 'brew_coffee')).toBe(true);
   });
 });
 
@@ -935,7 +944,11 @@ describe('End-to-end tool call loop (AC-40)', () => {
     // (1) PlanBuilderImpl produces the right tools.
     const builder = new PlanBuilderImpl();
     const payload = builder.build(makePerceptionResult());
-    expect(payload.tools).toEqual([formulatePlanTool, queryMemoryTool, updateInternalStateTool]);
+    // Tools now include affordance tools (spec 019)
+    expect(payload.tools.some((t) => t.function.name === 'formulate_plan')).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'query_memory')).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'update_internal_state')).toBe(true);
+    expect(payload.tools.some((t) => t.function.name === 'brew_coffee')).toBe(true);
 
     // (2) agentId is set.
     payload.agentId = AGENT_ID;
