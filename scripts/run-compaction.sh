@@ -7,6 +7,11 @@ set -e
 
 echo "=== Starting Compaction ==="
 
+if [ "$GITHUB_ACTIONS" == "true" ]; then
+  git config --global user.name "evol-hive-compactor[bot]"
+  git config --global user.email "compactor-bot@evol-hive.local"
+fi
+
 # Check if YAAM daemon is running locally
 if pgrep yaam-engine > /dev/null; then
   echo "YAAM engine is currently running."
