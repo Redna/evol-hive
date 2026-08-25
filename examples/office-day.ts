@@ -362,6 +362,7 @@ function makeConfig(): import('@evol-hive/shared').EngineConfig {
     maxConcurrentLLM: 8,
     guardrailsEnabled: true,
     guardrails: { affordanceMasking: true, contextualForcing: true, planValidation: true },
+    driveDecayRate: 0.1,
   };
 }
 

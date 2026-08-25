@@ -66,5 +66,6 @@ export function loadEngineConfig(): EngineConfig {
     maxConcurrentLLM: Number(process.env['ENGINE_MAX_CONCURRENT_LLM'] ?? 8),
     guardrailsEnabled,
     guardrails,
+    driveDecayRate: Number(process.env['ENGINE_DRIVE_DECAY_RATE'] ?? 0.1),
   };
 }

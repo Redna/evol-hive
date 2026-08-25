@@ -30,6 +30,12 @@ export interface EngineConfig {
   guardrailsEnabled: boolean;
   /** Per-guardrail toggle flags (spec 016, Req 1). */
   guardrails: GuardrailConfig;
+  /**
+   * Rate at which all drives decay per second (drive-points / second).
+   * When omitted, defaults to `0.1`. Configurable so scenes/tests/providers
+   * can tune urgency (spec 019, Req 1, AC-1).
+   */
+  driveDecayRate?: number;
 }
 
 /** A single game loop tick. */
@@ -67,6 +73,7 @@ export function defaultEngineConfig(): EngineConfig {
     maxConcurrentLLM: 8,
     guardrailsEnabled: true,
     guardrails: defaultGuardrailConfig(),
+    driveDecayRate: 0.1,
   };
 }
 
