@@ -20,6 +20,7 @@ import {
   ignoreTool,
   formatPersona,
   GUARDRAIL_FORCING_DIRECTIVE,
+  affordancesToToolDefinitions,
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PlanBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
@@ -118,12 +119,16 @@ export class PlanBuilderImpl implements PlanBuilder {
       contextLines.push(`Object dependencies: ${summary}`);
     }
 
+    // Affordance tools are included so the LLM sees exact affordance IDs as tool
+    // names when formulating a plan (spec 019, Req 8).
+    const affordanceTools = affordancesToToolDefinitions(prunedAffordances);
+
     return {
       systemPrompt,
       perceptionContext: contextLines.join('\n'),
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
-      tools: buildPlanTools(hasAgentsPresent),
+      tools: buildPlanTools(hasAgentsPresent, affordanceTools),
     };
   }
 }
@@ -161,8 +166,11 @@ function formatDrives(drives: Record<string, number>): string {
  * Build tool definitions for the Plan phase, including social tools when agents are present
  * (spec 018, Req 38).
  */
-function buildPlanTools(hasAgentsPresent: boolean) {
-  const base = [formulatePlanTool, queryMemoryTool, updateInternalStateTool];
+function buildPlanTools(
+  hasAgentsPresent: boolean,
+  affordanceTools: import('@evol-hive/shared').ToolDefinition[] = [],
+) {
+  const base = [formulatePlanTool, queryMemoryTool, updateInternalStateTool, ...affordanceTools];
   if (hasAgentsPresent) {
     return [...base, talkToTool, observeAgentTool, helpTool, ignoreTool];
   }

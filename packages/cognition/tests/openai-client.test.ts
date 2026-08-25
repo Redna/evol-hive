@@ -549,9 +549,8 @@ describe('OpenAICompatibleLLMClient', () => {
       const body = JSON.parse(call.init.body as string);
       const userMsg: string = body.messages[1].content;
       expect(userMsg).toContain(payload.perceptionContext);
-      expect(userMsg).toContain('Available actions:');
-      expect(userMsg).toContain('id: brew_coffee');
-      expect(userMsg).toContain('label: Brew coffee');
+      // "Available actions" text is no longer in the user message (spec 019)
+      expect(userMsg).not.toContain('Available actions:');
       expect(userMsg).toContain('Cognitive tools:');
       expect(userMsg).toContain('name: formulate_plan');
     });
@@ -878,16 +877,16 @@ describe('OpenAICompatibleLLMClient', () => {
       };
       const payload = builder.build(perceptionResult);
 
-      // Verify the payload has tools with chooseActionTool
+      // Verify the payload has affordance tools (spec 019)
       expect(payload.tools).toBeDefined();
-      expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(true);
+      expect(payload.tools.some((t) => t.function.name === 'brew_coffee')).toBe(true);
+      expect(payload.tools.some((t) => t.function.name === 'choose_action')).toBe(false);
       // No responseSchema or schemaHint
       expect((payload as Record<string, unknown>)['responseSchema']).toBeUndefined();
       expect((payload as Record<string, unknown>)['schemaHint']).toBeUndefined();
 
-      fetchMock.mockResolvedValue(
-        toolCallResponse('choose_action', { reasoning: 'I need energy.', action: 'brew_coffee' }),
-      );
+      // Mock fetch returns an affordance tool call (spec 019)
+      fetchMock.mockResolvedValue(toolCallResponse('brew_coffee', {}));
       const client = new OpenAICompatibleLLMClient({ baseUrl: BASE_URL, model: MODEL });
       const result = await client.completeStructured(payload);
 
@@ -896,9 +895,9 @@ describe('OpenAICompatibleLLMClient', () => {
       expect(body.tools).toBeDefined();
       expect(body.response_format).toBeUndefined();
 
-      // Verify parsed response
-      expect(result.reasoning).toBe('I need energy.');
+      // Verify parsed response — affordance tool name becomes the action
       expect(result.action).toBe('brew_coffee');
+      expect(result.reasoning).toBe('');
     });
   });
 });

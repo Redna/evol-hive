@@ -59,8 +59,8 @@ describe('DriveDecaySystem (AC-7, AC-20)', () => {
     const sys = new DriveDecaySystem(agents, driveSystem);
 
     sys.update({ tickNumber: 1, simulationTime: 1, deltaSeconds: 10 });
-    // 100 - 10 = 90
-    expect(agents.getState('a1')!.drives.energy).toBe(90);
+    // 100 - 10 * 0.1 (default decayRate) = 99 (spec 019, Req 12, AC-10)
+    expect(agents.getState('a1')!.drives.energy).toBe(99);
   });
 
   it('has the name "drive-decay"', () => {

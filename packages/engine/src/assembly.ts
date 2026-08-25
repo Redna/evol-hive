@@ -123,7 +123,7 @@ export function createEngineCore(
   vectorStore?: VectorStore,
 ): EngineCore {
   const agentManager = new AgentManagerImpl();
-  const driveSystem = new DriveSystemImpl(agentManager);
+  const driveSystem = new DriveSystemImpl(agentManager, config.driveDecayRate ?? 0.1);
   const clock = new GameLoopClock();
   const clockFn = (): number => clock.get();
   const planManager = new PlanManagerImpl(agentManager, clockFn);

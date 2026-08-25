@@ -13,7 +13,6 @@
 
 import type { AgentProfile, PerceptionResult, Relationship } from '@evol-hive/shared';
 import {
-  chooseActionTool,
   queryMemoryTool,
   updateInternalStateTool,
   talkToTool,
@@ -22,6 +21,7 @@ import {
   ignoreTool,
   formatPersona,
   GUARDRAIL_FORCING_DIRECTIVE,
+  affordancesToToolDefinitions,
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
@@ -109,15 +109,19 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     const maskingEnabled = guardrailOptions?.maskingEnabled ?? false;
     const noPlan = !hasPlan;
 
-    // Build tool definitions: chooseActionTool + cognitive tools (excluding formulate_plan).
-    // When no plan and masking enabled, hide chooseActionTool — only cognitive tools
-    // remain, and ALL cognitive tools (including formulate_plan) are available so the
+    // Build tool definitions: affordance tools + cognitive tools (excluding formulate_plan).
+    // Affordances are now registered as individual tools (spec 019) — the LLM
+    // calls the affordance tool directly instead of choose_action.
+    // When no plan and masking enabled, hide ALL affordance tools — only cognitive
+    // tools remain, and ALL cognitive tools (including formulate_plan) are available so the
     // agent can create a plan (spec 016, Req 10: cognitive tools are never masked).
+    const availableAffordances = noPlan && maskingEnabled ? [] : prunedAffordances;
     let tools;
     if (noPlan && maskingEnabled) {
       tools = cognitiveToolsToToolDefinitions(defaultCognitiveTools);
     } else {
-      tools = [chooseActionTool, queryMemoryTool, updateInternalStateTool];
+      const affordanceTools = affordancesToToolDefinitions(availableAffordances);
+      tools = [queryMemoryTool, updateInternalStateTool, ...affordanceTools];
     }
 
     // Social tools are included only when other agents are present (spec 018, Req 34).
@@ -132,9 +136,6 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     if (noPlan && forcingEnabled) {
       systemPrompt = `${systemPrompt} ${GUARDRAIL_FORCING_DIRECTIVE}`;
     }
-
-    // Affordance masking: set availableAffordances to [] when no plan and masking enabled (Req 10).
-    const availableAffordances = noPlan && maskingEnabled ? [] : prunedAffordances;
 
     return {
       systemPrompt,

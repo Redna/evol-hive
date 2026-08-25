@@ -23,9 +23,15 @@ provider validates the tool arguments against the schema before returning them.
 | Phase | Tool | Parameters Schema |
 |-------|------|-------------------|
 | Plan | `formulate_plan` | `formulatePlanSchema` |
-| Execute | `choose_action` | `llmActionResponseSchema` |
+| Execute | per-affordance tools (dynamic, spec 019) | `AFFORDANCE_TOOL_PARAMETERS` (empty object schema) |
 | Reflect | `reflect` | `reflectSchema` |
 | Memory Consolidation | `consolidate_memories` | `memoryConsolidationSchema` |
+
+> **Spec 019 — Affordance-as-Tools**: The Execute phase no longer uses a single
+> `choose_action` tool. Each available affordance is registered as a separate
+> tool whose `name` IS the affordance ID. The LLM cannot call a non-existent
+> tool, eliminating affordance name hallucination. The `chooseActionTool`
+> constant remains in the codebase (deprecated) for backward compatibility.
 
 ### Required LLM Output Schema
 
