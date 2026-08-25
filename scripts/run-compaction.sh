@@ -1,6 +1,7 @@
 #!/bin/bash
 # Compaction job: squashes all jsonl files into a single events.jsonl
 # Acquires a lock on the memory branch so that parallel agents wait
+ORIG_DIR="$(pwd)"
 # in restore-memory.sh and save-memory.sh before proceeding.
 set -e
 
@@ -46,7 +47,7 @@ if [ "$GITHUB_ACTIONS" == "true" ]; then
   }
   
   cd "$WORKTREE"
-  cp ../yaam-compaction.lock .
+  cp "$ORIG_DIR/yaam-compaction.lock" .
   git add yaam-compaction.lock
   git commit -m "Acquire compaction lock"
   git push origin memory || {
@@ -86,7 +87,7 @@ if [ "$GITHUB_ACTIONS" == "true" ]; then
   # Clean up old tracking files
   git rm -f *.jsonl 2>/dev/null || true
   # Add the new compacted file
-  cp ../events.jsonl .
+  cp "$ORIG_DIR/events.jsonl" .
   git add events.jsonl
   # Release lock
   git rm -f yaam-compaction.lock 2>/dev/null || true
