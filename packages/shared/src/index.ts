@@ -15,3 +15,4 @@ export * from './types/visualizer.js';
 
 // Schemas
 export * from './schemas/llm-schemas.js';
+export * from './schemas/scene-schema.js';
