@@ -27,7 +27,7 @@
 | Object Interactions | [018](docs/specs/018-object-interactions.md) | ✅ Merged | #69 |
 | Multi-Agent Social | [018](docs/specs/018-multi-agent-social.md) | ✅ Merged | #70 |
 
-**20 specs, 18 issues, 70+ PRs — all merged. 1244 tests passing.**
+**21 specs, 88+ PRs — all merged. 1,140 tests passing.**
 
 ## Completed Phases
 
