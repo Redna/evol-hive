@@ -97,6 +97,9 @@ export * from './systems/object-state.js';
 export * from './social/message-queue.js';
 export * from './social/social-manager.js';
 
+// Visualizer adapter — spec 023
+export * from './visualizer/data-adapter.js';
+
 // ── Persistence (spec 017) ───────────────────────────────────────────────
 export interface EnginePersistence {
   /** Serialize the full game state to a SaveState object. */
@@ -118,3 +121,6 @@ export * from './persistence/index.js';
 
 // Engine assembly factory — spec 005
 export * from './assembly.js';
+
+// Scene loader (declarative scene authoring) — spec 022
+export * from './scene-loader/index.js';

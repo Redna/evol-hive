@@ -1,8 +1,8 @@
 {
-  "name": "@evol-hive/engine",
+  "name": "@evol-hive/visualizer",
   "version": "0.1.0",
   "private": true,
-  "description": "Deterministic game engine — physics, game loop, spatial management, async routing, world objects, agent state, drives, plans",
+  "description": "Browser-based 2D canvas renderer and WebSocket transport for the evol-hive simulation (spec 023)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,14 +20,9 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@evol-hive/memory": "workspace:*",
-    "@evol-hive/shared": "workspace:*",
-    "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1",
-    "js-yaml": "^4.3.1"
+    "@evol-hive/shared": "workspace:*"
   },
   "devDependencies": {
-    "@types/js-yaml": "^4.0.9",
     "tsup": "^8.3.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
