@@ -16,6 +16,14 @@ import type { RetrievalEngine, MemoryInjector } from '../index.js';
 /** Constructor options for {@link MemoryInjectorImpl}. */
 export interface MemoryInjectorOptions {
   retrievalEngine: RetrievalEngine;
+  /**
+   * Optional cap on the number of memories injected by
+   * {@link MemoryInjectorImpl.injectAssociative} (spec 022, Req 13, AC-12).
+   * Defaults to `3` (down from the previous hardcoded `5`), overridable via
+   * the `MEMORY_INJECTION_TOP_K` env var. An explicit `topK` here takes
+   * precedence over the env var.
+   */
+  topK?: number;
 }
 
 /** Map a `MemoryNode` to its `MemorySnippet` projection. */
@@ -30,9 +38,13 @@ function toSnippet(node: MemoryNode): MemorySnippet {
 
 export class MemoryInjectorImpl implements MemoryInjector {
   private readonly retrievalEngine: RetrievalEngine;
+  private readonly topK: number;
 
   constructor(options: MemoryInjectorOptions) {
     this.retrievalEngine = options.retrievalEngine;
+    // Precedence (spec 022, Req 13, AC-12): explicit topK > MEMORY_INJECTION_TOP_K env > 3.
+    const envTopK = Number(process.env['MEMORY_INJECTION_TOP_K']);
+    this.topK = options.topK ?? (Number.isFinite(envTopK) && envTopK > 0 ? envTopK : 3);
   }
 
   async injectAssociative(
@@ -46,7 +58,7 @@ export class MemoryInjectorImpl implements MemoryInjector {
       .map(([k]) => k)
       .join(' ');
     const query = `${roomId} ${pressing}`.trim();
-    const results = await this.retrievalEngine.retrieve(query, agentId, 5);
+    const results = await this.retrievalEngine.retrieve(query, agentId, this.topK);
     return results.map((r) => toSnippet(r.node));
   }
 

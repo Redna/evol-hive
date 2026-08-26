@@ -98,6 +98,10 @@ export type PersonaText = string;
  * profile fields (spec 012, Req 3). The output is suitable for injection into
  * LLM system prompts.
  *
+ * Memoization (spec 022, Req 16, AC-16): the formatted string is cached per
+ * `AgentProfile` reference (see {@link personaCache}) and reused on subsequent
+ * calls, since persona text is stable per agent (spec 021, Req 6).
+ *
  * - If `backstory` is present: includes `"<name>: <backstory>"`.
  * - If `traits` is non-empty: includes `"Traits: <trait1>, <trait2>, ..."`.
  * - If `behavioralTendencies` is non-empty: includes `"Tendencies: <tendency1>, <tendency2>, ..."`.
@@ -109,7 +113,32 @@ export type PersonaText = string;
  *
  * If the output exceeds 500 characters, a warning is logged (Req 23).
  */
+
+/**
+ * In-process memoization cache for {@link formatPersona} (spec 022, Req 16,
+ * AC-16). Keyed by `AgentProfile` reference so the formatted persona string is
+ * computed once per profile and reused. A `WeakMap` lets entries be
+ * garbage-collected with the profile object.
+ */
+const personaCache = new WeakMap<AgentProfile, PersonaText>();
+
 export function formatPersona(profile: AgentProfile): PersonaText {
+  // Memoization (spec 022, Req 16, AC-16): persona text is stable per agent
+  // reference and reused. A `WeakMap` keyed by the profile object keeps the
+  // cache garbage-collectable with the profile. Reference-based: two
+  // different profile objects with identical content produce separate cache
+  // entries. In-process only — not persisted across restarts.
+  const cached = personaCache.get(profile);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const result = formatPersonaUncached(profile);
+  personaCache.set(profile, result);
+  return result;
+}
+
+/** Underlying, un-memoized persona formatter. */
+function formatPersonaUncached(profile: AgentProfile): PersonaText {
   // Check if any NEW persona fields are present (spec 012, Req 3).
   // traits is an existing field — it is only included in the composed output
   // when at least one new persona field is also present.

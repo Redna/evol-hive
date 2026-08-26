@@ -69,6 +69,12 @@ export interface ReflectBuilder {
     agentState: import('@evol-hive/shared').AgentInternalState,
     executeResult: import('@evol-hive/shared').ExecuteResult,
     profile?: import('@evol-hive/shared').AgentProfile | null,
+    /**
+     * Optional full drive-change history (spec 022, Req 12, AC-11). Only the
+     * last `maxDriveHistoryEntries` per drive are rendered; the array is not
+     * mutated.
+     */
+    driveChangeHistory?: import('./pper/reflect-builder.js').DriveChangeHistory,
   ): LLMContextPayload;
 }
 

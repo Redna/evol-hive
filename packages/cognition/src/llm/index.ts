@@ -14,3 +14,5 @@ export {
   LLMRateLimitError,
   LLMResponseError,
 } from './openai-client.js';
+export { TokenUsageReporter } from './token-usage-reporter.js';
+export { LLMResponseCache, type LLMResponseCacheOptions } from './response-cache.js';

@@ -34,6 +34,11 @@ export class PPERScheduler {
     this.maxConcurrent = config.maxConcurrentCycles;
   }
 
+  /** The configured max concurrent cycle limit (spec 022, Req 1, AC-1). */
+  get maxConcurrentCycles(): number {
+    return this.maxConcurrent;
+  }
+
   /** Called every tick by the game loop. Synchronous — never awaits. */
   update(_tick: GameTick): void {
     const agents = this.agentManager.getActiveAgents();

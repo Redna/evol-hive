@@ -114,6 +114,18 @@ export interface EngineCore {
   autoSaveConfig?: AutoSaveConfig;
   /** Social manager — always created (spec 019, Req 3). */
   socialManager: SocialManager;
+  /**
+   * Optional per-scene PPER scheduler config override (spec 022, Req 1, AC-1).
+   * Populated by {@link loadScene} from `SceneDefinition.maxConcurrentCycles`
+   * when present. Consumed by {@link assembleGameLoop} unless an explicit
+   * `schedulerConfig` argument is passed.
+   */
+  sceneSchedulerConfig?: PPERSchedulerConfig;
+  /**
+   * The `PPERScheduler` instance constructed by {@link assembleGameLoop}
+   * (spec 022, AC-1). `undefined` until the scheduler system is registered.
+   */
+  scheduler?: import('./systems/pper-scheduler.js').PPERScheduler;
 }
 
 /** Build all engine subsystems and bridges (no spec-mandated systems registered yet). */
@@ -216,12 +228,22 @@ export function assembleGameLoop(
   autoSave?: {
     config: AutoSaveConfig;
   },
+  /**
+   * Optional PPER scheduler config override (spec 022, Req 2, AC-2). When
+   * provided, this takes precedence over any per-scene config stored on
+   * `core` (via {@link loadScene}) and the env-var default.
+   */
+  schedulerConfig?: PPERSchedulerConfig,
 ): GameLoop {
-  const schedulerConfig: PPERSchedulerConfig = defaultPPERSchedulerConfig();
+  // Precedence (spec 022, Req 2/4): explicit arg > scene-level config > default.
+  const resolvedSchedulerConfig: PPERSchedulerConfig =
+    schedulerConfig ?? core.sceneSchedulerConfig ?? defaultPPERSchedulerConfig();
   core.gameLoop.registerSystem(core.spatial); // (1) SpatialSystem
   core.gameLoop.registerSystem(new DriveDecaySystem(core.agentManager, core.driveSystem)); // (2) DriveDecaySystem
   core.gameLoop.registerSystem(new ObjectStateSystem(core.smartObjectRegistry)); // (3) ObjectStateSystem (spec 018)
-  core.gameLoop.registerSystem(new PPERScheduler(core.agentManager, orchestrator, schedulerConfig)); // (4) PPERScheduler
+  const scheduler = new PPERScheduler(core.agentManager, orchestrator, resolvedSchedulerConfig); // (4) PPERScheduler
+  core.scheduler = scheduler;
+  core.gameLoop.registerSystem(scheduler);
 
   // (5) MemoryMaintenanceSystem — only when a decay service is provided (spec 014, Req 17/18).
   if (memoryMaintenance?.memoryDecayService) {
@@ -265,6 +287,8 @@ export interface AssembledEngine {
   persistence?: EnginePersistence;
   /** Social manager (spec 019, Req 5). */
   socialManager: SocialManager;
+  /** The PPER scheduler (spec 022, AC-1/AC-2). */
+  scheduler?: import('./systems/pper-scheduler.js').PPERScheduler;
 }
 
 /** Build the full engine (core + registered systems) in one call. */
@@ -273,9 +297,15 @@ export function createEngine(
   orchestrator: PPEROrchestratorPort,
   memoryStore?: MemoryStore,
   vectorStore?: VectorStore,
+  /**
+   * Optional PPER scheduler config override (spec 022, Req 3, AC-2). When
+   * provided, forwarded to {@link assembleGameLoop}. When omitted, the
+   * per-scene config (if any) or the env-var default is used.
+   */
+  schedulerConfig?: PPERSchedulerConfig,
 ): AssembledEngine {
   const core = createEngineCore(config, memoryStore, vectorStore);
-  assembleGameLoop(core, orchestrator);
+  assembleGameLoop(core, orchestrator, undefined, undefined, schedulerConfig);
   return {
     gameLoop: core.gameLoop,
     agentManager: core.agentManager,
@@ -285,11 +315,17 @@ export function createEngine(
     bridges: core.bridges,
     ...(core.persistence !== undefined ? { persistence: core.persistence } : {}),
     socialManager: core.socialManager,
+    ...(core.scheduler !== undefined ? { scheduler: core.scheduler } : {}),
   };
 }
 
 /** Load a SceneDefinition into an engine core (rooms, objects, agents). */
 export function loadScene(core: EngineCore, scene: SceneDefinition): void {
+  // Per-scene PPER scheduler concurrency override (spec 022, Req 1, AC-1).
+  if (scene.maxConcurrentCycles !== undefined) {
+    core.sceneSchedulerConfig = { maxConcurrentCycles: scene.maxConcurrentCycles };
+  }
+
   // Rooms.
   const roomMap = new Map<string, Room>();
   for (const room of scene.rooms) {

@@ -21,13 +21,46 @@ import {
 import type { LLMContextPayload, ReflectBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
 
+/** Drive change history entry rendered in the Reflect context (spec 022, Req 12). */
+export interface DriveChangeHistoryEntry {
+  delta: number;
+  timestamp: number;
+}
+
+/** Drive change history keyed by drive name (spec 022, Req 12). */
+export type DriveChangeHistory = Record<string, DriveChangeHistoryEntry[]>;
+
+/** Constructor options for {@link ReflectBuilderImpl}. */
+export interface ReflectBuilderOptions {
+  /**
+   * Max number of drive-change history entries rendered per drive in the
+   * LLM-visible context (spec 022, Req 12, AC-11). Default `3`. The full
+   * history remains in the caller's internal state — only the rendered
+   * context is compressed.
+   */
+  maxDriveHistoryEntries?: number;
+}
+
 /** Concrete ReflectBuilder producing the LLM context payload for reflection. */
 export class ReflectBuilderImpl implements ReflectBuilder {
+  private readonly maxDriveHistoryEntries: number;
+
+  constructor(options: ReflectBuilderOptions = {}) {
+    const configured = options.maxDriveHistoryEntries ?? 3;
+    this.maxDriveHistoryEntries = configured >= 0 ? configured : 3;
+  }
+
   build(
     _agentId: string,
     agentState: AgentInternalState,
     executeResult: ExecuteResult,
     profile?: AgentProfile | null,
+    /**
+     * Optional full drive-change history (spec 022, Req 12, AC-11). When
+     * provided, only the last `maxDriveHistoryEntries` changes per drive are
+     * rendered in the perceptionContext. The array passed in is not mutated.
+     */
+    driveChangeHistory?: DriveChangeHistory,
   ): LLMContextPayload {
     const systemPrompt = buildSystemPrompt(profile);
 
@@ -84,6 +117,27 @@ export class ReflectBuilderImpl implements ReflectBuilder {
     // ── Dynamic content (current drive values change per tick) ───────────────
     const driveSummary = formatDrives(agentState.drives);
     const dynamicLines: string[] = [`Drives: ${driveSummary}`];
+
+    // Drive change history compression (spec 022, Req 12, AC-11): render only
+    // the last `maxDriveHistoryEntries` changes per drive. The full history
+    // remains in the caller's internal state (the array passed in is not
+    // mutated). When no history is provided, no section is rendered.
+    if (driveChangeHistory !== undefined) {
+      const historyLines: string[] = ['Recent drive changes:'];
+      let hasAny = false;
+      for (const [drive, entries] of Object.entries(driveChangeHistory)) {
+        if (!Array.isArray(entries) || entries.length === 0) continue;
+        hasAny = true;
+        const visible = entries.slice(Math.max(0, entries.length - this.maxDriveHistoryEntries));
+        const rendered = visible
+          .map((e) => `${e.delta > 0 ? '+' : ''}${e.delta}@${e.timestamp}`)
+          .join(', ');
+        historyLines.push(`${drive}: ${rendered}`);
+      }
+      if (hasAny) {
+        dynamicLines.push(...historyLines);
+      }
+    }
 
     const contextLines = [...stableLines, '---', ...dynamicLines];
 

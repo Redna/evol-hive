@@ -19,9 +19,10 @@ describe('PPERSchedulerConfig (AC-12)', () => {
     expect(typeof config.maxConcurrentCycles).toBe('number');
   });
 
-  it('defaultPPERSchedulerConfig returns maxConcurrentCycles 8', () => {
+  it('defaultPPERSchedulerConfig returns maxConcurrentCycles 1 (spec 022, Req 4)', () => {
+    delete process.env['ENGINE_MAX_CONCURRENT_LLM'];
     const config = defaultPPERSchedulerConfig();
-    expect(config.maxConcurrentCycles).toBe(8);
+    expect(config.maxConcurrentCycles).toBe(1);
   });
 
   it('accepts a value of 1 for tight concurrency', () => {

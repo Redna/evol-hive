@@ -32,4 +32,11 @@ export interface SceneDefinition {
   rooms: Room[];
   objects: import('./affordance.js').SmartObject[];
   agents: import('./agent.js').AgentProfile[];
+  /**
+   * Optional per-scene override for the `PPERScheduler` concurrency limit
+   * (spec 022, Req 1, AC-1). When present, this value overrides the global
+   * `ENGINE_MAX_CONCURRENT_LLM` env var for the scheduler used by this
+   * scene's engine. When absent, the env-var default is used.
+   */
+  maxConcurrentCycles?: number;
 }

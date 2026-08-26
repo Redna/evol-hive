@@ -270,6 +270,55 @@ export const memoryConsolidationTool: ToolDefinition = {
   },
 };
 
+/**
+ * JSON schema for the `multi_agent_plans` tool arguments (spec 022, Req 6).
+ * The LLM returns one entry per agent, each with its own plan description and
+ * steps, so a single batched call can formulate plans for multiple agents
+ * sharing a room.
+ */
+export const multiAgentPlansSchema = {
+  type: 'object',
+  properties: {
+    plans: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          agentId: { type: 'string', description: 'The agent this plan is for.' },
+          description: { type: 'string', description: 'High-level description of the plan.' },
+          steps: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                description: { type: 'string' },
+                targetAffordance: { type: ['string', 'null'] },
+              },
+              required: ['description'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['agentId', 'description', 'steps'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['plans'],
+  additionalProperties: false,
+} as const;
+
+/** Tool definition for the multi-agent batch Plan phase (spec 022, Req 6). */
+export const multiAgentPlansTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'multi_agent_plans',
+    description:
+      'Formulate a plan for each agent in the shared room. Return one plan entry per agentId.',
+    parameters: multiAgentPlansSchema,
+  },
+};
+
 /** Tool definition for the query_memory cognitive tool (spec 015, Req 7). */
 export const queryMemoryTool: ToolDefinition = {
   type: 'function',
