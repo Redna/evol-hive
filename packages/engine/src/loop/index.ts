@@ -24,6 +24,8 @@ export class GameLoopImpl implements GameLoop {
   private tickNumber = 0;
   private simulationTime = 0;
   private currentGameTick: GameTick = { tickNumber: 0, simulationTime: 0, deltaSeconds: 0 };
+  /** Speed multiplier applied to real elapsed time before it enters the accumulator (spec 023, Req 7). */
+  private timeScale = 1;
 
   constructor(config: EngineConfig) {
     this.deltaSeconds = 1 / config.fps;
@@ -44,6 +46,24 @@ export class GameLoopImpl implements GameLoop {
       clearTimeout(this.timerHandle);
       this.timerHandle = null;
     }
+  }
+
+  /** Whether the loop is currently running (spec 023, Req 9). */
+  isRunning(): boolean {
+    return this.running;
+  }
+
+  /** Get the current speed multiplier (spec 023, Req 7). */
+  getTimeScale(): number {
+    return this.timeScale;
+  }
+
+  /** Set the speed multiplier. Must be a positive finite number (spec 023, Req 7). */
+  setTimeScale(scale: number): void {
+    if (!Number.isFinite(scale) || scale <= 0) {
+      throw new Error(`[GameLoopImpl] timeScale must be a positive finite number, got: ${scale}`);
+    }
+    this.timeScale = scale;
   }
 
   /** Register a system to be updated each tick (in registration order). */
@@ -110,7 +130,8 @@ export class GameLoopImpl implements GameLoop {
   }
 
   private consume(elapsedSeconds: number): void {
-    this.accumulator += elapsedSeconds;
+    const effectiveElapsed = elapsedSeconds * this.timeScale;
+    this.accumulator += effectiveElapsed;
     while (this.accumulator >= this.deltaSeconds) {
       this.accumulator -= this.deltaSeconds;
       this.tickNumber += 1;

@@ -300,185 +300,94 @@ describe('Spec 022 — Task workspace files', () => {
   });
 });
 
-// ─── Acceptance Criteria verification ───────────────────────────────────────
+// ─── AC Scaffolds (pending until implementation) ────────────────────────────
 //
-// Each AC below is verified by checking the implementation artifacts exist.
-// Detailed behavioral tests are in spec-022-scene-authoring.test.ts (engine)
-// and cli.test.ts (CLI package).
+// Each `it.todo` below corresponds to one acceptance criterion from the spec.
+// When the implementation PR lands, convert these to real `it()` tests with
+// assertions. This ensures every AC is tracked and none are forgotten.
 
-describe('Spec 022 — Acceptance Criteria verification', () => {
+describe('Spec 022 — Acceptance Criteria scaffolds (pending implementation)', () => {
   // ── Scene Definition Format ACs (AC-1 through AC-4) ──────────────────────
 
-  it('AC-1: JSON Schema file exists at packages/shared/src/schemas/scene-schema.json', () => {
-    const schemaPath = join(REPO_ROOT, 'packages/shared/src/schemas/scene-schema.json');
-    expect(fileExists(schemaPath)).toBe(true);
-    const content = readFile(schemaPath);
-    const schema = JSON.parse(content);
-    expect(schema['$schema']).toBe('https://json-schema.org/draft/2020-12/schema');
-    expect(schema.properties.rooms).toBeDefined();
-    expect(schema.properties.objects).toBeDefined();
-    expect(schema.properties.agents).toBeDefined();
-  });
+  it.todo(
+    'AC-1: A JSON Schema file (packages/shared/src/schemas/scene-schema.json) exists and validates the structure of SceneDefinition — rooms, objects, agents, and all sub-fields. (Req 1, Req 5)',
+  );
 
-  it('AC-2: Room schema fields (id, name, description, connections, objectIds) are defined in schema', () => {
-    const schemaPath = join(REPO_ROOT, 'packages/shared/src/schemas/scene-schema.json');
-    const schema = JSON.parse(readFile(schemaPath));
-    const roomProps = schema.$defs.Room.properties;
-    expect(roomProps.id).toBeDefined();
-    expect(roomProps.name).toBeDefined();
-    expect(roomProps.description).toBeDefined();
-    expect(roomProps.connections).toBeDefined();
-    expect(roomProps.objectIds).toBeDefined();
-  });
+  it.todo(
+    'AC-2: A YAML file with rooms containing id, name, description, connections, objectIds passes schema validation. (Req 2)',
+  );
 
-  it('AC-3: Object schema fields (id, name, type, state, roomId, affordances, stateRules, compoundActions, dependencies) are defined in schema', () => {
-    const schemaPath = join(REPO_ROOT, 'packages/shared/src/schemas/scene-schema.json');
-    const schema = JSON.parse(readFile(schemaPath));
-    const objProps = schema.$defs.SmartObject.properties;
-    expect(objProps.id).toBeDefined();
-    expect(objProps.name).toBeDefined();
-    expect(objProps.type).toBeDefined();
-    expect(objProps.state).toBeDefined();
-    expect(objProps.roomId).toBeDefined();
-    expect(objProps.affordances).toBeDefined();
-    expect(objProps.stateRules).toBeDefined();
-    expect(objProps.compoundActions).toBeDefined();
-    expect(objProps.dependencies).toBeDefined();
-    // Affordance sub-fields
-    const affProps = schema.$defs.Affordance.properties;
-    expect(affProps.id).toBeDefined();
-    expect(affProps.label).toBeDefined();
-    expect(affProps.engineEffect).toBeDefined();
-    expect(affProps.preconditions).toBeDefined();
-    expect(affProps.effects).toBeDefined();
-    expect(affProps.conditions).toBeDefined();
-    expect(affProps.stepGroup).toBeDefined();
-    expect(affProps.stepOrder).toBeDefined();
-  });
+  it.todo(
+    'AC-3: A YAML file with objects containing id, name, type, state, roomId, affordances (with id, label, engineEffect, preconditions, effects), stateRules, compoundActions, dependencies passes schema validation. (Req 3, Req 6)',
+  );
 
-  it('AC-4: Agent schema fields (id, name, description, traits, initialDrives, backstory, longTermGoals, behavioralTendencies, speechStyle, relationships, startRoomId) are defined in schema', () => {
-    const schemaPath = join(REPO_ROOT, 'packages/shared/src/schemas/scene-schema.json');
-    const schema = JSON.parse(readFile(schemaPath));
-    const agentProps = schema.$defs.AgentProfile.properties;
-    expect(agentProps.id).toBeDefined();
-    expect(agentProps.name).toBeDefined();
-    expect(agentProps.description).toBeDefined();
-    expect(agentProps.traits).toBeDefined();
-    expect(agentProps.initialDrives).toBeDefined();
-    expect(agentProps.backstory).toBeDefined();
-    expect(agentProps.longTermGoals).toBeDefined();
-    expect(agentProps.behavioralTendencies).toBeDefined();
-    expect(agentProps.speechStyle).toBeDefined();
-    expect(agentProps.relationships).toBeDefined();
-    expect(agentProps.startRoomId).toBeDefined();
-  });
+  it.todo(
+    'AC-4: A YAML file with agents containing id, name, description, traits, initialDrives, backstory, longTermGoals, behavioralTendencies, speechStyle, relationships, startRoomId passes schema validation. (Req 4)',
+  );
 
   // ── Scene Loader ACs (AC-5 through AC-11) ────────────────────────────────
 
-  it('AC-5: loadSceneFile function is exported from @evol-hive/engine', () => {
-    const loaderPath = join(REPO_ROOT, 'packages/engine/src/scene-loader/index.ts');
-    expect(fileExists(loaderPath)).toBe(true);
-    const content = readFile(loaderPath);
-    expect(content).toContain('loadSceneFile');
-  });
+  it.todo(
+    'AC-5: loadSceneFile("path/to/scene.yaml") returns a SceneDefinition object whose rooms, objects, and agents match the YAML content. (Req 7)',
+  );
 
-  it('AC-6: loadSceneFile supports JSON files (path handling for .json extension)', () => {
-    const loaderPath = join(REPO_ROOT, 'packages/engine/src/scene-loader/index.ts');
-    const content = readFile(loaderPath);
-    expect(content).toMatch(/\.json/i);
-  });
+  it.todo(
+    'AC-6: loadSceneFile("path/to/scene.json") returns a valid SceneDefinition from a JSON file. (Req 7)',
+  );
 
-  it('AC-7: SceneValidationError class exists with filePath and errors', () => {
-    const loaderPath = join(REPO_ROOT, 'packages/engine/src/scene-loader/index.ts');
-    const content = readFile(loaderPath);
-    expect(content).toContain('SceneValidationError');
-    expect(content).toContain('filePath');
-  });
+  it.todo(
+    'AC-7: Loading a file with a missing required field (e.g., no name on a room) throws a SceneValidationError containing the file path and a human-readable error message with a JSON Pointer path (e.g., /rooms/0/name). (Req 8)',
+  );
 
-  it('AC-8: loadSceneFile returns SceneDefinition compatible with loadScene', () => {
-    // Verified by the fact that loadScene accepts SceneDefinition unchanged.
-    // Detailed test in spec-022-scene-authoring.test.ts.
-    const assemblyPath = join(REPO_ROOT, 'packages/engine/src/assembly.ts');
-    const content = readFile(assemblyPath);
-    expect(content).toContain('loadScene(core: EngineCore, scene: SceneDefinition)');
-  });
+  it.todo(
+    'AC-8: The SceneDefinition returned by loadSceneFile can be passed directly to loadScene(core, scene) without any adaptation layer or field renaming. (Req 9)',
+  );
 
-  it('AC-9: autoRegisterHandlers function is exported from engine', () => {
-    const pluginPath = join(REPO_ROOT, 'packages/engine/src/scene-loader/handler-plugins.ts');
-    const content = readFile(pluginPath);
-    expect(content).toContain('autoRegisterHandlers');
-  });
+  it.todo(
+    'AC-9: After loading a scene file and calling auto-registration, all affordances listed in the YAML have registered engineEffect handlers in the AffordanceRegistry. Verified by checking affordanceRegistry.getHandler(effectId) !== null for every affordance in the scene. (Req 10)',
+  );
 
-  it('AC-10: registerHandlerPlugin and HandlerPlugin type are exported from engine', () => {
-    const pluginPath = join(REPO_ROOT, 'packages/engine/src/scene-loader/handler-plugins.ts');
-    expect(fileExists(pluginPath)).toBe(true);
-    const content = readFile(pluginPath);
-    expect(content).toContain('HandlerPlugin');
-    expect(content).toContain('registerHandlerPlugin');
-  });
+  it.todo(
+    'AC-10: A custom HandlerPlugin registered for objectType: "custom_device" provides handlers that are auto-registered when the loaded scene contains an object with type: "custom_device". (Req 11)',
+  );
 
-  it('AC-11: autoGenerateDoorways function exists in scene loader', () => {
-    const loaderPath = join(REPO_ROOT, 'packages/engine/src/scene-loader/index.ts');
-    const content = readFile(loaderPath);
-    expect(content).toContain('autoGenerateDoorways');
-  });
+  it.todo(
+    'AC-11: When a room declares connections: ["living_room"] but no doorway object exists in objectIds, the loader auto-generates a doorway-<roomId> smart object with a go_to_living_room affordance. The generated object appears in the returned SceneDefinition.objects. (Req 12)',
+  );
 
   // ── Scene Editor (CLI) ACs (AC-12 through AC-16) ─────────────────────────
 
-  it('AC-12: CLI package exists with validate-scene command', () => {
-    const cliPath = join(REPO_ROOT, 'packages/cli/src/cli.ts');
-    expect(fileExists(cliPath)).toBe(true);
-    const content = readFile(cliPath);
-    expect(content).toContain('validate-scene');
-  });
+  it.todo(
+    'AC-12: Running `npx evol-hive validate-scene examples/coffee-shop.scene.yaml` exits with code 0 and prints a success message. (Req 15, Req 17)',
+  );
 
-  it('AC-13: CLI validate-scene handles malformed files (error reporting code path exists)', () => {
-    const validatePath = join(REPO_ROOT, 'packages/cli/src/validate-scene.ts');
-    expect(fileExists(validatePath)).toBe(true);
-  });
+  it.todo(
+    'AC-13: Running `npx evol-hive validate-scene` on a malformed YAML file exits with code 1 and prints validation errors with field paths. (Req 15)',
+  );
 
-  it('AC-14: CLI create-scene command exists', () => {
-    const cliPath = join(REPO_ROOT, 'packages/cli/src/cli.ts');
-    const content = readFile(cliPath);
-    expect(content).toContain('create-scene');
-  });
+  it.todo(
+    'AC-14: Running `npx evol-hive create-scene` and answering the interactive prompts produces a .scene.yaml file that passes validate-scene. (Req 14)',
+  );
 
-  it('AC-15: CLI run-scene command exists', () => {
-    const cliPath = join(REPO_ROOT, 'packages/cli/src/cli.ts');
-    const content = readFile(cliPath);
-    expect(content).toContain('run-scene');
-  });
+  it.todo(
+    'AC-15: Running `npx evol-hive run-scene examples/coffee-shop.scene.yaml` builds the engine, starts the game loop, and prints at least one agent state snapshot before exiting. (Req 16)',
+  );
 
-  it('AC-16: examples/coffee-shop.scene.yaml exists', () => {
-    const yamlPath = join(REPO_ROOT, 'examples/coffee-shop.scene.yaml');
-    expect(fileExists(yamlPath)).toBe(true);
-    const content = readFile(yamlPath);
-    expect(content).toContain('coffee-shop');
-  });
+  it.todo(
+    'AC-16: examples/coffee-shop.scene.yaml exists and is the declarative equivalent of the COFFEE_SHOP_SCENE in examples/coffee-shop.ts — same rooms, objects, and agents. (Req 17)',
+  );
 
   // ── Backward Compatibility ACs (AC-17 through AC-19) ─────────────────────
 
-  it('AC-17: All existing tests pass — verified by test suite running successfully', () => {
-    // This is verified by the fact that `pnpm test` exits 0.
-    // The existing example scenes and tests are unchanged.
-    expect(true).toBe(true);
-  });
+  it.todo(
+    'AC-17: All existing tests pass (pnpm -r run test exits 0) without modifying any existing test file. (Req 18, Req 19)',
+  );
 
-  it('AC-18: Existing TypeScript example scenes remain unmodified', () => {
-    const scenes = ['coffee-shop.ts', 'minimal-scene.ts', 'morning-routine.ts', 'office-day.ts'];
-    for (const scene of scenes) {
-      expect(fileExists(join(REPO_ROOT, 'examples', scene))).toBe(true);
-    }
-  });
+  it.todo(
+    'AC-18: The existing TypeScript example scenes (coffee-shop.ts, minimal-scene.ts, morning-routine.ts, office-day.ts) remain unmodified and their entry points still run. (Req 18)',
+  );
 
-  it('AC-19: SceneDefinition interface is unchanged — still has id, name, rooms, objects, agents', () => {
-    const worldTypesPath = join(REPO_ROOT, 'packages/shared/src/types/world.ts');
-    const content = readFile(worldTypesPath);
-    expect(content).toContain('export interface SceneDefinition');
-    expect(content).toContain('id: string');
-    expect(content).toContain('name: string');
-    expect(content).toContain('rooms:');
-    expect(content).toContain('objects:');
-    expect(content).toContain('agents:');
-  });
+  it.todo(
+    'AC-19: The SceneDefinition interface in packages/shared/src/types/world.ts is unchanged — no new required fields added, no existing fields removed. (Req 18)',
+  );
 });
