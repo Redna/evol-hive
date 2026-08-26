@@ -47,7 +47,9 @@ describe('AC-37: MemoryInjectorImpl exported', () => {
 describe('AC-38, AC-60: injectAssociative', () => {
   it('builds a query from room + drives and returns top-5 MemorySnippet[]', async () => {
     const engine = new FakeRetrievalEngine();
-    const injector = new MemoryInjectorImpl({ retrievalEngine: engine });
+    // Spec 022, Req 13: the default topK changed from 5 to 3. This test
+    // verifies the original top-5 behavior when an explicit topK is provided.
+    const injector = new MemoryInjectorImpl({ retrievalEngine: engine, topK: 5 });
 
     const snippets = await injector.injectAssociative('a1', 'bedroom', {
       energy: 20, // > 50? no → excluded

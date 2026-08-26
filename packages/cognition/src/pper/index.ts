@@ -175,10 +175,21 @@ export type { PlanServiceOptions } from './plan-service.js';
 export { ExecuteServiceImpl } from './execute-service.js';
 export type { ExecuteServiceOptions } from './execute-service.js';
 export { ReflectBuilderImpl } from './reflect-builder.js';
+export type {
+  ReflectBuilderOptions,
+  DriveChangeHistory,
+  DriveChangeHistoryEntry,
+} from './reflect-builder.js';
 export { ReflectServiceImpl } from './reflect-service.js';
 export type { ReflectServiceOptions } from './reflect-service.js';
 export { PPEROrchestratorImpl, createPPEROrchestrator } from './orchestrator.js';
 export type { PPEROrchestratorOptions } from './orchestrator.js';
+export {
+  BatchPlanService,
+  type BatchPlanServiceOptions,
+  type BatchPlanEntry,
+  type BatchPlanLLMClient,
+} from './batch-plan-service.js';
 export {
   ConsolidationProviderImpl,
   type ConsolidationProviderOptions,

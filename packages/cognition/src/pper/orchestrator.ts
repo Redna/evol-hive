@@ -41,6 +41,7 @@ import {
   PlanBuilderImpl,
   ReflectBuilderImpl,
 } from './index.js';
+import type { BatchPlanService } from './batch-plan-service.js';
 
 /** Dependencies for {@link PPEROrchestratorImpl}. */
 export interface PPEROrchestratorOptions {
@@ -54,6 +55,14 @@ export interface PPEROrchestratorOptions {
   errorConfig?: PPERErrorConfig;
   /** Optional guardrail engine for cognitive guardrails (spec 016, Req 12). */
   guardrail?: GuardrailEngine;
+  /**
+   * Optional batch plan service for multi-agent Plan-phase batching (spec 022,
+   * Req 9, AC-7). When absent, the orchestrator uses the existing per-agent
+   * `PlanService.plan()` calls — no behavior change. When present, the
+   * orchestrator may delegate same-room plan formulation to the batch service
+   * to reduce LLM calls.
+   */
+  batchPlanService?: BatchPlanService;
 }
 
 /** Concrete PPEROrchestrator wiring the four phase services in sequence. */
@@ -63,6 +72,8 @@ export class PPEROrchestratorImpl {
   private readonly executeService: ExecuteServiceImpl;
   private readonly reflectService: ReflectServiceImpl;
   private readonly errorConfig: PPERErrorConfig;
+  /** Optional batch plan service (spec 022, Req 9). `undefined` when not wired in. */
+  private readonly batchPlanService: BatchPlanService | undefined;
 
   /** Current phase per agent (defaults to 'perceive' = idle). */
   private readonly phases = new Map<string, PPERPhase>();
@@ -97,6 +108,7 @@ export class PPEROrchestratorImpl {
       dataProvider: options.reflectProvider,
     });
     this.errorConfig = options.errorConfig ?? defaultPPERErrorConfig();
+    this.batchPlanService = options.batchPlanService;
   }
 
   /** Run a single PPER cycle for the given agent. */
@@ -186,6 +198,16 @@ export class PPEROrchestratorImpl {
   /** Get the current phase for an agent ('perceive' when idle). */
   getPhase(agentId: string): PPERPhase {
     return this.phases.get(agentId) ?? 'perceive';
+  }
+
+  /**
+   * The batch plan service wired into this orchestrator, if any (spec 022,
+   * Req 9). `undefined` when batching is not enabled. Exposed so callers /
+   * scheduler-level coordinators can access the batch service to drive
+   * multi-agent plan batching across per-agent cycles.
+   */
+  getBatchPlanService(): BatchPlanService | undefined {
+    return this.batchPlanService;
   }
 
   /** Get the cycle status for an agent (spec 008, Req 2.4, AC-8). */

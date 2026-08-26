@@ -73,4 +73,5 @@ export interface SceneManager {
 
 export * from './objects/index.js';
 export * from './affordances/index.js';
+export * from './affordances/cache.js';
 export * from './scenes/index.js';

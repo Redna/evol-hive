@@ -47,16 +47,22 @@ export interface GameTick {
 
 /**
  * Configuration for the {@link PPEROrchestratorPort} scheduler (spec 005, Req 9).
- * Limits how many agents can be in a PPER cycle simultaneously (default 8,
- * matching `ENGINE_MAX_CONCURRENT_LLM`).
+ * Limits how many agents can be in a PPER cycle simultaneously. The default is
+ * `1` (spec 022, Req 4) to protect single-model Ollama setups from
+ * quota-limited concurrent requests; multi-model / self-hosted setups can
+ * override via the `ENGINE_MAX_CONCURRENT_LLM` env var or a per-scene config.
  */
 export interface PPERSchedulerConfig {
   maxConcurrentCycles: number;
 }
 
-/** Default PPER scheduler config — `maxConcurrentCycles` of 8 (§9). */
+/**
+ * Default PPER scheduler config — `maxConcurrentCycles` of `1` when
+ * `ENGINE_MAX_CONCURRENT_LLM` is unset (spec 022, Req 4, AC-3). When the env
+ * var is set, that value is used.
+ */
 export function defaultPPERSchedulerConfig(): PPERSchedulerConfig {
-  const maxConcurrentCycles = Number(process.env['ENGINE_MAX_CONCURRENT_LLM'] ?? 8);
+  const maxConcurrentCycles = Number(process.env['ENGINE_MAX_CONCURRENT_LLM'] ?? 1);
   return { maxConcurrentCycles };
 }
 

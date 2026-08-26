@@ -24,8 +24,10 @@ import type {
   MemoryType,
   ToolDefinition,
   CognitiveToolExecutor,
+  MultiAgentPlanResponse,
+  MultiAgentPlanEntry,
 } from '@evol-hive/shared';
-import { memoryConsolidationTool } from '@evol-hive/shared';
+import { memoryConsolidationTool, multiAgentPlansTool } from '@evol-hive/shared';
 import type { LLMContextPayload } from '../index.js';
 import type { EmbeddingProvider } from '../classifier/index.js';
 
@@ -127,6 +129,14 @@ export interface OpenAICompatibleLLMClientConfig {
    * Req 12). Must be ≥ 1. If set to 0 or negative, defaults to 3.
    */
   maxToolCallIterations?: number;
+  /**
+   * Optional token-usage reporter (spec 022, Req 10, AC-8/AC-9). When wired in,
+   * the client captures the `usage` field from the OpenAI response envelope
+   * and records a {@link TokenUsageReport} per API call. When absent, no token
+   * tracking occurs (opt-in). Missing `usage` fields yield zero reports (no
+   * crash).
+   */
+  tokenUsageReporter?: import('./token-usage-reporter.js').TokenUsageReporter;
 }
 
 // ─── Internal types ──────────────────────────────────────────────────────────
@@ -195,6 +205,8 @@ export class OpenAICompatibleLLMClient {
   private readonly reasoningEffort: 'low' | 'medium' | 'high' | 'none' | undefined;
   private readonly cognitiveToolExecutor: CognitiveToolExecutor | undefined;
   private readonly maxToolCallIterations: number;
+  private readonly tokenUsageReporter:
+    import('./token-usage-reporter.js').TokenUsageReporter | undefined;
 
   constructor(config: OpenAICompatibleLLMClientConfig) {
     this.baseUrl = config.baseUrl;
@@ -210,13 +222,19 @@ export class OpenAICompatibleLLMClient {
     this.cognitiveToolExecutor = config.cognitiveToolExecutor;
     const configuredIterations = config.maxToolCallIterations ?? 3;
     this.maxToolCallIterations = configuredIterations >= 1 ? configuredIterations : 3;
+    this.tokenUsageReporter = config.tokenUsageReporter;
   }
 
   // ── LLMClient: completeStructured (Req 10) ─────────────────────────────────
 
   async completeStructured(payload: LLMContextPayload): Promise<LLMActionResponse> {
     const messages = this.buildPayloadMessages(payload);
-    const { toolName, args } = await this.requestChat(messages, payload.tools, payload.agentId);
+    const { toolName, args } = await this.requestChat(
+      messages,
+      payload.tools,
+      payload.agentId,
+      'execute',
+    );
 
     // Affordance tool call (spec 019, Req 10): the tool name IS the action.
     // Affordance tools are terminal — their name is not a cognitive tool name
@@ -261,7 +279,7 @@ export class OpenAICompatibleLLMClient {
 
   async completePlan(payload: LLMContextPayload): Promise<FormulatePlanResult> {
     const messages = this.buildPayloadMessages(payload);
-    const { args } = await this.requestChat(messages, payload.tools, payload.agentId);
+    const { args } = await this.requestChat(messages, payload.tools, payload.agentId, 'plan');
 
     const description = args['description'];
     const steps = args['steps'];
@@ -307,11 +325,74 @@ export class OpenAICompatibleLLMClient {
     };
   }
 
+  // ── Batch plan (spec 022, Req 5/6) ────────────────────────────────────────
+
+  /**
+   * Send a single multi-agent plan-formulation request (spec 022, Req 5/6).
+   * The `multi_agent_plans` tool is forced (`tool_choice`) and the response is
+   * parsed into a per-agent {@link MultiAgentPlanEntry} array. Token usage is
+   * reported with phase `'batch-plan'`.
+   *
+   * This is an additional public method on the concrete client (not part of
+   * the `LLMClient` interface, which is unchanged). The `BatchPlanService`
+   * depends on the narrower {@link BatchPlanLLMClient} port, which this
+   * client satisfies structurally.
+   */
+  async completeBatchPlan(payload: LLMContextPayload): Promise<MultiAgentPlanResponse> {
+    const messages = this.buildPayloadMessages(payload);
+    const { args } = await this.requestChat(
+      messages,
+      payload.tools.length > 0 ? payload.tools : [multiAgentPlansTool],
+      payload.agentId,
+      'batch-plan',
+    );
+
+    const plans = args['plans'];
+    if (!Array.isArray(plans)) {
+      return { plans: [] };
+    }
+    const parsed: MultiAgentPlanEntry[] = [];
+    for (const entry of plans) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const e = entry as Record<string, unknown>;
+      const agentId = e['agentId'];
+      const description = e['description'];
+      const steps = e['steps'];
+      if (typeof agentId !== 'string' || typeof description !== 'string' || !Array.isArray(steps)) {
+        continue;
+      }
+      parsed.push({
+        agentId,
+        description,
+        steps: (steps as unknown[]).map((s) => {
+          if (typeof s === 'string') {
+            return { description: s, targetAffordance: s };
+          }
+          const obj = s as Record<string, unknown>;
+          const step: { description: string; targetAffordance?: string } = {
+            description: String(obj['description'] ?? obj['reason'] ?? obj['action'] ?? ''),
+          };
+          const ta =
+            obj['targetAffordance'] ??
+            obj['action'] ??
+            obj['affordance'] ??
+            obj['target'] ??
+            obj['tool'];
+          if (typeof ta === 'string') {
+            step.targetAffordance = ta;
+          }
+          return step;
+        }),
+      });
+    }
+    return { plans: parsed };
+  }
+
   // ── LLMClient: completeReflect (Req 12) ────────────────────────────────────
 
   async completeReflect(payload: LLMContextPayload): Promise<ReflectLLMResponse> {
     const messages = this.buildPayloadMessages(payload);
-    const { args } = await this.requestChat(messages, payload.tools, payload.agentId);
+    const { args } = await this.requestChat(messages, payload.tools, payload.agentId, 'reflect');
 
     const result: ReflectLLMResponse = {};
     if (typeof args['newGoal'] === 'string') {
@@ -357,7 +438,12 @@ export class OpenAICompatibleLLMClient {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ];
-    const { args } = await this.requestChat(messages, [memoryConsolidationTool]);
+    const { args } = await this.requestChat(
+      messages,
+      [memoryConsolidationTool],
+      undefined,
+      'consolidation',
+    );
     const result = args as unknown as ConsolidationResult;
 
     const consolidatedMemories = result.consolidatedMemories ?? [];
@@ -408,13 +494,14 @@ export class OpenAICompatibleLLMClient {
     messages: ChatMessage[],
     tools: ToolDefinition[],
     agentId?: string,
+    phase?: string,
   ): Promise<{ toolName: string; args: Record<string, unknown> }> {
     const url = `${this.baseUrl}/chat/completions`;
 
     // When the cognitive tool executor is not wired or no agentId is available,
     // fall back to single-request behavior (spec 015, Req 15 step 5).
     if (this.cognitiveToolExecutor === undefined || agentId === undefined) {
-      const { toolName, argsStr } = await this.sendRequest(url, messages, tools);
+      const { toolName, argsStr } = await this.sendRequest(url, messages, tools, agentId, phase);
       return { toolName, args: this.parseToolCallArgs(argsStr, url) };
     }
 
@@ -424,7 +511,13 @@ export class OpenAICompatibleLLMClient {
     let iterationCount = 0;
 
     for (;;) {
-      const { toolCallId, toolName, argsStr } = await this.sendRequest(url, workingMessages, tools);
+      const { toolCallId, toolName, argsStr } = await this.sendRequest(
+        url,
+        workingMessages,
+        tools,
+        agentId,
+        phase,
+      );
 
       // Terminal tool — parse arguments and return (Req 15 step 3).
       if (!COGNITIVE_TOOL_NAMES.has(toolName)) {
@@ -527,6 +620,8 @@ export class OpenAICompatibleLLMClient {
     url: string,
     messages: ChatMessage[],
     tools: ToolDefinition[],
+    agentId?: string,
+    phase?: string,
   ): Promise<{ toolCallId: string; toolName: string; argsStr: string }> {
     const bodyObj: Record<string, unknown> = {
       model: this.model,
@@ -672,6 +767,9 @@ export class OpenAICompatibleLLMClient {
         );
       }
 
+      // Capture token usage from the response envelope (spec 022, Req 10).
+      this.reportUsage(parsedEnvelope, agentId, phase);
+
       return { toolCallId, toolName, argsStr };
     }
 
@@ -723,6 +821,38 @@ export class OpenAICompatibleLLMClient {
     if (err instanceof Error && err.name === 'AbortError') return true;
     const code = (err as Record<string, unknown> | null)?.['code'];
     return code === 'ABORT_ERR' || code === 'UND_ERR_ABORTED';
+  }
+
+  /**
+   * Records a {@link TokenUsageReport} for a single API call from the parsed
+   * response envelope (spec 022, Req 10, AC-8/AC-9). When the provider omits
+   * the `usage` field, a zero report is recorded (no crash). When no reporter
+   * is wired in, this is a no-op (opt-in).
+   */
+  private reportUsage(
+    parsedEnvelope: unknown,
+    agentId: string | undefined,
+    phase: string | undefined,
+  ): void {
+    if (this.tokenUsageReporter === undefined) {
+      return;
+    }
+    const usage = (parsedEnvelope as Record<string, unknown> | null)?.['usage'] as
+      Record<string, unknown> | undefined;
+    const promptTokens =
+      typeof usage?.['prompt_tokens'] === 'number' ? (usage['prompt_tokens'] as number) : 0;
+    const completionTokens =
+      typeof usage?.['completion_tokens'] === 'number' ? (usage['completion_tokens'] as number) : 0;
+    const totalTokens =
+      typeof usage?.['total_tokens'] === 'number' ? (usage['total_tokens'] as number) : 0;
+    const report: import('@evol-hive/shared').TokenUsageReport = {
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      ...(agentId !== undefined && agentId.length > 0 ? { agentId } : {}),
+      ...(phase !== undefined ? { phase } : {}),
+    };
+    this.tokenUsageReporter.record(report);
   }
 
   private sleep(ms: number): Promise<void> {

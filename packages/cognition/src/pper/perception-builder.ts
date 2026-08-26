@@ -147,6 +147,15 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       tools = [...tools, talkToTool, observeAgentTool, helpTool, ignoreTool];
     }
 
+    // Phase-aware tool pruning (spec 022, Req 11, AC-10): the formulate_plan
+    // tool is only relevant when the agent has no plan. Exclude it
+    // defensively when the agent already has an active plan to reduce tool
+    // definition tokens. (In the normal `hasPlan` path it is already absent;
+    // this guarantees it never leaks into the masked/no-plan-with-plan edge.)
+    if (hasPlan) {
+      tools = tools.filter((t) => t.function.name !== 'formulate_plan');
+    }
+
     // System prompt: persona-prefixed or generic (spec 012, Req 7).
     let systemPrompt = buildSystemPrompt(persona);
 
