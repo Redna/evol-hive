@@ -241,14 +241,16 @@ describe('buildUserMessage no "Available actions" text (AC-9)', () => {
     expect(userMsg).toContain(payload.perceptionContext);
   });
 
-  it('user message still contains cognitive tools text', async () => {
+  // Spec 021, Req 4: Cognitive tool descriptions are no longer rendered as
+  // text in the user message (sent via the `tools` API parameter instead).
+  it('user message does NOT contain cognitive tools text (spec 021, Req 4)', async () => {
     fetchMock.mockResolvedValue(toolCallResponse('choose_action', { reasoning: 'r', action: 'a' }));
     const client = new OpenAICompatibleLLMClient({ baseUrl: BASE_URL, model: MODEL });
     const payload = makePayload();
     await client.completeStructured(payload);
     const body = JSON.parse(callAt(fetchMock, 0).init.body as string);
     const userMsg: string = body.messages[1].content;
-    expect(userMsg).toContain('Cognitive tools:');
+    expect(userMsg).not.toContain('Cognitive tools:');
   });
 });
 
