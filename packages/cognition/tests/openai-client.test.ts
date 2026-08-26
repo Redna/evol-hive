@@ -538,7 +538,9 @@ describe('OpenAICompatibleLLMClient', () => {
   // ─── AC-19: User message construction ──────────────────────────────────────
 
   describe('User message construction (AC-19)', () => {
-    it('includes perceptionContext, affordance list, and cognitive tools list', async () => {
+    // Spec 021, Req 4: Cognitive tool descriptions are no longer rendered
+    // as text in the user message (sent via the `tools` API parameter instead).
+    it('includes perceptionContext but NOT cognitive tools text (spec 021, Req 4)', async () => {
       fetchMock.mockResolvedValue(
         toolCallResponse('choose_action', { reasoning: 'r', action: 'a' }),
       );
@@ -551,8 +553,9 @@ describe('OpenAICompatibleLLMClient', () => {
       expect(userMsg).toContain(payload.perceptionContext);
       // "Available actions" text is no longer in the user message (spec 019)
       expect(userMsg).not.toContain('Available actions:');
-      expect(userMsg).toContain('Cognitive tools:');
-      expect(userMsg).toContain('name: formulate_plan');
+      // "Cognitive tools:" text is no longer in the user message (spec 021, Req 4)
+      expect(userMsg).not.toContain('Cognitive tools:');
+      expect(userMsg).not.toContain('name: formulate_plan');
     });
 
     it('omits affordance section when availableAffordances is empty', async () => {

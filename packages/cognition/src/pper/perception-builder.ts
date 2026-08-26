@@ -52,21 +52,21 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     const objectNames = passive.objectsPresent.map((o) => o.name);
     const driveSummary = formatDrives(passive.drives);
 
-    const contextLines: string[] = [];
+    // Spec 021, Req 2: Stable content first (deterministic for a given room +
+    // object set), dynamic content last (separated by `---`).
+    const stableLines: string[] = [];
 
     // Persona context lines (spec 012, Req 7, Req 16).
     if (persona) {
-      contextLines.push(`Name: ${persona.name}`);
+      stableLines.push(`Name: ${persona.name}`);
       if (persona.behavioralTendencies !== undefined && persona.behavioralTendencies.length > 0) {
-        contextLines.push(`Tendencies: ${persona.behavioralTendencies.join(', ')}`);
+        stableLines.push(`Tendencies: ${persona.behavioralTendencies.join(', ')}`);
       }
     }
 
-    contextLines.push(
+    stableLines.push(
       `Room: ${passive.roomId}`,
       `Objects: ${objectNames.length > 0 ? objectNames.join(', ') : 'none'}`,
-      `Primary drive: ${primaryDriveLabel}`,
-      `Drives: ${driveSummary}`,
     );
 
     // ── Social context (spec 018, Req 34) ────────────────────────────────────
@@ -77,31 +77,40 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       const agentsStr = passive
         .agentsPresent!.map((a) => `${a.name} (${a.currentActivity})`)
         .join(', ');
-      contextLines.push(`Agents present: ${agentsStr}`);
+      stableLines.push(`Agents present: ${agentsStr}`);
     }
 
-    if (passive.socialContext !== undefined && passive.socialContext.length > 0) {
-      for (const msg of passive.socialContext) {
-        contextLines.push(`Message from ${msg.fromName}: "${msg.content}"`);
-      }
-    }
-
-    // Relationship context (spec 018, Req 35).
+    // Relationship context (spec 018, Req 35) — stable for a given room state.
     if (hasAgentsPresent && perceptionResult.relationships !== undefined) {
       for (const agent of passive.agentsPresent!) {
         const rel = perceptionResult.relationships[agent.agentId];
         if (rel !== undefined) {
-          contextLines.push(...buildRelationshipContextLines(agent.name, rel));
+          stableLines.push(...buildRelationshipContextLines(agent.name, rel));
         }
+      }
+    }
+
+    // ── Dynamic content (changes per tick) ──────────────────────────────────
+    const dynamicLines: string[] = [
+      `Primary drive: ${primaryDriveLabel}`,
+      `Drives: ${driveSummary}`,
+    ];
+
+    // Social context messages are dynamic (incoming messages change per tick).
+    if (passive.socialContext !== undefined && passive.socialContext.length > 0) {
+      for (const msg of passive.socialContext) {
+        dynamicLines.push(`Message from ${msg.fromName}: "${msg.content}"`);
       }
     }
 
     // Social drive prompt hint (spec 018, Req 39).
     if (hasAgentsPresent && primaryDriveLabel.toLowerCase().includes('social')) {
-      contextLines.push(
+      dynamicLines.push(
         'You feel a strong need for social interaction. Consider using talk_to or help to engage with other agents in the room.',
       );
     }
+
+    const contextLines = [...stableLines, '---', ...dynamicLines];
 
     // Guardrail options (spec 016, Req 10; spec 020, Req 4).
     const hasPlan = guardrailOptions?.hasPlan ?? true;
@@ -169,8 +178,11 @@ function buildSystemPrompt(persona: AgentProfile | null | undefined): string {
 }
 
 function formatDrives(drives: Record<string, number>): string {
+  // Spec 021, Req 3: Round drive values to the nearest integer in the user
+  // message so the KV cache prefix is stable across ticks. Internal state and
+  // engine computations continue to use full-precision floats.
   return Object.entries(drives)
-    .map(([name, value]) => `${name}=${value}`)
+    .map(([name, value]) => `${name}=${Math.round(value)}`)
     .join(', ');
 }
 

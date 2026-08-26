@@ -691,23 +691,22 @@ export class OpenAICompatibleLLMClient {
     ];
   }
 
-  /** Constructs the user message from perception context and cognitive tools (Req 14, spec 019 Req 9). */
+  /** Constructs the user message from perception context (Req 14, spec 019 Req 9, spec 021 Req 4).
+   *
+   * Spec 021, Req 4: Cognitive tool descriptions are no longer rendered as
+   * text — they are sent as tool definitions via the `tools` API parameter.
+   * Affordance text lists were already removed in spec 019. The user message
+   * now contains only the `perceptionContext`.
+   */
   private buildUserMessage(payload: LLMContextPayload): string {
-    const parts: string[] = [payload.perceptionContext];
-
-    // The affordance list is now represented as tool definitions (spec 019) —
+    // The affordance list is represented as tool definitions (spec 019) —
     // no longer rendered as text in the user message.
-
-    if (payload.cognitiveTools.length > 0) {
-      const lines = payload.cognitiveTools.map(
-        (t) => `name: ${t.name}, description: ${t.description}`,
-      );
-      parts.push(`Cognitive tools:\n${lines.join('\n')}`);
-    }
-
-    // No schema hint is appended (spec 011, Req 14 — schemaHint field removed).
-
-    return parts.join('\n\n');
+    //
+    // Spec 021, Req 4: The `Cognitive tools:\n…` block is no longer appended —
+    // cognitive tool descriptions are sent as tool definitions via the `tools`
+    // parameter. The `cognitiveTools` field on `LLMContextPayload` is retained
+    // for internal use but not rendered into user-visible prompt text.
+    return payload.perceptionContext;
   }
 
   /** Constructs the user message for memory consolidation (Req 13 — no schema hint). */

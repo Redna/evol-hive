@@ -31,23 +31,25 @@ export class ReflectBuilderImpl implements ReflectBuilder {
   ): LLMContextPayload {
     const systemPrompt = buildSystemPrompt(profile);
 
-    const contextLines: string[] = [];
+    // Spec 021, Req 2: Stable content first (deterministic for a given
+    // execution result), dynamic content last (separated by `---`).
+    const stableLines: string[] = [];
 
     // Persona context: long-term goals / aspirations (spec 012, Req 18).
     if (profile && profile.longTermGoals !== undefined && profile.longTermGoals.length > 0) {
-      contextLines.push(`Aspirations: ${profile.longTermGoals.join('; ')}`);
+      stableLines.push(`Aspirations: ${profile.longTermGoals.join('; ')}`);
     }
 
     // Execution result status.
     if (executeResult.success) {
-      contextLines.push('Execution result: success');
+      stableLines.push('Execution result: success');
     } else {
-      contextLines.push('Execution result: failure');
+      stableLines.push('Execution result: failure');
     }
 
     // Error message if any.
     if (executeResult.error !== undefined) {
-      contextLines.push(`Error: ${executeResult.error}`);
+      stableLines.push(`Error: ${executeResult.error}`);
     }
 
     // Affordance result summary.
@@ -57,31 +59,33 @@ export class ReflectBuilderImpl implements ReflectBuilder {
         const changes = Object.entries(ar.driveChanges)
           .map(([k, v]) => `${k}=${v}`)
           .join(', ');
-        contextLines.push(`Drive changes applied: ${changes}`);
+        stableLines.push(`Drive changes applied: ${changes}`);
       }
       if (ar.failureReason !== undefined) {
-        contextLines.push(`Failure reason: ${ar.failureReason}`);
+        stableLines.push(`Failure reason: ${ar.failureReason}`);
       }
     }
 
     // Step skipped info.
     if (executeResult.stepSkipped === true) {
-      contextLines.push('Note: step was skipped (non-physical step, no affordance executed).');
+      stableLines.push('Note: step was skipped (non-physical step, no affordance executed).');
     }
 
-    // Agent's current drives.
-    const driveSummary = formatDrives(agentState.drives);
-    contextLines.push(`Drives: ${driveSummary}`);
-
     // Agent's current goal.
-    contextLines.push(`Current goal: ${agentState.currentGoal}`);
+    stableLines.push(`Current goal: ${agentState.currentGoal}`);
 
     // Plan status.
     if (executeResult.planComplete) {
-      contextLines.push('Plan status: complete');
+      stableLines.push('Plan status: complete');
     } else {
-      contextLines.push('Plan status: in-progress');
+      stableLines.push('Plan status: in-progress');
     }
+
+    // ── Dynamic content (current drive values change per tick) ───────────────
+    const driveSummary = formatDrives(agentState.drives);
+    const dynamicLines: string[] = [`Drives: ${driveSummary}`];
+
+    const contextLines = [...stableLines, '---', ...dynamicLines];
 
     // Select only the update_internal_state tool (for prompt text).
     const updateStateToolList = defaultCognitiveTools.filter(
@@ -120,8 +124,10 @@ function buildSystemPrompt(profile: AgentProfile | null | undefined): string {
 }
 
 function formatDrives(drives: object): string {
+  // Spec 021, Req 3: Round drive values to the nearest integer in the user
+  // message so the KV cache prefix is stable across ticks.
   return Object.entries(drives)
-    .map(([name, value]) => `${name}=${value}`)
+    .map(([name, value]) => `${name}=${Math.round(value as number)}`)
     .join(', ');
 }
 

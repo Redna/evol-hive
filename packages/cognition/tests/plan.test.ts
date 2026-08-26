@@ -83,11 +83,16 @@ describe('PlanBuilderImpl.build (AC-4, AC-5, AC-6, AC-7, AC-26)', () => {
     expect(payload.systemPrompt.toLowerCase()).toContain('plan');
   });
 
-  it('systemPrompt references the primary drive label (AC-5)', () => {
+  // Spec 021, Req 1: The primary drive label is no longer in the system prompt
+  // (moved to the dynamic section of the user message for KV cache stability).
+  it('systemPrompt does NOT reference the primary drive label (spec 021, Req 1)', () => {
     const payload = builder.build(
       makePerceptionResult({ primaryDriveLabel: 'low energy, need to restore energy' }),
     );
-    expect(payload.systemPrompt).toContain('energy');
+    expect(payload.systemPrompt).not.toContain('low energy');
+    expect(payload.systemPrompt).not.toContain('Your primary drive is:');
+    // The perceptionContext (user message) still contains the drive label.
+    expect(payload.perceptionContext).toContain('Primary drive:');
   });
 
   it('systemPrompt references the formulate_plan cognitive tool (AC-5)', () => {
