@@ -118,3 +118,6 @@ export * from './persistence/index.js';
 
 // Engine assembly factory — spec 005
 export * from './assembly.js';
+
+// Scene loader (declarative scene authoring) — spec 022
+export * from './scene-loader/index.js';

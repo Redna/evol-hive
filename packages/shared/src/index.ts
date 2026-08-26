@@ -14,3 +14,4 @@ export * from './types/persistence.js';
 
 // Schemas
 export * from './schemas/llm-schemas.js';
+export * from './schemas/scene-schema.js';
