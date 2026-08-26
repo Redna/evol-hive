@@ -61,7 +61,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      23
 ✅ Done:          17
 🔨 In Development: 0
-🔍 In Review:      2
+🔍 In Review:      3
 📝 Drafted:        1
 🚫 Blocked:        0
 ⛔ Superseded:     2
@@ -75,3 +75,4 @@ Architecture sections fully implemented: 11/11
 | [020](020-pper-mask-leak-fix.md) | PPER Mask Leak Fix — Separate Unmasked and Masked Affordances in PerceptionResult | §6, §10 | 🔍 In Review | [#83](https://github.com/Redna/evol-hive/issues/83) | [#85](https://github.com/Redna/evol-hive/pull/85) | shared, cognition |
 | [021](021-kv-cache-prompt-optimization.md) | KV Cache Prompt Optimization — Freeze Prompt Prefix for Ollama Prompt Caching | §6, §7, §8 | 🔍 In Review | [#86](https://github.com/Redna/evol-hive/issues/86) | [#88](https://github.com/Redna/evol-hive/pull/88) | cognition |
 | [022](022-scene-authoring-declarative.md) | Scene Authoring — Declarative Tools for Defining Rooms, Objects, Agents | §2, §3, §4 | 📝 Drafted | [#90](https://github.com/Redna/evol-hive/issues/90) | [#92](https://github.com/Redna/evol-hive/pull/92) | shared, engine, CLI |
+| [023](023-visual-output-canvas-renderer.md) | Visual Output — Canvas/WebGL Renderer for the Simulation | §2, §3, §4, §6, §9 | 🔍 In Review | [#89](https://github.com/Redna/evol-hive/issues/89) | [#95](https://github.com/Redna/evol-hive/pull/95) | shared, engine, visualizer |
