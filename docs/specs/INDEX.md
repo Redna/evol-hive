@@ -44,9 +44,9 @@ Living index of all feature specifications. Updated by the Architect when creati
 | Section | Topic | Spec(s) | Status |
 |---------|-------|---------|--------|
 | [§1](../architecture/01-vision.md) | Vision & Philosophy | — | ✅ Documented |
-| [§2](../architecture/02-system-overview.md) | System Overview | 008, 013, 017 | ✅ Documented |
-| [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002, 008, 012, 017 | ✅ Implemented |
-| [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001, 003, 008, 013, 018, 019 | ✅ Implemented |
+| [§2](../architecture/02-system-overview.md) | System Overview | 008, 013, 017, 022 | ✅ Documented |
+| [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002, 008, 012, 017, 022 | ✅ Implemented |
+| [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001, 003, 008, 013, 018, 019, 022 | ✅ Implemented |
 | [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) | 001, 006, 007, 018 | ✅ Implemented |
 | [§6](../architecture/06-pper-loop.md) | PPER Loop | 001-004, 006, 008, 012, 017 | ✅ Implemented |
 | [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 011 (tool calling), 019 (affordance-as-tools) | ✅ Implemented |
@@ -58,11 +58,11 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      22
+Total specs:      23
 ✅ Done:          17
 🔨 In Development: 0
 🔍 In Review:      2
-📝 Drafted:        0
+📝 Drafted:        1
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -74,3 +74,4 @@ Architecture sections fully implemented: 11/11
 | [019](019-affordance-as-tools.md) | Affordance-as-Tools — Replace `choose_action` with Per-Affordance Tool Definitions | §4, §6, §7, §8, §10 | ✅ Done | [#71](https://github.com/Redna/evol-hive/issues/71) | [#80](https://github.com/Redna/evol-hive/pull/80) | shared, cognition, examples |
 | [020](020-pper-mask-leak-fix.md) | PPER Mask Leak Fix — Separate Unmasked and Masked Affordances in PerceptionResult | §6, §10 | 🔍 In Review | [#83](https://github.com/Redna/evol-hive/issues/83) | [#85](https://github.com/Redna/evol-hive/pull/85) | shared, cognition |
 | [021](021-kv-cache-prompt-optimization.md) | KV Cache Prompt Optimization — Freeze Prompt Prefix for Ollama Prompt Caching | §6, §7, §8 | 🔍 In Review | [#86](https://github.com/Redna/evol-hive/issues/86) | [#88](https://github.com/Redna/evol-hive/pull/88) | cognition |
+| [022](022-scene-authoring-declarative.md) | Scene Authoring — Declarative Tools for Defining Rooms, Objects, Agents | §2, §3, §4 | 📝 Drafted | [#90](https://github.com/Redna/evol-hive/issues/90) | [#92](https://github.com/Redna/evol-hive/pull/92) | shared, engine, CLI |
