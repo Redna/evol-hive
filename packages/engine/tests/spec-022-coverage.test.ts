@@ -217,7 +217,9 @@ describe('Spec 022 — Existing scaffolding verification', () => {
     const assemblyPath = join(REPO_ROOT, 'packages/engine/src/assembly.ts');
     expect(fileExists(assemblyPath)).toBe(true);
     const content = readFile(assemblyPath);
-    expect(content).toContain('export function loadScene(core: EngineCore, scene: SceneDefinition)');
+    expect(content).toContain(
+      'export function loadScene(core: EngineCore, scene: SceneDefinition)',
+    );
   });
 
   it('EngineCore interface and createEngineCore function exist in assembly.ts', () => {

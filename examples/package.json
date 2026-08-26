@@ -10,7 +10,8 @@
     "@evol-hive/shared": "workspace:*",
     "@evol-hive/engine": "workspace:*",
     "@evol-hive/cognition": "workspace:*",
-    "@evol-hive/memory": "workspace:*"
+    "@evol-hive/memory": "workspace:*",
+    "@evol-hive/visualizer": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
