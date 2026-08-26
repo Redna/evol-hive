@@ -1,0 +1,7 @@
+{
+  "name": "feature-022-scene-authoring",
+  "description": "Declarative scene authoring — YAML/JSON schema for scene definition, scene loader with validation and affordance handler auto-registration, CLI commands (create-scene, validate-scene, run-scene). Issue #90.",
+  "createdAt": "2026-08-17T08:00:00Z",
+  "specIssue": 90,
+  "specFile": "docs/specs/022-scene-authoring-declarative.md"
+}
