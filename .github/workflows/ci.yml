@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number to run CI on (fallback if pull_request event didn't fire)"
-        required: false
-        type: string
 
 jobs:
   quality:
@@ -18,11 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        if: github.event_name != 'workflow_dispatch'
-      - uses: actions/checkout@v4
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          ref: refs/pull/${{ inputs.pr_number }}/head
 
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -51,11 +41,6 @@ jobs:
     needs: quality
     steps:
       - uses: actions/checkout@v4
-        if: github.event_name != 'workflow_dispatch'
-      - uses: actions/checkout@v4
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          ref: refs/pull/${{ inputs.pr_number }}/head
 
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -75,11 +60,6 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v4
-        if: github.event_name != 'workflow_dispatch'
-      - uses: actions/checkout@v4
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          ref: refs/pull/${{ inputs.pr_number }}/head
 
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
