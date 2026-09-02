@@ -61,8 +61,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      26
 ✅ Done:          17
 🔨 In Development: 0
-🔍 In Review:      3
-📝 Drafted:        3
+🔍 In Review:      4
+📝 Drafted:        2
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -76,5 +76,5 @@ Architecture sections fully implemented: 11/11
 | [021](021-kv-cache-prompt-optimization.md) | KV Cache Prompt Optimization — Freeze Prompt Prefix for Ollama Prompt Caching | §6, §7, §8 | 🔍 In Review | [#86](https://github.com/Redna/evol-hive/issues/86) | [#88](https://github.com/Redna/evol-hive/pull/88) | cognition |
 | [022](022-scene-authoring-declarative.md) | Scene Authoring — Declarative Tools for Defining Rooms, Objects, Agents | §2, §3, §4 | 🔍 In Review | [#90](https://github.com/Redna/evol-hive/issues/90) | [#92](https://github.com/Redna/evol-hive/pull/92), [#96](https://github.com/Redna/evol-hive/pull/96) | shared, engine, CLI |
 | [024](024-social-tool-invocation-fix.md) | Social Tool Invocation Fix — Make LLM Call `talk_to` Directly When Agents Are Present | §6, §8, §9, §10 | 📝 Drafted | [#98](https://github.com/Redna/evol-hive/issues/98) | — | cognition |
-| [025](025-memory-entry-flatten-and-fallback.md) | Memory Entry — Flatten Schema & Auto-Fallback | §6, §8, §11 | 📝 Drafted | [#99](https://github.com/Redna/evol-hive/issues/99) | — | shared, cognition |
+| [025](025-memory-entry-flatten-and-fallback.md) | Memory Entry — Flatten Schema & Auto-Fallback | §6, §8, §11 | 🔍 In Review | [#99](https://github.com/Redna/evol-hive/issues/99) | [#104](https://github.com/Redna/evol-hive/pull/104) | shared, cognition |
 | [026](026-memory-entry-fix.md) | Memory Entry Fix — Flatten Reflect Schema & Auto-Fallback Memory Generation | §6, §7, §8, §11 | 📝 Drafted | [#99](https://github.com/Redna/evol-hive/issues/99) | — | shared, cognition, engine |
