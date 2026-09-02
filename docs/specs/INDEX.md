@@ -48,21 +48,21 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002, 008, 012, 017, 022 | ✅ Implemented |
 | [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001, 003, 008, 013, 018, 019, 022 | ✅ Implemented |
 | [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) | 001, 006, 007, 018 | ✅ Implemented |
-| [§6](../architecture/06-pper-loop.md) | PPER Loop | 001-004, 006, 008, 012, 017 | ✅ Implemented |
+| [§6](../architecture/06-pper-loop.md) | PPER Loop | 001-004, 006, 008, 012, 017, 025 | ✅ Implemented |
 | [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 011 (tool calling), 019 (affordance-as-tools) | ✅ Implemented |
-| [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002, 011, 015 | ✅ Implemented |
+| [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002, 011, 015, 025 | ✅ Implemented |
 | [§9](../architecture/09-engine-routing.md) | Engine Routing | 002, 003, 004, 006, 008, 009 | ✅ Implemented |
 | [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | 016, 019 | ✅ Implemented |
-| [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 004, 007, 014, 017 | ✅ Implemented |
+| [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 004, 007, 014, 017, 025 | ✅ Implemented |
 
 ## Spec Status Summary
 
 ```
-Total specs:      24
+Total specs:      25
 ✅ Done:          17
 🔨 In Development: 0
 🔍 In Review:      3
-📝 Drafted:        1
+📝 Drafted:        2
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -75,4 +75,5 @@ Architecture sections fully implemented: 11/11
 | [020](020-pper-mask-leak-fix.md) | PPER Mask Leak Fix — Separate Unmasked and Masked Affordances in PerceptionResult | §6, §10 | 🔍 In Review | [#83](https://github.com/Redna/evol-hive/issues/83) | [#85](https://github.com/Redna/evol-hive/pull/85) | shared, cognition |
 | [021](021-kv-cache-prompt-optimization.md) | KV Cache Prompt Optimization — Freeze Prompt Prefix for Ollama Prompt Caching | §6, §7, §8 | 🔍 In Review | [#86](https://github.com/Redna/evol-hive/issues/86) | [#88](https://github.com/Redna/evol-hive/pull/88) | cognition |
 | [022](022-scene-authoring-declarative.md) | Scene Authoring — Declarative Tools for Defining Rooms, Objects, Agents | §2, §3, §4 | 🔍 In Review | [#90](https://github.com/Redna/evol-hive/issues/90) | [#92](https://github.com/Redna/evol-hive/pull/92), [#96](https://github.com/Redna/evol-hive/pull/96) | shared, engine, CLI |
-| [024](024-social-tool-invocation-fix.md) | Social Tool Invocation Fix — Make LLM Call `talk_to` Directly When Agents Are Present | §6, §8, §9, §10 | 🔍 In Review | [#98](https://github.com/Redna/evol-hive/issues/98) | — | cognition |
+| [024](024-social-tool-invocation-fix.md) | Social Tool Invocation Fix — Make LLM Call `talk_to` Directly When Agents Are Present | §6, §8, §9, §10 | 📝 Drafted | [#98](https://github.com/Redna/evol-hive/issues/98) | — | cognition |
+| [025](025-memory-entry-flatten-and-fallback.md) | Memory Entry — Flatten Schema & Auto-Fallback | §6, §8, §11 | 📝 Drafted | [#99](https://github.com/Redna/evol-hive/issues/99) | — | shared, cognition |
