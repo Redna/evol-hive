@@ -1,0 +1,7 @@
+{
+  "name": "feature-099-memory-entry-fix",
+  "description": "Fix memory entries not being stored — flatten the reflect schema memoryEntry into top-level fields and add auto-fallback memory generation when the LLM omits memory fields.",
+  "createdAt": "2026-06-15T12:00:00Z",
+  "specIssue": 99,
+  "specFile": "docs/specs/026-memory-entry-fix.md"
+}
