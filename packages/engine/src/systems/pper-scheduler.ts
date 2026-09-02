@@ -8,6 +8,10 @@
  * The `update()` method is fully synchronous — it never awaits the cycle
  * promise. Uncaught rejections are caught and `isThinking` is reset to
  * `false` so the loop can retry on the next tick (§9.1).
+ *
+ * Round-robin fairness (fix): tracks the last agent index so that with
+ * `maxConcurrentCycles=1`, each agent gets a turn instead of the first
+ * agent monopolizing the slot.
  */
 
 import type { PPERSchedulerConfig, PPEROrchestratorPort } from '@evol-hive/shared';
@@ -23,6 +27,8 @@ export class PPERScheduler {
   private readonly maxConcurrent: number;
   /** Number of cycles currently in flight (incremented on start, decremented on settle). */
   private activeCycles = 0;
+  /** Round-robin cursor — next tick starts scanning from this index. */
+  private rrCursor = 0;
 
   constructor(
     agentManager: AgentManager,
@@ -42,11 +48,23 @@ export class PPERScheduler {
   /** Called every tick by the game loop. Synchronous — never awaits. */
   update(_tick: GameTick): void {
     const agents = this.agentManager.getActiveAgents();
-    for (const agent of agents) {
+    if (agents.length === 0) return;
+
+    // Round-robin: start scanning from the last position so that
+    // with maxConcurrent=1, different agents get turns across ticks.
+    let scanned = 0;
+    let idx = this.rrCursor;
+    while (scanned < agents.length) {
       if (this.activeCycles >= this.maxConcurrent) break;
-      if (agent.isThinking) continue;
-      this.startCycle(agent.agentId);
+      const agent = agents[idx]!;
+      if (!agent.isThinking) {
+        this.startCycle(agent.agentId);
+      }
+      idx = (idx + 1) % agents.length;
+      scanned++;
     }
+    // Advance cursor past the last agent we checked.
+    this.rrCursor = idx;
   }
 
   /** Fire-and-forget a single PPER cycle. */

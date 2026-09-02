@@ -79,10 +79,10 @@ describe('ReflectBuilderImpl.build (AC-12, AC-13, AC-35, AC-36)', () => {
     expect(payload.cognitiveTools).not.toEqual(defaultCognitiveTools);
   });
 
-  it('systemPrompt mentions reflection and the update_internal_state tool (AC-12)', () => {
+  it('systemPrompt mentions reflection and memory storage (AC-12)', () => {
     const payload = builder.build(AGENT_ID, agentState, executeResult);
     expect(payload.systemPrompt.toLowerCase()).toContain('reflect');
-    expect(payload.systemPrompt).toContain('update_internal_state');
+    expect(payload.systemPrompt.toLowerCase()).toContain('memory');
   });
 
   it('perceptionContext includes the execution result status (success) (AC-13)', () => {

@@ -165,7 +165,7 @@ function buildSystemPrompt(profile: AgentProfile | null | undefined): string {
       'Evaluate whether your goal or drives need adjustment based on what happened.',
       'Decide if a memory entry should be stored for future reference.',
       'Consider your personality when deciding what is worth remembering.',
-      'Use the update_internal_state cognitive tool to adjust your goal, drives, or store a memory.',
+      'Include a memoryEntry in your reflect response to store a memory for future reference.',
     ].join(' ');
   }
   return [
@@ -173,7 +173,7 @@ function buildSystemPrompt(profile: AgentProfile | null | undefined): string {
     'You must reflect on the outcome of your last action.',
     'Evaluate whether your goal or drives need adjustment based on what happened.',
     'Decide if a memory entry should be stored for future reference.',
-    'Use the update_internal_state cognitive tool to adjust your goal, drives, or store a memory.',
+    'Include a memoryEntry in your reflect response to store a memory for future reference.',
   ].join(' ');
 }
 

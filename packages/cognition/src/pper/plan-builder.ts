@@ -71,6 +71,9 @@ export class PlanBuilderImpl implements PlanBuilder {
         .agentsPresent!.map((a) => `${a.name} (${a.currentActivity})`)
         .join(', ');
       stableLines.push(`Agents present: ${agentsStr}`);
+      stableLines.push(
+        'You can call talk_to, observe_agent, help, or ignore directly to interact with other agents.',
+      );
     }
 
     // Relationship context (spec 018, Req 35) — stable for a given room state.
