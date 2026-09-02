@@ -43,10 +43,19 @@ export class PlanBuilderImpl implements PlanBuilder {
     const objectNames = passive.objectsPresent.map((o) => o.name);
     const driveSummary = formatDrives(passive.drives);
 
+    // ── Social context (spec 018, Req 38) ────────────────────────────────────
+    const hasAgentsPresent =
+      passive.agentsPresent !== undefined && passive.agentsPresent.length > 0;
+
     // Spec 021, Req 1: The system prompt no longer contains the dynamic
     // `primaryDriveLabel` — it is frozen for a given persona so the KV cache
     // can hit across ticks.
-    let systemPrompt = buildSystemPrompt(persona);
+    //
+    // Spec 024, Req 7: When agents are present, a conditional social directive
+    // is appended to the system prompt. This breaks the KV cache prefix, but
+    // only on room-entry events (which already break the cache via the user
+    // message's "Agents present: ..." lines).
+    let systemPrompt = buildSystemPrompt(persona, hasAgentsPresent);
 
     // Contextual forcing directive (spec 016, Req 9).
     const hasPlan = guardrailOptions?.hasPlan ?? true;
@@ -54,10 +63,6 @@ export class PlanBuilderImpl implements PlanBuilder {
     if (!hasPlan && forcingEnabled) {
       systemPrompt = `${systemPrompt} ${GUARDRAIL_FORCING_DIRECTIVE}`;
     }
-
-    // ── Social context (spec 018, Req 38) ────────────────────────────────────
-    const hasAgentsPresent =
-      passive.agentsPresent !== undefined && passive.agentsPresent.length > 0;
 
     // Spec 021, Req 2: Stable content first (deterministic for a given room +
     // object set), dynamic content last (separated by `---`).
@@ -113,10 +118,22 @@ export class PlanBuilderImpl implements PlanBuilder {
       }
     }
 
-    // Social drive prompt hint (spec 018, Req 39).
-    if (hasAgentsPresent && primaryDriveLabel.toLowerCase().includes('social')) {
+    // Social drive prompt hint (spec 018, Req 39; spec 024, Req 4).
+    // When agents are present AND social is the primary drive, a stronger
+    // imperative hint replaces the original hedging hint (spec 024, Req 4).
+    const isSocialPrimary = hasAgentsPresent && primaryDriveLabel.toLowerCase().includes('social');
+    if (isSocialPrimary) {
       dynamicLines.push(
-        'You feel a strong need for social interaction. Consider using talk_to or help to engage with other agents in the room.',
+        'Your social drive is your most urgent need. Call talk_to or help NOW to interact with another agent in this room. Do not formulate a plan first.',
+      );
+    }
+
+    // Stronger social directive (spec 024, Req 3): added to the dynamic section
+    // whenever agents are present (regardless of primary drive). This is an
+    // imperative that counters the system prompt's "You must formulate a plan".
+    if (hasAgentsPresent) {
+      dynamicLines.push(
+        'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them. Do not use formulate_plan for social actions.',
       );
     }
 
@@ -143,29 +160,41 @@ export class PlanBuilderImpl implements PlanBuilder {
       perceptionContext: contextLines.join('\n'),
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
-      tools: buildPlanTools(hasAgentsPresent, affordanceTools),
+      tools: buildPlanTools(hasAgentsPresent, affordanceTools, isSocialPrimary),
     };
   }
 }
 
-function buildSystemPrompt(persona: AgentProfile | null | undefined): string {
+function buildSystemPrompt(
+  persona: AgentProfile | null | undefined,
+  hasAgentsPresent = false,
+): string {
   // Spec 021, Req 1: No dynamic primaryDriveLabel — the system prompt is fully
   // stable for a given persona so the KV cache prefix can hit.
+  //
+  // Spec 024, Req 7: When `hasAgentsPresent` is true, a conditional social
+  // directive is appended after the "You must formulate a plan" sentence,
+  // creating a conditional override. When false/undefined, the prompt is
+  // byte-identical to the pre-spec-024 implementation (KV cache preserved).
+  const socialDirective =
+    'When other agents are present and your social drive is urgent, call talk_to, observe_agent, help, or ignore directly — do not use formulate_plan for social actions.';
   if (persona) {
     const personaText = formatPersona(persona);
-    return [
+    const base = [
       `You are ${persona.name}, ${personaText}.`,
       'You must formulate a plan to satisfy your most urgent drive.',
       'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
       'Each step should map to an available affordance when possible.',
     ].join(' ');
+    return hasAgentsPresent ? `${base} ${socialDirective}` : base;
   }
-  return [
+  const base = [
     'You are an autonomous NPC in a deterministic simulation.',
     'You must formulate a plan to satisfy your most urgent drive.',
     'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
     'Each step should map to an available affordance when possible.',
   ].join(' ');
+  return hasAgentsPresent ? `${base} ${socialDirective}` : base;
 }
 
 function formatDrives(drives: Record<string, number>): string {
@@ -184,12 +213,35 @@ function formatDrives(drives: Record<string, number>): string {
 function buildPlanTools(
   hasAgentsPresent: boolean,
   affordanceTools: import('@evol-hive/shared').ToolDefinition[] = [],
+  isSocialPrimary = false,
 ) {
-  const base = [formulatePlanTool, queryMemoryTool, updateInternalStateTool, ...affordanceTools];
-  if (hasAgentsPresent) {
-    return [...base, talkToTool, observeAgentTool, helpTool, ignoreTool];
+  // Spec 024, Req 1 & Req 2: When agents are present, social tools are placed
+  // FIRST in the tools array to leverage the positional bias of smaller LLMs
+  // toward first-listed tools. When social is the primary drive, `formulate_plan`
+  // is demoted to the very end of the array (after all other tools) to make it
+  // the least likely choice.
+  if (!hasAgentsPresent) {
+    return [formulatePlanTool, queryMemoryTool, updateInternalStateTool, ...affordanceTools];
   }
-  return base;
+  const socialTools = [talkToTool, observeAgentTool, helpTool, ignoreTool];
+  if (isSocialPrimary) {
+    // Req 2: social first, cognitive + affordance next, formulate_plan LAST.
+    return [
+      ...socialTools,
+      queryMemoryTool,
+      updateInternalStateTool,
+      ...affordanceTools,
+      formulatePlanTool,
+    ];
+  }
+  // Req 1: social first, then formulate_plan, cognitive, affordance.
+  return [
+    ...socialTools,
+    formulatePlanTool,
+    queryMemoryTool,
+    updateInternalStateTool,
+    ...affordanceTools,
+  ];
 }
 
 /**

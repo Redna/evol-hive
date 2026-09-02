@@ -1049,10 +1049,10 @@ describe('AC-47: PlanBuilderImpl with agentsPresent', () => {
   });
 });
 
-// ── AC-48: PlanBuilder social drive hint ─────────────────────────────────────
+// ── AC-48: PlanBuilder social drive hint (spec 024 updated) ───────────────
 
 describe('AC-48: PlanBuilderImpl social drive hint', () => {
-  it('includes social hint when primary drive is social and agents present', () => {
+  it('includes strengthened social hint when primary drive is social and agents present (spec 024, Req 4)', () => {
     const builder = new PlanBuilderImpl();
     const pr: PerceptionResult = {
       passive: {
@@ -1067,7 +1067,14 @@ describe('AC-48: PlanBuilderImpl social drive hint', () => {
       primaryDriveLabel: 'low social, need to restore social',
     };
     const payload = builder.build(pr);
-    expect(payload.perceptionContext).toContain('You feel a strong need for social interaction');
+    // Spec 024, Req 4: the old hedging hint is replaced by a stronger imperative.
+    expect(payload.perceptionContext).toContain(
+      'Your social drive is your most urgent need. Call talk_to or help NOW to interact with another agent in this room. Do not formulate a plan first.',
+    );
+    // The old soft hint should no longer be present.
+    expect(payload.perceptionContext).not.toContain(
+      'You feel a strong need for social interaction',
+    );
   });
 });
 
