@@ -401,22 +401,99 @@ export class OpenAICompatibleLLMClient {
     if (typeof args['driveOverrides'] === 'object' && args['driveOverrides'] !== null) {
       result.driveOverrides = args['driveOverrides'] as Partial<Record<string, number>>;
     }
+
+    // ── Spec 025: parse flattened memory fields ────────────────────────────
+    const memoryContent =
+      typeof args['memoryContent'] === 'string' ? (args['memoryContent'] as string) : undefined;
+    const rawImportance = args['memoryImportance'];
+    const rawType = args['memoryType'];
+    const rawLocation = args['memoryLocation'];
+
+    // Validate and apply defaults (R3.3).
+    const validTypes: readonly string[] = ['observation', 'reflection', 'action', 'interaction'];
+
+    const memoryImportance =
+      typeof rawImportance === 'number' &&
+      Number.isInteger(rawImportance) &&
+      rawImportance >= 1 &&
+      rawImportance <= 10
+        ? rawImportance
+        : 5;
+
+    const memoryType =
+      typeof rawType === 'string' && validTypes.includes(rawType)
+        ? (rawType as MemoryType)
+        : 'observation';
+
+    const memoryLocation = typeof rawLocation === 'string' ? (rawLocation as string) : undefined;
+
+    // Parse legacy memoryEntry (R3.2) — translated to flattened fields.
+    // Flattened fields take precedence over legacy memoryEntry (R3.2).
     const memEntry = args['memoryEntry'];
+    let legacyContent: string | undefined;
+    let legacyImportance: number | undefined;
+    let legacyType: MemoryType | undefined;
+    let legacyLocation: string | undefined;
     if (typeof memEntry === 'object' && memEntry !== null) {
       const me = memEntry as Record<string, unknown>;
-      const content = me['content'];
-      const importance = me['importance'];
-      const type = me['type'];
+      if (typeof me['content'] === 'string') {
+        legacyContent = me['content'];
+      }
       if (
-        typeof content === 'string' &&
-        typeof importance === 'number' &&
-        typeof type === 'string'
+        typeof me['importance'] === 'number' &&
+        Number.isInteger(me['importance']) &&
+        me['importance'] >= 1 &&
+        me['importance'] <= 10
+      ) {
+        legacyImportance = me['importance'];
+      }
+      if (typeof me['type'] === 'string' && validTypes.includes(me['type'])) {
+        legacyType = me['type'] as MemoryType;
+      }
+      if (typeof me['location'] === 'string') {
+        legacyLocation = me['location'];
+      }
+    }
+
+    // Flattened fields take precedence; legacy memoryEntry fills gaps.
+    const content = memoryContent ?? legacyContent;
+    const importance =
+      memoryContent !== undefined ? memoryImportance : (legacyImportance ?? memoryImportance);
+    const type = memoryContent !== undefined ? memoryType : (legacyType ?? memoryType);
+    const location =
+      memoryContent !== undefined ? memoryLocation : (legacyLocation ?? memoryLocation);
+
+    if (content !== undefined) {
+      result.memoryContent = content;
+      result.memoryImportance = importance;
+      result.memoryType = type;
+      if (location !== undefined) {
+        result.memoryLocation = location;
+      }
+    } else if (legacyContent !== undefined) {
+      // Legacy memoryEntry was present — populate flattened fields from it.
+      result.memoryContent = legacyContent;
+      result.memoryImportance = legacyImportance ?? 5;
+      result.memoryType = legacyType ?? 'observation';
+      if (legacyLocation !== undefined) {
+        result.memoryLocation = legacyLocation;
+      }
+    }
+
+    // Retain the legacy memoryEntry on the result for backward compatibility
+    // (R2.2) — some consumers may still read it directly.
+    if (typeof memEntry === 'object' && memEntry !== null) {
+      const me = memEntry as Record<string, unknown>;
+      if (
+        typeof me['content'] === 'string' &&
+        typeof me['importance'] === 'number' &&
+        typeof me['type'] === 'string'
       ) {
         const entry: { content: string; importance: number; type: MemoryType; location?: string } =
           {
-            content,
-            importance,
-            type: type as MemoryType,
+            content: me['content'],
+            importance: me['importance'],
+            type: me['type'] as MemoryType,
           };
         if (typeof me['location'] === 'string') {
           entry.location = me['location'];
@@ -424,6 +501,7 @@ export class OpenAICompatibleLLMClient {
         result.memoryEntry = entry;
       }
     }
+
     return result;
   }
 

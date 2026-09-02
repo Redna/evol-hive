@@ -518,16 +518,34 @@ export interface MemoryEntryInput {
 
 /**
  * The structured output the LLM returns during the Reflect phase (spec 004,
- * Req 2). Extends `UpdateStateResult` (§8.3) with an optional `memoryEntry`.
- * All three fields are optional — the LLM may choose to update only the goal,
- * only drives, only store a memory, or any combination.
+ * Req 2; spec 025, Req 2). Extends `UpdateStateResult` (§8.3) with optional
+ * flattened memory fields. All fields are optional — the LLM may choose to
+ * update only the goal, only drives, only store a memory, or any combination.
+ *
+ * Spec 025 replaces the nested `memoryEntry` with four top-level fields:
+ * `memoryContent`, `memoryImportance`, `memoryType`, `memoryLocation`.
+ * The legacy `memoryEntry` field is retained for backward compatibility —
+ * when both are present, the flattened fields take precedence.
  */
 export interface ReflectLLMResponse {
   /** The agent's updated goal, if it changed. */
   newGoal?: string;
   /** Drive overrides to apply (clamped to 0–100 by `DriveSystem`). */
   driveOverrides?: Partial<Record<string, number>>;
-  /** A memory entry to store, if the LLM decides to record one. */
+  /** Memory content to store (spec 025, Req 2.1). */
+  memoryContent?: string;
+  /** Importance score 1–10 for the memory (spec 025, Req 2.1). */
+  memoryImportance?: number;
+  /** The type of memory (spec 025, Req 2.1). */
+  memoryType?: MemoryType;
+  /** Optional room/scene ID where the event occurred (spec 025, Req 2.1). */
+  memoryLocation?: string;
+  /**
+   * Legacy nested memory entry (spec 025, Req 2.2). Accepted for backward
+   * compatibility — when both flattened fields and `memoryEntry` are present,
+   * the flattened fields take precedence.
+   * @deprecated Use `memoryContent` / `memoryImportance` / `memoryType` / `memoryLocation` instead.
+   */
   memoryEntry?: MemoryEntryInput;
 }
 

@@ -311,16 +311,14 @@ describe('ReflectServiceImpl.reflect (AC-15 through AC-26)', () => {
     expect(provider.setThinkingCalls).toHaveLength(0);
   });
 
-  // AC-18: Full success with all updates
+  // AC-18: Full success with all updates (spec 025: uses flattened fields)
   it('applies drives, goal, memory, clears plan, returns all-true on full LLM response (AC-18)', async () => {
     const response: ReflectLLMResponse = {
       newGoal: 'Find food',
       driveOverrides: { hunger: 30 },
-      memoryEntry: {
-        content: 'Ate snacks from the fridge',
-        importance: 5,
-        type: 'action',
-      },
+      memoryContent: 'Ate snacks from the fridge',
+      memoryImportance: 5,
+      memoryType: 'action',
     };
     const { service } = makeService(provider, response);
     const result = await service.reflect(AGENT_ID, makeExecuteResult());
@@ -342,21 +340,19 @@ describe('ReflectServiceImpl.reflect (AC-15 through AC-26)', () => {
     expect(provider.clearPlanIfCompleteCalls).toEqual([AGENT_ID]);
   });
 
-  // AC-19: Empty response
-  it('on empty LLM response: no updates, clears plan, returns success with all-false (AC-19)', async () => {
+  // AC-19: Empty response — auto-fallback generates a memory (spec 025, R5)
+  it('on empty LLM response: auto-fallback stores a memory, clears plan (AC-19, spec 025)', async () => {
     const { service } = makeService(provider, {});
     const result = await service.reflect(AGENT_ID, makeExecuteResult());
 
-    expect(result).toEqual({
-      success: true,
-      cycleComplete: true,
-      memoryStored: false,
-      goalUpdated: false,
-      drivesUpdated: false,
-    });
+    expect(result.success).toBe(true);
+    expect(result.cycleComplete).toBe(true);
+    expect(result.memoryStored).toBe(true);
+    expect(result.goalUpdated).toBe(false);
+    expect(result.drivesUpdated).toBe(false);
     expect(provider.applyDriveChangesCalls).toHaveLength(0);
     expect(provider.updateGoalCalls).toHaveLength(0);
-    expect(provider.storeMemoryCalls).toHaveLength(0);
+    expect(provider.storeMemoryCalls).toHaveLength(1);
     expect(provider.clearPlanIfCompleteCalls).toEqual([AGENT_ID]);
   });
 
@@ -458,17 +454,15 @@ describe('ReflectServiceImpl.reflect (AC-15 through AC-26)', () => {
     expect(provider.agentState?.isThinking).toBe(false);
   });
 
-  // AC-26: storeMemory throws after drives and goal applied
+  // AC-26: storeMemory throws after drives and goal applied (spec 025: flattened fields)
   it('on storeMemory throw after drives/goal applied: returns failure with partial flags (AC-26)', async () => {
     provider.storeMemoryShouldThrow = new Error('Vector store offline');
     const response: ReflectLLMResponse = {
       newGoal: 'Find food',
       driveOverrides: { hunger: 30 },
-      memoryEntry: {
-        content: 'Ate snacks',
-        importance: 5,
-        type: 'action',
-      },
+      memoryContent: 'Ate snacks',
+      memoryImportance: 5,
+      memoryType: 'action',
     };
     const { service } = makeService(provider, response);
     const result = await service.reflect(AGENT_ID, makeExecuteResult());
@@ -527,14 +521,14 @@ describe('ReflectServiceImpl.reflect (AC-15 through AC-26)', () => {
     expect(payload.perceptionContext.toLowerCase()).toContain('success');
   });
 
-  it('handles null/undefined LLM response as empty object (AC-15)', async () => {
+  it('handles null/undefined LLM response as empty object — auto-fallback stores memory (spec 025, AC-15)', async () => {
     const { service, llm } = makeService(provider);
     llm.completeReflect = vi.fn().mockResolvedValue(null);
     const result = await service.reflect(AGENT_ID, makeExecuteResult());
 
     expect(result.success).toBe(true);
     expect(result.cycleComplete).toBe(true);
-    expect(result.memoryStored).toBe(false);
+    expect(result.memoryStored).toBe(true);
     expect(result.goalUpdated).toBe(false);
     expect(result.drivesUpdated).toBe(false);
   });

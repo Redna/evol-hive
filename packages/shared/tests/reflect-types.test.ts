@@ -157,26 +157,42 @@ describe('reflectSchema constant (AC-4)', () => {
     });
   });
 
-  it('has memoryEntry as object|null with content, importance, type, location', () => {
-    const memSchema = reflectSchema.properties.memoryEntry;
-    expect(memSchema.type).toEqual(['object', 'null']);
-    expect(memSchema.properties.content).toEqual({ type: 'string' });
-    expect(memSchema.properties.importance).toEqual({
-      type: 'integer',
-      minimum: 1,
-      maximum: 10,
-    });
-    expect(memSchema.properties.type).toEqual({
-      type: 'string',
-      enum: ['observation', 'reflection', 'action', 'interaction'],
-    });
-    expect(memSchema.properties.location).toEqual({ type: ['string', 'null'] });
-    expect(memSchema.required).toEqual(['content', 'importance', 'type']);
-    expect(memSchema.additionalProperties).toBe(false);
+  // Spec 025: memoryEntry replaced with flattened top-level fields
+  it('has memoryContent as a top-level string property', () => {
+    expect(reflectSchema.properties.memoryContent).toBeDefined();
+    expect(reflectSchema.properties.memoryContent.type).toBe('string');
   });
 
-  it('has no required fields at the top level', () => {
-    expect(reflectSchema.required ?? []).toEqual([]);
+  it('has memoryImportance as a top-level integer property with min 1, max 10', () => {
+    const impSchema = reflectSchema.properties.memoryImportance;
+    expect(impSchema.type).toBe('integer');
+    expect(impSchema.minimum).toBe(1);
+    expect(impSchema.maximum).toBe(10);
+  });
+
+  it('has memoryType as a top-level string enum', () => {
+    const typeSchema = reflectSchema.properties.memoryType;
+    expect(typeSchema.type).toBe('string');
+    expect(typeSchema.enum).toEqual(['observation', 'reflection', 'action', 'interaction']);
+  });
+
+  it('has memoryLocation as a top-level string property', () => {
+    expect(reflectSchema.properties.memoryLocation).toBeDefined();
+    expect(reflectSchema.properties.memoryLocation.type).toBe('string');
+  });
+
+  it('does NOT have a nested memoryEntry property', () => {
+    expect(reflectSchema.properties.memoryEntry).toBeUndefined();
+  });
+
+  it('has "memoryContent" in the required array (spec 025, AC-5)', () => {
+    expect(reflectSchema.required).toContain('memoryContent');
+  });
+
+  it('does NOT include memoryImportance, memoryType, or memoryLocation in required', () => {
+    expect(reflectSchema.required).not.toContain('memoryImportance');
+    expect(reflectSchema.required).not.toContain('memoryType');
+    expect(reflectSchema.required).not.toContain('memoryLocation');
   });
 
   it('has additionalProperties: false at the top level', () => {

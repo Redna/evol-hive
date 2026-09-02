@@ -128,7 +128,15 @@ export const memoryConsolidationSchema = {
   additionalProperties: false,
 } as const;
 
-/** The reflect phase response schema (spec 004, Req 4). No top-level fields are required. */
+/**
+ * The reflect phase response schema (spec 004, Req 4; spec 025, Req 1).
+ *
+ * Spec 025 flattens the nested `memoryEntry` object into four top-level
+ * fields (`memoryContent`, `memoryImportance`, `memoryType`,
+ * `memoryLocation`) because small models do not reliably populate nested
+ * objects. Only `memoryContent` is required — the other three have defaults
+ * applied at the parsing layer (R3.3).
+ */
 export const reflectSchema = {
   type: 'object',
   properties: {
@@ -137,21 +145,27 @@ export const reflectSchema = {
       type: 'object',
       additionalProperties: { type: 'number' },
     },
-    memoryEntry: {
-      type: ['object', 'null'],
-      properties: {
-        content: { type: 'string' },
-        importance: { type: 'integer', minimum: 1, maximum: 10 },
-        type: {
-          type: 'string',
-          enum: ['observation', 'reflection', 'action', 'interaction'],
-        },
-        location: { type: ['string', 'null'] },
-      },
-      required: ['content', 'importance', 'type'],
-      additionalProperties: false,
+    memoryContent: {
+      type: 'string',
+      description: 'Memory content to store for future reference.',
+    },
+    memoryImportance: {
+      type: 'integer',
+      minimum: 1,
+      maximum: 10,
+      description: 'Importance score 1-10 (default: 5).',
+    },
+    memoryType: {
+      type: 'string',
+      enum: ['observation', 'reflection', 'action', 'interaction'],
+      description: 'Type of memory (default: observation).',
+    },
+    memoryLocation: {
+      type: 'string',
+      description: 'Optional room/scene ID where the event occurred.',
     },
   },
+  required: ['memoryContent'],
   additionalProperties: false,
 } as const;
 

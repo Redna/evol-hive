@@ -157,6 +157,11 @@ export class ReflectBuilderImpl implements ReflectBuilder {
 }
 
 function buildSystemPrompt(profile: AgentProfile | null | undefined): string {
+  // Spec 025, Req 6: System prompt references flattened field names.
+  const memoryInstruction =
+    'Include memoryContent in your reflect response to store a memory for future reference. ' +
+    'Set memoryImportance (1-10), memoryType (observation|reflection|action|interaction), ' +
+    'and optionally memoryLocation.';
   if (profile) {
     const personaText = formatPersona(profile);
     return [
@@ -165,7 +170,7 @@ function buildSystemPrompt(profile: AgentProfile | null | undefined): string {
       'Evaluate whether your goal or drives need adjustment based on what happened.',
       'Decide if a memory entry should be stored for future reference.',
       'Consider your personality when deciding what is worth remembering.',
-      'Include a memoryEntry in your reflect response to store a memory for future reference.',
+      memoryInstruction,
     ].join(' ');
   }
   return [
@@ -173,7 +178,7 @@ function buildSystemPrompt(profile: AgentProfile | null | undefined): string {
     'You must reflect on the outcome of your last action.',
     'Evaluate whether your goal or drives need adjustment based on what happened.',
     'Decide if a memory entry should be stored for future reference.',
-    'Include a memoryEntry in your reflect response to store a memory for future reference.',
+    memoryInstruction,
   ].join(' ');
 }
 
