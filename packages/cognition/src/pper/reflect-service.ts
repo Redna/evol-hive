@@ -6,6 +6,12 @@
  * the LLM, validates the response, applies drive/goal/memory updates, and
  * clears the plan if complete.
  *
+ * Spec 025: The memory entry is now specified via flattened top-level fields
+ * (`memoryContent`, `memoryImportance`, `memoryType`, `memoryLocation`) on
+ * the `ReflectLLMResponse`. When the LLM omits all memory fields, an
+ * auto-fallback memory is generated from the execution result and agent
+ * state, guaranteeing at least one memory per reflect cycle.
+ *
  * The `isThinking` flag is always reset to `false` — on success, on
  * failure, and on any exception path. The method never re-throws; it
  * returns a `ReflectResult` with `success: false` on error so the PPER
@@ -123,10 +129,11 @@ export class ReflectServiceImpl {
         goalUpdated = true;
       }
 
-      // (3) Store memory entry if present and valid.
-      if (llmResponse.memoryEntry !== undefined) {
+      // (3) Store memory entry — flattened fields, legacy memoryEntry, or auto-fallback (spec 025).
+      const memoryEntry = resolveMemoryEntry(llmResponse, executeResult, agentState);
+      if (memoryEntry !== undefined) {
         try {
-          await dataProvider.storeMemory(agentId, llmResponse.memoryEntry);
+          await dataProvider.storeMemory(agentId, memoryEntry);
           memoryStored = true;
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
@@ -177,16 +184,115 @@ export class ReflectServiceImpl {
 }
 
 /**
+ * Resolves the memory entry to store from the LLM response, execution result,
+ * and agent state (spec 025, R4 + R5).
+ *
+ * Priority:
+ * 1. Flattened `memoryContent` (if present and non-empty) — constructs a
+ *    `MemoryEntryInput` from the flattened fields with defaults.
+ * 2. Legacy `memoryEntry` (if present and valid) — backward compatibility.
+ * 3. Auto-fallback — generates a memory from the execution result and agent
+ *    state when the LLM omits all memory fields (R5).
+ *
+ * Returns `undefined` when no memory should be stored (this should not
+ * happen with the auto-fallback, but is retained for safety).
+ */
+function resolveMemoryEntry(
+  response: ReflectLLMResponse,
+  executeResult: ExecuteResult,
+  agentState: import('@evol-hive/shared').AgentInternalState,
+): MemoryEntryInput | undefined {
+  // (1) Flattened memoryContent (spec 025, R4.2).
+  if (response.memoryContent !== undefined && response.memoryContent.trim().length > 0) {
+    return {
+      content: response.memoryContent,
+      importance: response.memoryImportance ?? 5,
+      type: response.memoryType ?? 'observation',
+      ...(response.memoryLocation !== undefined ? { location: response.memoryLocation } : {}),
+    };
+  }
+
+  // (2) Legacy memoryEntry (spec 025, R4.3).
+  if (response.memoryEntry !== undefined) {
+    return response.memoryEntry;
+  }
+
+  // (3) Auto-fallback (spec 025, R5.1).
+  return generateAutoFallbackMemory(executeResult, agentState);
+}
+
+/**
+ * Generates an auto-fallback memory entry from the execution result and agent
+ * state (spec 025, R5).
+ *
+ * - Content: `"Idle tick — no action taken. Goal: {currentGoal}"` when
+ *   `stepSkipped` is true; `"Action succeeded: {currentGoal}"` (plus drive
+ *   changes) on success; `"Action failed: {error}. Goal: {currentGoal}"` on
+ *   failure.
+ * - Importance: `3` (low — auto-generated, not LLM-curated).
+ * - Type: `"action"` when execution succeeded, `"observation"` otherwise.
+ * - Location: the agent's `location` from `AgentInternalState`, or
+ *   `undefined`.
+ */
+function generateAutoFallbackMemory(
+  executeResult: ExecuteResult,
+  agentState: import('@evol-hive/shared').AgentInternalState,
+): MemoryEntryInput {
+  let content: string;
+  let type: MemoryType;
+
+  if (executeResult.stepSkipped === true) {
+    content = `Idle tick — no action taken. Goal: ${agentState.currentGoal}`;
+    type = 'observation';
+  } else if (executeResult.success) {
+    content = `Action succeeded: ${agentState.currentGoal}`;
+    type = 'action';
+
+    // Append drive changes when present (R5.2).
+    if (executeResult.result?.driveChanges !== undefined) {
+      const changes = Object.entries(executeResult.result.driveChanges);
+      if (changes.length > 0) {
+        const formatted = changes
+          .map(([key, value]) => `${key} ${value! >= 0 ? '+' : ''}${value!}`)
+          .join(', ');
+        content += `, drives: ${formatted}`;
+      }
+    }
+  } else {
+    const error = executeResult.error ?? 'unknown';
+    content = `Action failed: ${error}. Goal: ${agentState.currentGoal}`;
+    type = 'observation';
+  }
+
+  return {
+    content,
+    importance: 3,
+    type,
+    ...(agentState.location !== undefined ? { location: agentState.location } : {}),
+  };
+}
+
+/**
  * Validates the ReflectLLMResponse before any changes are applied (Req 15).
  * Returns an error message string if invalid, or `null` if valid.
  *
  * - `newGoal` empty string → treated as undefined (no error, just no update).
  * - `driveOverrides` empty object → treated as undefined (no error, just no update).
+ * - `memoryContent` present but empty → not an error (treated as "no memory").
  * - `memoryEntry` invalid → returns an error (atomicity: no partial updates).
  * - null/undefined response → treated as empty object (valid, no updates).
  */
 function validateReflectLLMResponse(response: ReflectLLMResponse): string | null {
-  // Validate memoryEntry if present.
+  // Validate flattened memoryContent if present (R4.1).
+  // An empty/whitespace-only memoryContent is NOT an error — it means the
+  // LLM chose not to store a memory. The auto-fallback handles this case.
+  if (response.memoryContent !== undefined && response.memoryContent.trim().length > 0) {
+    if (typeof response.memoryContent !== 'string') {
+      return 'Invalid memory content from LLM: memoryContent must be a string';
+    }
+  }
+
+  // Validate legacy memoryEntry if present (R4.1, backward compatibility).
   if (response.memoryEntry !== undefined) {
     const entry: MemoryEntryInput = response.memoryEntry;
 
