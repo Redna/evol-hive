@@ -113,6 +113,17 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       );
     }
 
+    // Stronger social directive (spec 024, Req 6): added to the dynamic
+    // section whenever agents are present. The Perception/Action phase does
+    // not include formulate_plan by default, so this directive omits the
+    // "do not use formulate_plan" clause and focuses on encouraging direct
+    // social tool use.
+    if (hasAgentsPresent) {
+      dynamicLines.push(
+        'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them.',
+      );
+    }
+
     const contextLines = [...stableLines, '---', ...dynamicLines];
 
     // Guardrail options (spec 016, Req 10; spec 020, Req 4).
@@ -145,9 +156,13 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       tools = [queryMemoryTool, updateInternalStateTool, ...affordanceTools];
     }
 
-    // Social tools are included only when other agents are present (spec 018, Req 34).
+    // Social tools are included only when other agents are present (spec 018,
+    // Req 34). Spec 024, Req 5: when agents are present, social tools are
+    // placed FIRST in the tools array (before cognitive and affordance tools)
+    // to leverage the positional bias of smaller LLMs toward first-listed
+    // tools. This applies to both the normal and masked paths.
     if (hasAgentsPresent) {
-      tools = [...tools, talkToTool, observeAgentTool, helpTool, ignoreTool];
+      tools = [talkToTool, observeAgentTool, helpTool, ignoreTool, ...tools];
     }
 
     // Phase-aware tool pruning (spec 022, Req 11, AC-10): the formulate_plan
