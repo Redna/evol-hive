@@ -18,7 +18,7 @@ if [ "$DISABLE_PI_EXTENSIONS" != "true" ] && [ "$DISABLE_YAAM_EXTENSION" != "tru
   pi install https://github.com/Redna/yaam
 fi
 
-if [ "$DISABLE_PI_EXTENSIONS" != "true" ]; then
+if [ "$DISABLE_PI_EXTENSIONS" != "true" ] && [ "$DISABLE_YAAM_EXTENSION" != "true" ]; then
 YAAM_DIR="$HOME/.pi/agent/git/github.com/Redna/yaam"
 BINARY_PATH="$YAAM_DIR/src-rust/target/release/yaam-engine"
 CACHED_BINARY="$HOME/.yaam-cache/yaam-engine"
