@@ -30,6 +30,27 @@ Built around a fluid **PPER loop** (Perceive → Plan → Execute → Reflect) u
 | Cognitive Guardrails | [§10](docs/architecture/10-cognitive-guardrails.md) | Affordance masking, contextual forcing, plan validation |
 | Memory Architecture | [§11](docs/architecture/11-memory-architecture.md) | Dual-track injection, weighted retrieval, reflection |
 
+## Visualizer
+
+The simulation ships with a browser-based 2D canvas visualizer — rooms, smart objects, agents, drive bars, and live object state over WebSocket.
+
+![Minimal scene](docs/screenshots/visualizer-minimal.png)
+
+![Coffee Shop scene](docs/screenshots/visualizer-coffee-shop.png)
+
+![Running at 5x — coffee machine water depleting, drive bars updating](docs/screenshots/visualizer-running-5x.png)
+
+Run it:
+
+```bash
+npx tsx examples/visualizer-demo.ts
+# Open http://localhost:3000
+```
+
+Controls: Play/Pause, speed (1x/2x/5x), Save/Load state, and a scene selector (minimal, morning-routine, coffee-shop).
+
+> Note: the demo runs a no-op mock orchestrator (rendering demo only). Agents do not perform PPER cycles — see issue [#106](https://github.com/Redna/evol-hive/issues/106) for wiring real LLM cognition into the demo.
+
 ## Project Structure
 
 See [ADR-0001](docs/adr/0001-lean-monorepo-structure.md) for the rationale behind this structure.
