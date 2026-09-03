@@ -38,7 +38,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.yaam-cache
-          key: yaam-binary-v1
+          key: yaam-binary-v2
 
       - name: Cache ONNX model
         uses: actions/cache@v4
