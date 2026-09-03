@@ -96,7 +96,7 @@ jobs:
 
           pi -p "$TASK" \
             --append-system-prompt "$(cat .pi/agents/responder.md)" \
-            --model ollama/glm-5.3-flash \
+            --model ollama/glm-5.3-flash:cloud \
             --thinking medium \
             --tools read,bash \
             --verbose
