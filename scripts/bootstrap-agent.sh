@@ -18,6 +18,7 @@ if [ "$DISABLE_PI_EXTENSIONS" != "true" ]; then
   pi install https://github.com/Redna/yaam
 fi
 
+if [ "$DISABLE_PI_EXTENSIONS" != "true" ]; then
 YAAM_DIR="$HOME/.pi/agent/git/github.com/Redna/yaam"
 BINARY_PATH="$YAAM_DIR/src-rust/target/release/yaam-engine"
 CACHED_BINARY="$HOME/.yaam-cache/yaam-engine"
@@ -41,6 +42,8 @@ else
   cp "$BINARY_PATH" "$CACHED_BINARY"
   cd -
 fi
+
+fi  # end DISABLE_PI_EXTENSIONS guard
 
 # Download or restore ONNX model files
 MODEL_DIR="$HOME/.yaam/models"
