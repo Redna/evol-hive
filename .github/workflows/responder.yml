@@ -54,6 +54,7 @@ jobs:
       - name: Bootstrap agent environment
         env:
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+          DISABLE_PI_EXTENSIONS: 'true' 
         run: bash scripts/bootstrap-agent.sh
 
       - name: Run Responder Agent
