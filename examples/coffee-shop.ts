@@ -47,6 +47,7 @@ import {
   AffordanceClassifierImpl,
   defaultClassifierConfig,
   ConsolidationProviderImpl,
+  TokenUsageReporter,
 } from '@evol-hive/cognition';
 import type {
   EmbeddingProvider as MemEmbeddingProvider,
@@ -547,6 +548,8 @@ export interface CoffeeShopAssembledEngine extends AssembledEngine {
   readonly socialManager: SocialManager;
   readonly cognitiveToolExecutor?: CognitiveToolExecutorImpl;
   readonly llmClient: LLMClient;
+  /** Token usage aggregation (spec 022, Req 10) — populated for real LLM runs. */
+  readonly tokenUsageReporter: TokenUsageReporter;
   readonly guardrail: GuardrailEngineImpl;
   readonly embeddingProvider: MemEmbeddingProvider;
   readonly classifier: AffordanceClassifier;
@@ -601,6 +604,10 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
   const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as
     'low' | 'medium' | 'high' | 'none' | undefined;
 
+  // Spec 022 (Req 10): token usage aggregation — created always so the end-of-run
+  // summary can report real token numbers when USE_REAL_LLM=true.
+  const tokenUsageReporter = new TokenUsageReporter();
+
   const maxToolCallIterationsEnv = process.env['LLM_MAX_TOOL_CALL_ITERATIONS'];
   const maxToolCallIterations =
     maxToolCallIterationsEnv !== undefined ? Number(maxToolCallIterationsEnv) : undefined;
@@ -622,6 +629,9 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
         ...(cognitiveToolExecutor !== undefined ? { cognitiveToolExecutor } : {}),
         ...(maxToolCallIterations !== undefined ? { maxToolCallIterations } : {}),
         embeddingProvider: embeddingProvider as MemEmbeddingProvider,
+        // Spec 022 (Req 10): opt-in token usage tracking — wired when token
+        // reporting is enabled so `getUsageSummary()` can print totals at end.
+        tokenUsageReporter: useRealLLM ? tokenUsageReporter : undefined,
       })
     : new CoffeeShopMockLLMClient();
 
@@ -689,6 +699,7 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
     socialManager,
     ...(cognitiveToolExecutor !== undefined ? { cognitiveToolExecutor } : {}),
     llmClient,
+    tokenUsageReporter,
     guardrail,
     embeddingProvider,
     classifier,
@@ -750,6 +761,16 @@ async function main(): Promise<void> {
 
   // Final state log.
   logAgentState(engine);
+
+  // Token usage summary (spec 022, Req 10) — real LLM runs only.
+  if (process.env['USE_REAL_LLM'] === 'true') {
+    const total = engine.tokenUsageReporter.getTotalUsage();
+    // eslint-disable-next-line no-console
+    console.log(
+      `[tokens] prompt=${total.promptTokens} completion=${total.completionTokens} ` +
+        `total=${total.totalTokens}`,
+    );
+  }
 
   // ── Save/load demonstration (Req 22) ──────────────────────────────────────
   if (engine.persistence) {
