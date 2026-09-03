@@ -81,7 +81,7 @@ jobs:
 
           pi -p "$TASK_CONTENT" \
             --append-system-prompt "$(cat .pi/agents/qa-tester.md)" \
-            --model ollama/glm-5.3-flash:cloud \
+            --model ollama/glm-5.3-flash \
             --thinking medium \
             --tools read,write,edit,bash \
             --verbose

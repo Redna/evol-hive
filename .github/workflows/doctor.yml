@@ -77,7 +77,7 @@ jobs:
 
           pi -p "$TASK_CONTENT" \
             --append-system-prompt "$(cat .pi/agents/doctor.md)" \
-            --model ollama/glm-5.3-flash:cloud \
+            --model ollama/glm-5.3-flash \
             --thinking high \
             --tools read,bash,edit,write \
             --verbose

@@ -93,7 +93,7 @@ jobs:
           # Run the agent
           pi -p "$TASK_CONTENT" \
             --append-system-prompt "$(cat .pi/agents/developer.md)" \
-            --model ollama/glm-5.3-flash:cloud \
+            --model ollama/glm-5.3-flash \
             --thinking medium \
             --tools read,write,edit,bash \
             --verbose
