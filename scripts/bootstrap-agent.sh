@@ -57,6 +57,20 @@ d['providers']['ollama']['apiKey'] = os.environ.get('OLLAMA_API_KEY', 'missing')
 json.dump(d, open(os.path.expanduser('~/.pi/agent/models.json'), 'w'), indent=2)
 "
 
+# Raise the HTTP idle timeout — developer runs send large first prompts (full spec)
+# and cloud models can take >2min to first token under load. Default is 300s but
+# the runner environment has been canceling at exactly 120s; make it explicit.
+python3 -c "
+import json, os
+p = os.path.expanduser('~/.pi/agent/settings.json')
+try:
+    s = json.load(open(p))
+except Exception:
+    s = {}
+s['httpIdleTimeoutMs'] = 600000
+json.dump(s, open(p, 'w'), indent=2)
+"
+
 # Install project dependencies
 echo "=== Installing project deps ==="
 pnpm install --frozen-lockfile
