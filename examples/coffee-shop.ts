@@ -33,38 +33,25 @@ import type {
   LLMActionResponse,
   ReflectionResult,
   EngineConfig,
-  MemoryDecayConfig,
   AutoSaveConfig,
 } from '@evol-hive/shared';
-import { defaultMemoryDecayConfig, defaultReflectionConfig } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload, AffordanceClassifier } from '@evol-hive/cognition';
-import {
-  createPPEROrchestrator,
-  OpenAICompatibleLLMClient,
+import type {
   CognitiveToolExecutorImpl,
   GuardrailEngineImpl,
-  OnnxEmbeddingProvider,
-  AffordanceClassifierImpl,
-  defaultClassifierConfig,
-  ConsolidationProviderImpl,
   TokenUsageReporter,
 } from '@evol-hive/cognition';
 import type {
   EmbeddingProvider as MemEmbeddingProvider,
-  MemoryStore,
   MemoryDecayService,
   ReflectionLoop,
-} from '@evol-hive/memory';
-import {
-  MemoryStoreImpl,
   InMemoryVectorStore,
-  MemoryDecayServiceImpl,
-  ReflectionLoopImpl,
 } from '@evol-hive/memory';
 import { createEngineCore, assembleGameLoop, loadScene } from '@evol-hive/engine';
 import type { AssembledEngine, EngineCore, EnginePersistence } from '@evol-hive/engine';
 import { SocialManager } from '@evol-hive/engine';
 import { registerAffordanceHandlers, registerCoffeeShopHandlers } from './scene-helpers.ts';
+import { assembleCognitionStack, buildMemorySubsystem } from './assembly.ts';
 
 // Re-export for convenience and testability (spec 019, Req 16–18).
 export { registerCoffeeShopHandlers } from './scene-helpers.ts';
@@ -348,34 +335,6 @@ export const COFFEE_SHOP_SCENE: SceneDefinition = {
   agents: [alice, bob, carol],
 };
 
-// ── Mock embedding provider ───────────────────────────────────────────────────
-
-class MockEmbeddingProvider implements MemEmbeddingProvider {
-  readonly dimensions = 384;
-
-  async embed(text: string): Promise<number[]> {
-    const vec = new Array<number>(this.dimensions).fill(0);
-    vec[0] = text.length;
-    return vec;
-  }
-
-  async embedBatch(texts: string[]): Promise<number[][]> {
-    return texts.map((t) => {
-      const vec = new Array<number>(this.dimensions).fill(0);
-      vec[0] = t.length;
-      return vec;
-    });
-  }
-}
-
-function makeMockClassifier(): AffordanceClassifier {
-  return {
-    async prune(_driveLabel: string, affordances: Affordance[]) {
-      return affordances;
-    },
-  };
-}
-
 // ── Drive-aware mock LLM (Req 23) ────────────────────────────────────────────
 
 /**
@@ -510,22 +469,6 @@ function readDriveDecayRate(): number | undefined {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-/** Build a MemoryDecayConfig from defaults + env overrides (Req 13). */
-function buildMemoryDecayConfig(): MemoryDecayConfig {
-  const base = { ...defaultMemoryDecayConfig };
-  const decayRate = process.env['MEMORY_DECAY_RATE'];
-  if (decayRate !== undefined) {
-    const parsed = Number(decayRate);
-    if (!Number.isNaN(parsed)) base.decayRate = parsed;
-  }
-  const pruneThreshold = process.env['MEMORY_PRUNE_THRESHOLD'];
-  if (pruneThreshold !== undefined) {
-    const parsed = Number(pruneThreshold);
-    if (!Number.isNaN(parsed)) base.pruneThreshold = parsed;
-  }
-  return base;
-}
-
 /** Build the AutoSaveConfig from env (Req 11). 30s = 1800 ticks at 60 FPS. */
 function buildAutoSaveConfig(): AutoSaveConfig {
   const useAutosave = process.env['USE_AUTOSAVE'] !== 'false';
@@ -561,10 +504,13 @@ export interface CoffeeShopAssembledEngine extends AssembledEngine {
 // ── Engine assembly (Req 5–15) ────────────────────────────────────────────────
 
 /**
- * Build the full Coffee Shop engine with all subsystems wired. When
- * `USE_REAL_LLM=true`, uses `OpenAICompatibleLLMClient`; otherwise uses
- * `CoffeeShopMockLLMClient`. When `USE_REAL_EMBEDDINGS=true`, uses
- * `OnnxEmbeddingProvider` and `AffordanceClassifierImpl`; otherwise uses mocks.
+ * Build the full Coffee Shop engine with all subsystems wired. Cognition and
+ * memory assembly is delegated to the shared `assembleCognitionStack()` helper
+ * (spec 027, Req 2) so this entry point and the visualizer demo share one
+ * wiring source of truth. When `USE_REAL_LLM=true`, the helper builds an
+ * `OpenAICompatibleLLMClient`; otherwise this scene's drive-aware
+ * `CoffeeShopMockLLMClient`. When `USE_REAL_EMBEDDINGS=true`, the helper uses
+ * `OnnxEmbeddingProvider` and `AffordanceClassifierImpl`; otherwise mocks.
  */
 export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
   const config = makeConfig();
@@ -574,105 +520,22 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
   // var is read here so it is ready when the underlying spec is implemented.
   void readDriveDecayRate();
 
-  // ── Memory subsystem (Req 6, Req 15) ──────────────────────────────────────
-  const useRealEmbeddings = process.env['USE_REAL_EMBEDDINGS'] === 'true';
-  const embeddingProvider: MemEmbeddingProvider = useRealEmbeddings
-    ? new OnnxEmbeddingProvider({
-        modelPath: process.env['EMBEDDING_MODEL_PATH']!,
-        ...(process.env['EMBEDDING_TOKENIZER_PATH'] !== undefined
-          ? { tokenizerPath: process.env['EMBEDDING_TOKENIZER_PATH'] }
-          : {}),
-      })
-    : new MockEmbeddingProvider();
-
-  const vectorStore = new InMemoryVectorStore();
-  const memoryStore: MemoryStore = new MemoryStoreImpl({ vectorStore, embeddingProvider });
+  // ── Memory subsystem (Req 6, Req 15) — shared helper (spec 027) ───────────
+  const memory = buildMemorySubsystem();
 
   // ── Engine core (Req 11) ──────────────────────────────────────────────────
-  const core: EngineCore = createEngineCore(config, memoryStore, vectorStore);
+  const core: EngineCore = createEngineCore(config, memory.memoryStore, memory.vectorStore);
   loadScene(core, COFFEE_SHOP_SCENE);
   registerAffordanceHandlers(core);
   registerCoffeeShopHandlers(core);
 
-  // ── SocialManager (Req 8) ─────────────────────────────────────────────────
-  const socialManager = new SocialManager(core.agentManager);
-  // Wire social perception into the perception bridge.
-  core.bridges.perception.setSocialManager(socialManager);
-
-  // ── LLM client (Req 5, Req 9) ─────────────────────────────────────────────
-  const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
-  const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as
-    'low' | 'medium' | 'high' | 'none' | undefined;
-
-  // Spec 022 (Req 10): token usage aggregation — created always so the end-of-run
-  // summary can report real token numbers when USE_REAL_LLM=true.
-  const tokenUsageReporter = new TokenUsageReporter();
-
-  const maxToolCallIterationsEnv = process.env['LLM_MAX_TOOL_CALL_ITERATIONS'];
-  const maxToolCallIterations =
-    maxToolCallIterationsEnv !== undefined ? Number(maxToolCallIterationsEnv) : undefined;
-
-  // CognitiveToolExecutor (Req 9) — only needed for real LLM (tool call loop).
-  const cognitiveToolExecutor = useRealLLM
-    ? new CognitiveToolExecutorImpl({
-        stateDataProvider: core.bridges.reflect,
-        socialBridge: socialManager,
-      })
-    : undefined;
-
-  const llmClient: LLMClient = useRealLLM
-    ? new OpenAICompatibleLLMClient({
-        baseUrl: process.env['LLM_BASE_URL'] ?? 'http://localhost:11434/v1',
-        model: process.env['LLM_MODEL'] ?? 'llama3.1',
-        ...(process.env['LLM_API_KEY'] !== undefined ? { apiKey: process.env['LLM_API_KEY'] } : {}),
-        ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
-        ...(cognitiveToolExecutor !== undefined ? { cognitiveToolExecutor } : {}),
-        ...(maxToolCallIterations !== undefined ? { maxToolCallIterations } : {}),
-        embeddingProvider: embeddingProvider as MemEmbeddingProvider,
-        // Spec 022 (Req 10): opt-in token usage tracking — wired when token
-        // reporting is enabled so `getTotalUsage()` can print totals at end.
-        ...(useRealLLM ? { tokenUsageReporter } : {}),
-      })
-    : new CoffeeShopMockLLMClient();
-
-  // ── Classifier (Req 7) ────────────────────────────────────────────────────
-  const classifier: AffordanceClassifier = useRealEmbeddings
-    ? new AffordanceClassifierImpl(embeddingProvider, defaultClassifierConfig())
-    : makeMockClassifier();
-
-  // ── Guardrails (Req 10) ───────────────────────────────────────────────────
-  const guardrail = new GuardrailEngineImpl({
-    affordanceMasking: true,
-    contextualForcing: true,
-    planValidation: true,
+  // ── Cognition stack: SocialManager, LLM selection, classifier, guardrail,
+  //    PPER orchestrator, memory decay + reflection (Req 5–10, Req 13) —
+  //    shared helper (spec 027).
+  const stack = assembleCognitionStack(core, undefined, {
+    memory,
+    mockLLMClient: new CoffeeShopMockLLMClient(),
   });
-
-  // ── PPER orchestrator ─────────────────────────────────────────────────────
-  const orchestrator = createPPEROrchestrator({
-    perceptionProvider: core.bridges.perception,
-    planProvider: core.bridges.plan,
-    executeProvider: core.bridges.execute,
-    reflectProvider: core.bridges.reflect,
-    classifier,
-    llmClient,
-    guardrail,
-  });
-
-  // ── Memory decay + reflection (Req 13) ────────────────────────────────────
-  const decayConfig = buildMemoryDecayConfig();
-  const memoryDecayService = new MemoryDecayServiceImpl({ vectorStore, config: decayConfig });
-  const consolidationProvider = new ConsolidationProviderImpl({ llmClient });
-  const reflectionLoop = new ReflectionLoopImpl({
-    vectorStore,
-    embeddingProvider,
-    consolidationProvider,
-    config: defaultReflectionConfig,
-    clock: () => core.gameLoop.currentTick().simulationTime,
-  });
-  // Expose on core for introspection (spec 019, Req 13).
-  core.memoryDecayService = memoryDecayService;
-  core.reflectionLoop = reflectionLoop;
-  core.memoryMaintenanceConfig = decayConfig;
 
   // ── Auto-save (Req 11) ────────────────────────────────────────────────────
   const autoSaveConfig = buildAutoSaveConfig();
@@ -681,8 +544,14 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
   // ── Assemble game loop with memory maintenance + auto-save ────────────────
   const gameLoop = assembleGameLoop(
     core,
-    orchestrator,
-    { memoryDecayService, reflectionLoop, decayConfig },
+    stack.orchestrator,
+    stack.memoryDecayService !== undefined
+      ? {
+          memoryDecayService: stack.memoryDecayService,
+          ...(stack.reflectionLoop !== undefined ? { reflectionLoop: stack.reflectionLoop } : {}),
+          decayConfig: stack.decayConfig,
+        }
+      : undefined,
     { config: autoSaveConfig },
   );
 
@@ -696,16 +565,20 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
     affordanceRegistry: core.affordanceRegistry,
     bridges: core.bridges,
     ...(persistence !== undefined ? { persistence } : {}),
-    socialManager,
-    ...(cognitiveToolExecutor !== undefined ? { cognitiveToolExecutor } : {}),
-    llmClient,
-    tokenUsageReporter,
-    guardrail,
-    embeddingProvider,
-    classifier,
-    vectorStore,
-    memoryDecayService,
-    reflectionLoop,
+    socialManager: stack.socialManager,
+    ...(stack.cognitiveToolExecutor !== undefined
+      ? { cognitiveToolExecutor: stack.cognitiveToolExecutor }
+      : {}),
+    llmClient: stack.llmClient,
+    tokenUsageReporter: stack.tokenUsageReporter,
+    guardrail: stack.guardrail,
+    embeddingProvider: stack.embeddingProvider,
+    classifier: stack.classifier,
+    vectorStore: stack.vectorStore,
+    ...(stack.memoryDecayService !== undefined
+      ? { memoryDecayService: stack.memoryDecayService }
+      : {}),
+    ...(stack.reflectionLoop !== undefined ? { reflectionLoop: stack.reflectionLoop } : {}),
   };
 }
 
