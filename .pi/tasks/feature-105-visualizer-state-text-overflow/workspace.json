@@ -1,0 +1,7 @@
+{
+  "name": "feature-105-visualizer-state-text-overflow",
+  "description": "Visualizer: round numeric object state values to ≤2 decimals and truncate state text to the 60px object chip via measureText, fixing overflowing label boxes in the coffee-shop scene. Issue #105.",
+  "createdAt": "2026-09-03T20:20:00Z",
+  "specIssue": 105,
+  "specFile": "docs/specs/029-visualizer-state-text-overflow.md"
+}
