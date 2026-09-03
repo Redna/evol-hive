@@ -9,10 +9,14 @@ echo "=== Installing Pi ==="
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
 echo "=== Installing pi-goal ==="
-pi install npm:@narumitw/pi-goal
+if [ "$DISABLE_PI_EXTENSIONS" != "true" ]; then
+  pi install npm:@narumitw/pi-goal
+fi
 
 echo "=== Installing YAAM extension ==="
-pi install https://github.com/Redna/yaam
+if [ "$DISABLE_PI_EXTENSIONS" != "true" ]; then
+  pi install https://github.com/Redna/yaam
+fi
 
 YAAM_DIR="$HOME/.pi/agent/git/github.com/Redna/yaam"
 BINARY_PATH="$YAAM_DIR/src-rust/target/release/yaam-engine"
