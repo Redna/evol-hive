@@ -1,0 +1,7 @@
+{
+  "name": "feature-106-real-llm-visualizer",
+  "description": "Real-LLM visualizer demo — wire PPER cycles into examples/visualizer-demo.ts via USE_REAL_LLM, extract shared cognition assembly from buildCoffeeShopEngine(), load scenes through the YAML scene loader. Issue #106.",
+  "createdAt": "2026-08-18T00:00:00Z",
+  "specIssue": 106,
+  "specFile": "docs/specs/027-real-llm-visualizer-demo.md"
+}
