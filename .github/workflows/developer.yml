@@ -57,6 +57,7 @@ jobs:
       - name: Bootstrap agent environment
         env:
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+          DISABLE_YAAM_EXTENSION: 'true'
         run: bash scripts/bootstrap-agent.sh
 
       - name: Run Developer Agent

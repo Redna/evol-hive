@@ -14,7 +14,7 @@ if [ "$DISABLE_PI_EXTENSIONS" != "true" ]; then
 fi
 
 echo "=== Installing YAAM extension ==="
-if [ "$DISABLE_PI_EXTENSIONS" != "true" ]; then
+if [ "$DISABLE_PI_EXTENSIONS" != "true" ] && [ "$DISABLE_YAAM_EXTENSION" != "true" ]; then
   pi install https://github.com/Redna/yaam
 fi
 
