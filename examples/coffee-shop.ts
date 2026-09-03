@@ -630,8 +630,8 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
         ...(maxToolCallIterations !== undefined ? { maxToolCallIterations } : {}),
         embeddingProvider: embeddingProvider as MemEmbeddingProvider,
         // Spec 022 (Req 10): opt-in token usage tracking — wired when token
-        // reporting is enabled so `getUsageSummary()` can print totals at end.
-        tokenUsageReporter: useRealLLM ? tokenUsageReporter : undefined,
+        // reporting is enabled so `getTotalUsage()` can print totals at end.
+        ...(useRealLLM ? { tokenUsageReporter } : {}),
       })
     : new CoffeeShopMockLLMClient();
 
