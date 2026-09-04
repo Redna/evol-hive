@@ -52,8 +52,12 @@ export class PPERScheduler {
 
     // Round-robin: start scanning from the last position so that
     // with maxConcurrent=1, different agents get turns across ticks.
+    // The cursor must be wrapped BEFORE the first access: agent despawns
+    // (spec 030) shrink the active list between ticks, and a stale cursor
+    // ≥ agents.length would read undefined and crash the frame (found by
+    // the dynamic-world long-horizon run at the t+360s despawn).
     let scanned = 0;
-    let idx = this.rrCursor;
+    let idx = this.rrCursor % agents.length;
     while (scanned < agents.length) {
       if (this.activeCycles >= this.maxConcurrent) break;
       const agent = agents[idx]!;

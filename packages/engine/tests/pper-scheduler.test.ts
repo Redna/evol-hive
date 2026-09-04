@@ -174,3 +174,58 @@ describe('PPERScheduler — concurrency control (AC-23)', () => {
     expect(orch.runCycleCalls).toEqual(['a1', 'a2']);
   });
 });
+
+describe('PPERScheduler — despawn with stale round-robin cursor (spec 030 regression)', () => {
+  it('does not crash when the agent list shrinks below the cursor position', async () => {
+    const agents = new AgentManagerImpl();
+    agents.spawn(makeAgent('g1'));
+    agents.spawn(makeAgent('a1'));
+    const orch = new FakeOrchestrator();
+    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 1 });
+
+    // Advance the cursor past index 0 with both agents present.
+    scheduler.update(TICK);
+    scheduler.update(TICK);
+    scheduler.update(TICK);
+    // Let in-flight cycles settle so agents are schedulable again.
+    await vi.waitFor(() => {
+      const all = agents.getActiveAgents();
+      expect(all.every((a) => !a.isThinking)).toBe(true);
+    });
+
+    // Despawn the second agent — active list shrinks to 1 while the cursor
+    // may point at index 1 (the old end of the list).
+    agents.despawn('a1');
+    expect(agents.getActiveAgents().length).toBe(1);
+
+    // Pre-fix, this read agents[1] → undefined → TypeError mid-frame.
+    expect(() => scheduler.update(TICK)).not.toThrow();
+    // The remaining agent is still schedulable.
+    scheduler.update(TICK);
+    expect(orch.runCycleCalls).toContain('g1');
+  });
+
+  it('clamps the cursor to the new length after despawn and keeps round-robin fairness', async () => {
+    const agents = new AgentManagerImpl();
+    agents.spawn(makeAgent('g1'));
+    agents.spawn(makeAgent('a1'));
+    agents.spawn(makeAgent('c1'));
+    const orch = new FakeOrchestrator();
+    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 1 });
+
+    // Several ticks to move the cursor deep into the list.
+    for (let i = 0; i < 5; i++) {
+      scheduler.update(TICK);
+      await vi.waitFor(() => {
+        expect(agents.getActiveAgents().every((a) => !a.isThinking)).toBe(true);
+      });
+    }
+
+    // Shrink from 3 to 1: cursor (up to 2) is now out of bounds.
+    agents.despawn('a1');
+    agents.despawn('c1');
+    expect(() => scheduler.update(TICK)).not.toThrow();
+    expect(() => scheduler.update(TICK)).not.toThrow();
+    expect(orch.runCycleCalls).toContain('g1');
+  });
+});
