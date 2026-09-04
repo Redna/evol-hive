@@ -91,7 +91,7 @@
 - [x] **Performance Tuning** — KV-cache-optimized prompts (371-char stable system prompt, 1 variant), round-robin PPER scheduling at maxConcurrent=1 (spec 025, #97)
 - [x] **Real-LLM Visualizer Demo** — coffee-shop example wired to the visualizer server with TokenUsageReporter (spec 027, #113)
 - [x] **Compound Action Execution** — LLM-planned compound actions execute via the Execute service (spec 028, #114)
-- [ ] **Dynamic Scenes** — objects that move, agents that spawn/despawn, room connections that change (no spec yet)
+- [x] **Dynamic Scenes** — SceneMutationService (validated mutation funnel, tick-boundary apply, event-sourced), object/agent lifecycle with dormant-agent store + YAAM persistence, dynamic topology (open/close doors), `modify_scene` cognitive tool with §10 guardrails, live visualizer deltas (spec 030, #120)
 
 ## Architecture Coverage Map
 
