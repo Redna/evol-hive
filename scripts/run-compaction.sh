@@ -81,8 +81,10 @@ else
 fi
 
 # ── Run compactor (deduplicate UPSERT_NODE events, keep latest per node ID) ──
-echo "Compacting events..."
-node scripts/compact.js events.jsonl events-compacted.jsonl
+# Uses the STREAMING compactor (readline + Maps) — the in-memory compact.js
+# OOM'd at ~4GB heap on 3.7M events (compaction workflow failure 2026-09-04).
+echo "Compacting events (streaming)..."
+node scripts/compact-stream.js events.jsonl events-compacted.jsonl
 
 mv events-compacted.jsonl events.jsonl
 
