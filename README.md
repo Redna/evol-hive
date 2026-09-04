@@ -49,6 +49,19 @@ npx tsx examples/visualizer-demo.ts
 
 Controls: Play/Pause, speed (1x/2x/5x), Save/Load state, and a scene selector (minimal, morning-routine, coffee-shop).
 
+### Dynamic World — living scenes (spec 030)
+
+`dynamic-world-sim.ts` runs a 12-minute real-LLM simulation that mutates the scene live: an agent spawns mid-run, objects appear and move, a gate closes and reopens, and an agent despawns to dormancy and returns with its state restored — all visible on canvas without a reload.
+
+![Dynamic World — mutations live: watering can added, gate closed, apprentice present](docs/screenshots/dynamic-world-mutations.png)
+
+![Dynamic World — apprentice respawned from dormancy, gate reopened](docs/screenshots/dynamic-world-respawn.png)
+
+```bash
+USE_REAL_LLM=true npx tsx examples/dynamic-world-sim.ts
+# Open http://localhost:3100
+```
+
 > Note: the demo runs a no-op mock orchestrator (rendering demo only). Agents do not perform PPER cycles — see issue [#106](https://github.com/Redna/evol-hive/issues/106) for wiring real LLM cognition into the demo.
 
 ## Project Structure
