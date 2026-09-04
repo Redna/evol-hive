@@ -72,10 +72,16 @@ export class ExecuteServiceImpl {
 
       // Plan validation (spec 016, Req 11): before executing, validate that the
       // action aligns with the current plan. If the guardrail rejects it, set
-      // system feedback, stop thinking, and return a deviation result.
+      // system feedback, stop thinking, and return a deviation result. The
+      // optional context carries the agent identity + room so topology-aware
+      // guardrails can reject movement through closed connections (spec 030,
+      // Req 10 — blocked steps trigger a reflection tick).
       const guardrail = this.options.guardrail;
       if (guardrail !== undefined) {
-        const validation = guardrail.validateAction(step.targetAffordance, agentState.currentPlan);
+        const validation = guardrail.validateAction(step.targetAffordance, agentState.currentPlan, {
+          agentId,
+          fromRoom: agentState.location,
+        });
         if (!validation.valid) {
           const reason = validation.reason ?? 'Action deviates from plan';
           dataProvider.setSystemFeedback(agentId, reason);

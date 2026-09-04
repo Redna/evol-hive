@@ -19,6 +19,10 @@ import type {
   UpdateStateToolResult,
   SocialActionBridge,
   SocialToolResult,
+  SceneMutationPort,
+  SceneMutationProposal,
+  SceneMutationType,
+  ModifySceneToolResult,
 } from '@evol-hive/shared';
 import type { MemoryInjector } from '@evol-hive/memory';
 
@@ -32,6 +36,17 @@ export interface CognitiveToolExecutorOptions {
   socialBridge?: SocialActionBridge;
   /** Optional current simulation tick for relationship timestamps (spec 018, Req 41). */
   currentTick?: number;
+  /**
+   * Optional mutation port for the modify_scene tool (spec 030, Req 13).
+   * Implemented by the engine (`SceneMutationService`); per ADR-0001 the
+   * tool layer only *proposes* — validation happens engine-side.
+   */
+  mutationPort?: SceneMutationPort;
+  /**
+   * Max modify_scene proposals per agent per PPER cycle (spec 030, Req 14a).
+   * Default 1. Wired from `GuardrailConfig.maxSceneMutationsPerCycle`.
+   */
+  maxSceneMutationsPerCycle?: number;
 }
 
 /**
@@ -48,12 +63,18 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
   private readonly stateDataProvider: CognitiveToolDataProvider | undefined;
   private readonly socialBridge: SocialActionBridge | undefined;
   private readonly currentTick: number;
+  private readonly mutationPort: SceneMutationPort | undefined;
+  private readonly maxSceneMutationsPerCycle: number;
+  /** modify_scene proposals used this cycle, per agent (spec 030, Req 14a). */
+  private readonly sceneMutationBudget = new Map<string, number>();
 
   constructor(options: CognitiveToolExecutorOptions = {}) {
     this.memoryInjector = options.memoryInjector;
     this.stateDataProvider = options.stateDataProvider;
     this.socialBridge = options.socialBridge;
     this.currentTick = options.currentTick ?? Date.now();
+    this.mutationPort = options.mutationPort;
+    this.maxSceneMutationsPerCycle = options.maxSceneMutationsPerCycle ?? 1;
   }
 
   async executeQueryMemory(
@@ -309,6 +330,111 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         message: `Failed to ignore agent: ${errMsg}.`,
         relationshipUpdated: false,
       };
+    }
+  }
+
+  /**
+   * Execute modify_scene: enqueue a scene mutation proposal through the
+   * engine's mutation port (spec 030, Req 13). The LLM can only propose —
+   * validation happens engine-side, and the actionable rejection message is
+   * returned as tool feedback so the LLM can self-correct (Req 14b).
+   *
+   * Guardrail (Req 14a): at most `maxSceneMutationsPerCycle` proposals per
+   * agent per PPER cycle. The budget is reset at cycle start via
+   * {@link resetSceneMutationBudget} (wired from the orchestrator's
+   * `onCycleStart` hook).
+   */
+  async executeModifyScene(
+    agentId: string,
+    args: Record<string, unknown>,
+  ): Promise<ModifySceneToolResult> {
+    if (this.mutationPort === undefined) {
+      return { success: false, error: 'Scene mutation is not available in this environment.' };
+    }
+
+    // Rate limit (Req 14a / AC-9).
+    const used = this.sceneMutationBudget.get(agentId) ?? 0;
+    if (used >= this.maxSceneMutationsPerCycle) {
+      return {
+        success: false,
+        error: `Rate limit: at most ${this.maxSceneMutationsPerCycle} modify_scene proposal(s) per agent per PPER cycle (used ${used}). Reflect and retry next cycle.`,
+      };
+    }
+
+    // Map flat tool args to a validated proposal (Req 13).
+    const op = typeof args['op'] === 'string' ? (args['op'] as string) : '';
+    const proposal = this.buildProposal(op, args);
+    if (proposal === null) {
+      return {
+        success: false,
+        error: `Unknown or incomplete modify_scene op '${op}'. Valid ops: add_object, remove_object, move_object, spawn_agent, despawn_agent, set_connection_state.`,
+      };
+    }
+
+    const result = this.mutationPort.propose(proposal);
+    if (!result.accepted) {
+      return { success: false, error: result.error ?? 'Mutation proposal rejected.' };
+    }
+
+    this.sceneMutationBudget.set(agentId, used + 1);
+    return { success: true, ...(result.seq !== undefined ? { seq: result.seq } : {}) };
+  }
+
+  /** Reset the per-cycle modify_scene budget for an agent (Req 14a). */
+  resetSceneMutationBudget(agentId: string): void {
+    this.sceneMutationBudget.delete(agentId);
+  }
+
+  /** Build a SceneMutationProposal from flat tool args, or `null` for unknown ops. */
+  private buildProposal(op: string, args: Record<string, unknown>): SceneMutationProposal | null {
+    const str = (key: string): string | undefined => {
+      const value = args[key];
+      return typeof value === 'string' && value.length > 0 ? value : undefined;
+    };
+
+    const proposalFor = (
+      type: SceneMutationType,
+      payload: SceneMutationProposal['payload'],
+    ): SceneMutationProposal => ({ type, payload, source: 'llm' });
+
+    switch (op) {
+      case 'add_object':
+        if (typeof args['object'] !== 'object' || args['object'] === null) return null;
+        return proposalFor('add_object', { object: args['object'] as never });
+      case 'remove_object': {
+        const objectId = str('objectId');
+        return objectId === undefined ? null : proposalFor('remove_object', { objectId });
+      }
+      case 'move_object': {
+        const objectId = str('objectId');
+        const toRoomId = str('toRoomId');
+        if (objectId === undefined || toRoomId === undefined) return null;
+        return proposalFor('move_object', { objectId, toRoomId });
+      }
+      case 'spawn_agent': {
+        const dormantAgentId = str('dormantAgentId');
+        if (dormantAgentId !== undefined) {
+          return proposalFor('spawn_agent', { dormantAgentId });
+        }
+        if (typeof args['profile'] !== 'object' || args['profile'] === null) return null;
+        return proposalFor('spawn_agent', { profile: args['profile'] as never });
+      }
+      case 'despawn_agent': {
+        const agentId = str('agentId');
+        return agentId === undefined ? null : proposalFor('despawn_agent', { agentId });
+      }
+      case 'set_connection_state': {
+        const roomA = str('roomA');
+        const roomB = str('roomB');
+        const action = str('action');
+        if (roomA === undefined || roomB === undefined) return null;
+        if (action !== 'open' && action !== 'close' && action !== 'insert' && action !== 'remove') {
+          return null;
+        }
+        return proposalFor('set_connection_state', { roomA, roomB, action });
+      }
+      default:
+        return null;
     }
   }
 }

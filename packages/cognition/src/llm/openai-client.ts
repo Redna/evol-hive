@@ -160,7 +160,7 @@ export type ChatMessage =
     }
   | { role: 'tool'; content: string; tool_call_id: string };
 
-/** The set of cognitive tool names executed mid-loop (spec 015, Req 14; spec 018, Req 29). */
+/** The set of cognitive tool names executed mid-loop (spec 015, Req 14; spec 018, Req 29; spec 030, Req 13). */
 const COGNITIVE_TOOL_NAMES = new Set<string>([
   'query_memory',
   'update_internal_state',
@@ -168,6 +168,7 @@ const COGNITIVE_TOOL_NAMES = new Set<string>([
   'observe_agent',
   'help',
   'ignore',
+  'modify_scene',
 ]);
 
 interface ConsolidatedMemoryItem {
@@ -628,6 +629,15 @@ export class OpenAICompatibleLLMClient {
           const targetAgentId =
             typeof args['targetAgentId'] === 'string' ? (args['targetAgentId'] as string) : '';
           result = await executor.executeIgnore(agentId, targetAgentId);
+        } else if (toolName === 'modify_scene') {
+          // spec 030, Req 13: proposals go through the engine's mutation port;
+          // rejection messages (validation / rate limit) come back as tool
+          // feedback for LLM self-correction.
+          if (typeof executor.executeModifyScene === 'function') {
+            result = await executor.executeModifyScene(agentId, args);
+          } else {
+            result = { success: false, error: 'modify_scene is not available.' };
+          }
         } else {
           // update_internal_state
           const newGoal =
