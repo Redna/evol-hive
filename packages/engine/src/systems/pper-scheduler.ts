@@ -50,6 +50,11 @@ export class PPERScheduler {
     const agents = this.agentManager.getActiveAgents();
     if (agents.length === 0) return;
 
+    // The agent list can shrink between ticks (runtime DespawnAgent,
+    // spec 030) — a stale round-robin cursor must never read past the end
+    // of the fresh snapshot, so clamp it before scanning.
+    if (this.rrCursor >= agents.length) this.rrCursor = 0;
+
     // Round-robin: start scanning from the last position so that
     // with maxConcurrent=1, different agents get turns across ticks.
     let scanned = 0;

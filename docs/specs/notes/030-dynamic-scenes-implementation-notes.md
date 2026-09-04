@@ -79,3 +79,33 @@
 ## Remaining follow-ups (none blocking)
 - Optional: compaction strategy for the YAAM log is the memory pipeline's
   existing concern (unchanged by this feature).
+
+## QA pass (PR #120 review, session 2)
+
+**Coverage audit** — mapped all 11 ACs to tests; two gaps found and closed:
+- AC-1 integration path (agent executes a `carry` affordance → engine effect →
+  mutation funnel → tick boundary) was only exercised at service level. Added
+  `packages/engine/tests/spec-030-carry-integration.test.ts` (4 tests) through
+  the real `PhysicsSystem.executeAffordance` + assembled loop.
+- No E2E ran the fully assembled engine as one living-world flow. Added
+  `packages/engine/tests/spec-030-e2e-dynamic-world.test.ts` (6 tests):
+  mid-run spawn → PPER cycle ≤ 20 ticks (AC-2), visualizer snapshot + deltas
+  (AC-6), closed-door topology/guard/affordances (AC-4), despawn dormancy
+  (AC-3), save/load round-trip (AC-7), replay determinism (AC-8).
+
+**Bug found & fixed by the new E2E**: `PPERScheduler.update()` crashed with
+`TypeError: cannot read 'isThinking' of undefined` on the tick after a mid-run
+despawn — the round-robin `rrCursor` went stale when the agent list shrank.
+Fixed with a cursor clamp in `packages/engine/src/systems/pper-scheduler.ts`;
+the e2e despawn test now covers the regression. Any real runtime despawn
+could have hit this (AC-3's "excluded from scheduler surfaces").
+
+**AC-11 deviation (flagged for reviewer sign-off)**: five existing test files
+were modified (system-order lists ×4, save-version literals ×4 + one title).
+Req 11 mandates the SAVE_FORMAT_VERSION 1→2 bump, which collides with
+spec-017's hard-coded literals — Req 16's "tests pass unmodified" and Req 11
+are mutually exclusive; the changes are mechanical and now track the constant.
+Static-scene byte-identical save fields are covered (`spec-030-persistence`).
+
+**Verification**: `pnpm test` 1732 passing workspace-wide (1722 + 10 new),
+`pnpm typecheck` ✓, `pnpm lint` ✓, `pnpm format:check` ✓.
