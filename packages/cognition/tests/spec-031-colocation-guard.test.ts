@@ -246,9 +246,11 @@ describe('ExecuteServiceImpl co-location failure (spec 031, Req 4 — AC-3)', ()
     expect(provider.setThinkingCalls).toEqual([{ agentId: AGENT_ID, isThinking: false }]);
   });
 
-  it('does not advance the plan step', async () => {
+  it('does not advance the plan step and applies no drive changes', async () => {
     await service.execute(AGENT_ID);
     expect(provider.advanceStepCalls).toEqual([]);
+    // No accumulated drive changes reach the provider on the failure path.
+    expect(provider.applyDriveChangesCalls).toEqual([]);
   });
 
   it('skip path stays reachable for truly-unresolvable affordances (not a co-location failure)', async () => {

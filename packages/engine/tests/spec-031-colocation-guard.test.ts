@@ -132,6 +132,22 @@ describe('PhysicsSystemImpl co-location guard (spec 031, Req 1/2 — AC-1, AC-2,
     expect(registry.get('toolbox-1')!.roomId).toBe(WORKSHOP);
   });
 
+  it('AC-2 (drives): no drive changes occur — the agent drives are identical before and after the failed call', async () => {
+    registry.setRoom('toolbox-1', WORKSHOP);
+    agentManager.updateState(AGENT_ID, {
+      drives: { energy: 10, hunger: 50, social: 80, comfort: 60, curiosity: 40 },
+    });
+    const drivesBefore = { ...agentManager.getState(AGENT_ID)!.drives };
+
+    const result = await physics.executeAffordance('toolbox-1', 'take_tool', AGENT_ID);
+
+    expect(result.success).toBe(false);
+    // No AffordanceResult.driveChanges is ever produced — the handler never runs.
+    expect(result.driveChanges).toBeUndefined();
+    const drivesAfter = agentManager.getState(AGENT_ID)!.drives;
+    expect(drivesAfter).toEqual(drivesBefore);
+  });
+
   it('AC-13: the guard runs on direct executeAffordance(objectId, …) calls (non-room-scoped resolution path)', async () => {
     // The caller bypasses room-scoped resolution entirely — the guard must
     // still compare live object.roomId vs live agent location.

@@ -18,8 +18,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { Affordance, Room, SmartObject } from '@evol-hive/shared';
 import { createEngineCore, loadScene } from '@evol-hive/engine';
 import type { AffordanceHandler, EngineCore } from '@evol-hive/engine';
-import { ExecuteServiceImpl, GuardrailEngineImpl } from '@evol-hive/cognition';
-import type { TopologyGuard, AffordanceGuard } from '@evol-hive/shared';
+import {
+  ExecuteServiceImpl,
+  GuardrailEngineImpl,
+  PassivePerceptionAssembler,
+  PlanBuilderImpl,
+} from '@evol-hive/cognition';
+import type { TopologyGuard, AffordanceGuard, PerceptionResult } from '@evol-hive/shared';
 
 const AGENT_ID = 'gardener-1';
 const GARDEN = 'garden';
@@ -191,15 +196,38 @@ describe('Issue #121 E2E — execute-time co-location guard (spec 031)', () => {
     expect(state.isThinking).toBe(false);
   });
 
+  it('AC-5 (integration): the next perception tick carries the feedback into the Plan-phase LLM context (§9.2)', async () => {
+    moveToolbox(core);
+
+    const execute = new ExecuteServiceImpl({ dataProvider: core.bridges.execute });
+    await execute.execute(AGENT_ID);
+
+    // Real next-tick perception: the assembler reads the live engine bridges.
+    const assembler = new PassivePerceptionAssembler(core.bridges.perception);
+    const passive = assembler.buildPassivePerception(AGENT_ID);
+    expect(passive.systemFeedback).toBe(
+      'The Toolbox (toolbox-1) is no longer here — it moved to the workshop.',
+    );
+
+    // The feedback is rendered into the Plan-phase context the LLM sees
+    // (spec 003 §9.2 → plan-builder "System feedback:" line) so the Reflect
+    // /re-plan step can adapt (e.g. plan go_to_workshop next).
+    const perceptionResult: PerceptionResult = {
+      passive,
+      prunedAffordances: [],
+      primaryDriveLabel: 'curious, wants to explore',
+    };
+    const payload = new PlanBuilderImpl().build(perceptionResult);
+    expect(payload.perceptionContext).toContain(
+      'System feedback: The Toolbox (toolbox-1) is no longer here — it moved to the workshop.',
+    );
+  });
+
   it('AC-13: a direct, non-room-scoped executeAffordance call hits the physics co-location guard', async () => {
     moveToolbox(core);
 
     // Direct bridge call — no room-scoped resolution involved.
-    const result = await core.bridges.execute.executeAffordance(
-      'toolbox-1',
-      'take_tool',
-      AGENT_ID,
-    );
+    const result = await core.bridges.execute.executeAffordance('toolbox-1', 'take_tool', AGENT_ID);
 
     expect(result.success).toBe(false);
     expect(result.failureReason).toBe(
