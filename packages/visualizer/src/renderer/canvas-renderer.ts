@@ -29,34 +29,70 @@ const DRIVES: { key: keyof VisualizerAgent['drives']; label: string; color: stri
 /** A canvas-like rendering context (CanvasRenderingContext2D or a mock). */
 type RenderContext = CanvasRenderingContext2D;
 
+/** Usable width of the 60px object chip: 60px box − 2px left padding − ~2px right margin (spec 029, Req 3). */
+const STATE_LINE_MAX_WIDTH = 56;
+
+/** Single trailing ellipsis appended when a state line must be clipped (spec 029, Req 3). */
+const ELLIPSIS = '…';
+
 /**
- * Format an object state key/value line for the object chip (issue #105).
- * Numeric values are rounded to 1 decimal (state rules decay by fractions,
- * which used to render as "95.666666674" and overflow the chip). The VALUE is
- * always visible — the KEY is truncated first, then the whole line is clamped
- * to the 60px chip width with an ellipsis.
+ * Format a single object state value for display (spec 029, Req 1/2).
+ *
+ * Numeric values are rounded to at most 2 decimal places with trailing zeros
+ * trimmed (`95.666666674 → "95.67"`, `95.5 → "95.5"`, `5 → "5"`) — float error
+ * from drive-decay / state-rule arithmetic must not leak into labels. The
+ * rounding is display-only: it never mutates the underlying state. Strings and
+ * booleans pass through verbatim (`String(value)`); anything else falls back
+ * to `JSON.stringify` as a last resort.
  */
-export function formatStateLine(key: string, val: unknown, maxWidthPx = 56): string {
-  let valueText: string;
+export function formatStateValue(val: unknown): string {
   if (typeof val === 'number') {
-    valueText = String(Math.round(val * 10) / 10);
-  } else if (typeof val === 'string' || typeof val === 'boolean') {
-    valueText = String(val);
-  } else {
-    valueText = JSON.stringify(val);
+    // Round to 2 decimals, then let Number → String drop trailing zeros
+    // (blind toFixed(2) would render 5 as "5.00" and 95.5 as "95.50").
+    return String(Math.round(val * 100) / 100);
   }
-  // Approximate rendered width (10px sans-serif ≈ 5.5px/char in Node; on the
-  // browser we could measureText, but approximation keeps this DOM-free).
-  const approxWidth = (s: string): number => s.length * 5.5;
-  const maxKeyChars = 10;
-  let shortKey = key.length > maxKeyChars ? key.slice(0, maxKeyChars) : key;
-  let line = `${shortKey}: ${valueText}`;
-  // If still too wide, shrink the key further (value stays visible).
-  while (approxWidth(line) > maxWidthPx && shortKey.length > 1) {
-    shortKey = shortKey.slice(0, -1);
-    line = `${shortKey}: ${valueText}`;
+  if (typeof val === 'string' || typeof val === 'boolean') {
+    return String(val);
   }
-  return line;
+  return JSON.stringify(val);
+}
+
+/**
+ * Shrink `text` character-by-character with a single trailing ellipsis until
+ * its measured width fits `maxWidthPx` (spec 029, Req 3/4). Text that already
+ * fits is returned unmodified. The decision is driven entirely by the injected
+ * `measure` callback (backed by `ctx.measureText(...).width` under the font
+ * currently in effect) — never by a fixed character count, which would be
+ * font- and DPI-dependent.
+ */
+function fitTextToWidth(
+  text: string,
+  measure: (text: string) => number,
+  maxWidthPx: number,
+): string {
+  if (measure(text) <= maxWidthPx) {
+    return text;
+  }
+  let fitted = text;
+  while (fitted.length > 0 && measure(`${fitted}${ELLIPSIS}`) > maxWidthPx) {
+    fitted = fitted.slice(0, -1);
+  }
+  return `${fitted}${ELLIPSIS}`;
+}
+
+/**
+ * Format an object state key/value line for the object chip (spec 029).
+ * Composes `${key}: ${value}` (numeric values rounded per `formatStateValue`),
+ * then clips the whole line to the chip's usable width (default 56px) via the
+ * injected `measure` callback, appending a single ellipsis when clipped.
+ */
+export function formatStateLine(
+  key: string,
+  val: unknown,
+  measure: (text: string) => number,
+  maxWidthPx: number = STATE_LINE_MAX_WIDTH,
+): string {
+  return fitTextToWidth(`${key}: ${formatStateValue(val)}`, measure, maxWidthPx);
 }
 
 /**
@@ -202,11 +238,13 @@ export class CanvasRenderer {
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.fillText(obj.name.slice(0, 8), ox + 2, oy + 2);
-      // State text — first key/value pair, rounded and clamped to the chip.
+      // State text — first key/value pair, rounded and clamped to the chip
+      // (spec 029): measured via ctx.measureText under the font set above.
       const stateEntries = Object.entries(obj.state);
       if (stateEntries.length > 0) {
         const [key, val] = stateEntries[0]!;
-        ctx.fillText(formatStateLine(key, val), ox + 2, oy + 16);
+        const measure = (text: string): number => ctx.measureText(text).width;
+        ctx.fillText(formatStateLine(key, val, measure, STATE_LINE_MAX_WIDTH), ox + 2, oy + 16);
       }
     });
   }
