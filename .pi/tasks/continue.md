@@ -9,7 +9,8 @@ A previous session was interrupted mid-work. Resume it:
    - YAAM notes: `yaam_search("feature-")` — previous sessions left progress breadcrumbs
 3. Finish whatever remains: tests written? implementation complete? typecheck/lint/build green?
 4. Commit and push after every completed step (uncommitted work is lost on session end)
-5. When tests pass and everything is green: open/refresh the PR with `gh pr create`
+5. When tests pass and everything is green: open/refresh the PR with
+   `GH_TOKEN=$GH_PAT gh pr create` (REQUIRED — App-token PRs can't run CI)
    - Title: "feat: [feature name]"
    - Body: reference the spec file and issue number
 6. Update `docs/specs/INDEX.md` — spec status to "🔍 In Review"

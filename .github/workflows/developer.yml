@@ -73,6 +73,11 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # PAT for the agent's `gh pr create` — PRs authored by the App bot put
+          # CI in action_required (manual approval needed). PAT-authored PRs
+          # run CI immediately (cross-identity rule: bot specs → PAT approves;
+          # PAT code PRs → bot approves).
+          GH_PAT: ${{ secrets.GH_PAT }}
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
         run: |
           set -x

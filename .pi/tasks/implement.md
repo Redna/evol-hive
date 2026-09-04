@@ -13,9 +13,11 @@ Steps:
 10. Run `pnpm build` — confirm it builds
 11. Commit tests and implementation
 12. Push the branch: `git push -u origin feature/NNN-name`
-13. Open a PR using `gh pr create` with:
+13. Open a PR using `GH_TOKEN=$GH_PAT gh pr create` with:
     - Title: "feat: [feature name]"
     - Body: reference the spec file and issue number
+    (the GH_TOKEN override is REQUIRED — PRs created with the default App
+     token are blocked from running CI)
 14. Record what you built in YAAM notes
 15. Update `docs/specs/INDEX.md` — change the spec status to "🔍 In Review"
 
