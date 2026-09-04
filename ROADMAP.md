@@ -33,9 +33,10 @@
 
 | Spec | Feature | Status | PRs |
 |---|---|---|---|
-| [023](docs/specs/023-visual-output.md) | Visual Output (canvas renderer) | ✅ Merged | #95 |
-| [024](docs/specs/024-scene-authoring.md) | Scene Authoring (YAML + CLI) | ✅ Merged | #96 |
-| [025](docs/specs/025-performance-tuning.md) | Performance Tuning (KV-cache prompts) | ✅ Merged | #97 |
+| [021](docs/specs/021-kv-cache-prompt-optimization.md) | KV-Cache Prompt Optimization | ✅ Merged | #97 |
+| [022](docs/specs/022-scene-authoring-declarative.md) | Scene Authoring (YAML + CLI) | ✅ Merged | #96 |
+| [023](docs/specs/023-visual-output-canvas-renderer.md) | Visual Output (canvas renderer) | ✅ Merged | #95 |
+| [024](docs/specs/024-social-tool-invocation-fix.md) | Social Tool Invocation Fix | ✅ Merged | #102 |
 | [026](docs/specs/026-memory-entry-fix.md) | Memory Entry Fix (flatten + fallback) | ✅ Merged | #104 |
 | [027](docs/specs/027-real-llm-visualizer-demo.md) | Real-LLM Visualizer Demo | ✅ Merged | #113 |
 | [028](docs/specs/028-compound-action-execution.md) | Compound Action Execution | ✅ Merged | #114 |
