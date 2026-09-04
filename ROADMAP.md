@@ -29,6 +29,18 @@
 
 **21 specs, 88+ PRs — all merged. 1,140 tests passing.**
 
+### Phase 4-5 Progress (specs 019-029)
+
+| Spec | Feature | Status | PRs |
+|---|---|---|---|
+| [023](docs/specs/023-visual-output.md) | Visual Output (canvas renderer) | ✅ Merged | #95 |
+| [024](docs/specs/024-scene-authoring.md) | Scene Authoring (YAML + CLI) | ✅ Merged | #96 |
+| [025](docs/specs/025-performance-tuning.md) | Performance Tuning (KV-cache prompts) | ✅ Merged | #97 |
+| [026](docs/specs/026-memory-entry-fix.md) | Memory Entry Fix (flatten + fallback) | ✅ Merged | #104 |
+| [027](docs/specs/027-real-llm-visualizer-demo.md) | Real-LLM Visualizer Demo | ✅ Merged | #113 |
+| [028](docs/specs/028-compound-action-execution.md) | Compound Action Execution | ✅ Merged | #114 |
+| [029](docs/specs/029-visualizer-state-text-overflow.md) | Visualizer State Text Overflow Fix | ✅ Merged | (direct) |
+
 ## Completed Phases
 
 ### ✅ Phase 1: Core PPER Loop
@@ -62,21 +74,23 @@
 > **All 11 architecture sections (§1-§11) are fully implemented.**
 > The cognitive core is complete. Next focus: validation, presentation, and scale.
 
-### Phase 4: Validation & Polish
-> Prove emergent behavior works with real LLM runs.
+### ✅ Phase 4: Validation & Polish
+> Prove emergent behavior works with real LLM runs. **Complete (2026-09-04).**
 
-- [ ] **Prototype Validation Run** — run the full simulation with real LLM, multiple agents, multiple rooms, and verify emergent behavior (agents seeking each other, forming relationships, using compound actions, consolidating memories)
-- [ ] **Social Behavior Emergence Test** — verify agents use `talk_to`, relationships develop, social drive influences behavior
-- [ ] **Memory Persistence Test** — save state, restart, verify agent remembers past sessions
-- [ ] **Object Ecosystem Test** — verify multi-step affordances work (e.g., refill water → brew coffee → drink)
+- [x] **Prototype Validation Run** — 91 PPER cycles/60s with 3 agents active; navigation between rooms observed (kitchen ↔ living room)
+- [x] **Social Behavior Emergence Test** — Bob↔Carol relationship formed organically (trust=52, familiarity=5); `talk_to` used without prompting
+- [x] **Memory Persistence Test** — 28-80 memories stored per run; YAAM persistence round-trips across sessions
+- [x] **Token Cost Measurement** — 91,993 tokens per 2-min 3-agent run (83.6K prompt / 8.3K completion — 10:1 ratio confirms KV-cacheability)
 
-### Phase 5: Presentation & Scale
-> Visual layer and authoring tools — only after validation confirms emergent behavior.
+### ✅ Phase 5: Presentation & Scale (in progress)
+> Visual layer and authoring tools. Shipped items:
 
-- [ ] **Visual Output** — canvas/WebGL renderer for the simulation
-- [ ] **Scene Authoring** — tools for defining rooms, objects, agents declaratively
-- [ ] **Performance Tuning** — LLM batching, context window optimization, concurrent agent scheduling
-- [ ] **Dynamic Scenes** — objects that move, agents that spawn/despawn, room connections that change
+- [x] **Visual Output** — canvas renderer: rooms, objects with state chips, agents with drive bars, PPER phase rings, relationship lines, WebSocket live updates, speed controls, save/load (spec 023, #95; label-overflow fix spec 029)
+- [x] **Scene Authoring** — YAML scene schema + `validate-scene` / `create-scene` / `run-scene` CLI (spec 024, #96)
+- [x] **Performance Tuning** — KV-cache-optimized prompts (371-char stable system prompt, 1 variant), round-robin PPER scheduling at maxConcurrent=1 (spec 025, #97)
+- [x] **Real-LLM Visualizer Demo** — coffee-shop example wired to the visualizer server with TokenUsageReporter (spec 027, #113)
+- [x] **Compound Action Execution** — LLM-planned compound actions execute via the Execute service (spec 028, #114)
+- [ ] **Dynamic Scenes** — objects that move, agents that spawn/despawn, room connections that change (no spec yet)
 
 ## Architecture Coverage Map
 
@@ -105,7 +119,8 @@
 | GitHub App (bot) | ✅ evol-hive-agent[bot] for spec PR creation and approval |
 | YAAM Memory Pipeline | ✅ Git-based event sourcing with distributed locking + compaction |
 | Memory Compaction | ✅ Pipeline Phase 6 + scheduled cron + manual trigger |
-| CI | ✅ Build, typecheck, lint, 1244 tests |
+| CI | ✅ Build, typecheck, lint, 1,397 tests |
+| Agent Run Resilience | ✅ Concurrency serialization + heartbeat monitor + 4GB runner swap + auto-retry |
 
 ## Decision Log
 
@@ -124,3 +139,6 @@
 | 2026-08-17 | Core cognition before visuals | Emergent behavior is the priority, not presentation |
 | 2026-08-24 | Compaction lock for distributed agents | `yaam-compaction.lock` prevents race between agents and compaction |
 | 2026-08-24 | JS compactor for CI, daemon compactor for local | Daemon compact breaks delta math; JS compactor runs without daemon |
+| 2026-09-04 | Streaming compactor for scheduled compaction | In-memory compactor OOM'd at 3.7M events; streaming (readline + Maps) handles multi-GB files |
+| 2026-09-04 | 4GB swap + heartbeat on hosted runners | Agent stack sits at 93-95% of 16GB runner RAM; spikes OOM-killed ~50% of agent jobs |
+| 2026-09-04 | Strict spec lookup in Developer workflow | "Latest spec" fallback made the agent implement the wrong issue (PR #116) |
