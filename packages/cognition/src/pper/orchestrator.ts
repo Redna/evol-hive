@@ -63,6 +63,12 @@ export interface PPEROrchestratorOptions {
    * to reduce LLM calls.
    */
   batchPlanService?: BatchPlanService;
+  /**
+   * Optional hook fired at the start of every PPER cycle (spec 030, Req 14a).
+   * Used by the application wiring to reset per-cycle budgets such as the
+   * `modify_scene` rate limit on the cognitive tool executor.
+   */
+  onCycleStart?: (agentId: string) => void;
 }
 
 /** Concrete PPEROrchestrator wiring the four phase services in sequence. */
@@ -74,6 +80,8 @@ export class PPEROrchestratorImpl {
   private readonly errorConfig: PPERErrorConfig;
   /** Optional batch plan service (spec 022, Req 9). `undefined` when not wired in. */
   private readonly batchPlanService: BatchPlanService | undefined;
+  /** Optional per-cycle start hook (spec 030, Req 14a). */
+  private readonly onCycleStart: ((agentId: string) => void) | undefined;
 
   /** Current phase per agent (defaults to 'perceive' = idle). */
   private readonly phases = new Map<string, PPERPhase>();
@@ -109,12 +117,17 @@ export class PPEROrchestratorImpl {
     });
     this.errorConfig = options.errorConfig ?? defaultPPERErrorConfig();
     this.batchPlanService = options.batchPlanService;
+    this.onCycleStart = options.onCycleStart;
   }
 
   /** Run a single PPER cycle for the given agent. */
   async runCycle(agentId: string): Promise<void> {
     const failures = this.consecutiveFailures.get(agentId) ?? 0;
     const cooldownStart = this.cooldownStartedAt.get(agentId) ?? 0;
+
+    // Per-cycle hook (spec 030, Req 14a): reset per-cycle budgets (e.g. the
+    // modify_scene rate limit) before the phases run.
+    this.onCycleStart?.(agentId);
 
     // Check cooldown (spec 008, Req 2.3).
     if (failures >= this.errorConfig.maxConsecutiveFailures) {

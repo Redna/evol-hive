@@ -566,6 +566,10 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
     bridges: core.bridges,
     ...(persistence !== undefined ? { persistence } : {}),
     socialManager: stack.socialManager,
+    // Dynamic world (spec 030, Req 1): the mutation funnel + dormancy state.
+    mutationService: core.mutationService,
+    dormantStore: core.dormantStore,
+    yaamEventLog: core.yaamEventLog,
     ...(stack.cognitiveToolExecutor !== undefined
       ? { cognitiveToolExecutor: stack.cognitiveToolExecutor }
       : {}),

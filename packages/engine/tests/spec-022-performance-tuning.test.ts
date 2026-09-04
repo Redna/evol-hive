@@ -155,6 +155,7 @@ describe('AC-2: createEngine & assembleGameLoop schedulerConfig (Req 2, Req 3)',
   it('createEngine without schedulerConfig still registers systems in order', () => {
     const engine = createEngine(makeConfig(), new FakeOrchestrator());
     expect(engine.gameLoop.systemNames()).toEqual([
+      'scene-mutations',
       'spatial',
       'drive-decay',
       'object-state',

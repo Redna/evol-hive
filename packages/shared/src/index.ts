@@ -11,6 +11,7 @@ export * from './types/memory.js';
 export * from './types/world.js';
 export * from './types/embedding.js';
 export * from './types/persistence.js';
+export * from './types/mutations.js';
 export * from './types/visualizer.js';
 export * from './types/performance.js';
 

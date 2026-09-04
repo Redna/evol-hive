@@ -13,6 +13,7 @@ import type { AgentInternalState, AgentProfile } from './agent.js';
 import type { SmartObject } from './affordance.js';
 import type { MemoryNode } from './memory.js';
 import type { Room } from './world.js';
+import type { DynamicWorldSnapshot } from './mutations.js';
 
 /** A snapshot of the deterministic game loop state (spec 017, Req 2). */
 export interface GameLoopSnapshot {
@@ -53,13 +54,26 @@ export interface SaveState {
   world: WorldSnapshot;
   /** All memory nodes across all agents. */
   memories: MemoryNode[];
+  /**
+   * Dynamic-world extension (spec 030, Req 11): the applied mutation log and
+   * dormant agent snapshots. Absent for scenes that never mutated, so static
+   * scenes produce byte-identical saves (spec 030, AC-11).
+   */
+  dynamic?: DynamicWorldSnapshot;
 }
 
 /**
  * The current save format version (spec 017, Req 5). Increment on breaking
  * format changes and add a migration function (future concern).
+ *
+ * Spec 030 bumps 1 → 2: the optional `dynamic` field was added to
+ * `SaveState`. Old (v1) saves still load — absence of dynamic data is
+ * equivalent to zero mutations replayed (spec 030, Req 11).
  */
-export const SAVE_FORMAT_VERSION = 1;
+export const SAVE_FORMAT_VERSION = 2;
+
+/** The last save format version that `load()` still accepts (spec 030, Req 11). */
+export const MIN_SUPPORTED_SAVE_FORMAT_VERSION = 1;
 
 /**
  * Thrown by `load()` when the loaded `formatVersion` does not match

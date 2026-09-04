@@ -50,7 +50,7 @@ describe('AC-1: SaveState interface', () => {
       world: { rooms: [], objects: [] },
       memories: [],
     };
-    expect(save.formatVersion).toBe(1);
+    expect(save.formatVersion).toBe(SAVE_FORMAT_VERSION);
     expect(save.agents).toHaveLength(1);
     // AC-50: JSON round-trip without a replacer.
     const json = JSON.stringify(save);
@@ -124,8 +124,8 @@ describe('AC-4: WorldSnapshot interface', () => {
 });
 
 describe('AC-5: SAVE_FORMAT_VERSION constant', () => {
-  it('is defined with value 1', () => {
-    expect(SAVE_FORMAT_VERSION).toBe(1);
+  it('is defined with the current format version (bumped to 2 by spec 030)', () => {
+    expect(SAVE_FORMAT_VERSION).toBe(2);
   });
 });
 

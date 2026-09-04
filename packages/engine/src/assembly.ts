@@ -52,6 +52,12 @@ import { ObjectStateSystem } from './systems/object-state.js';
 import { AutoSaveSystem } from './systems/auto-save.js';
 import { EnginePersistenceImpl } from './persistence/index.js';
 import { SocialManager } from './social/social-manager.js';
+import {
+  SceneMutationServiceImpl,
+  SceneMutationSystem,
+  DormantAgentStore,
+  YaamEventLog,
+} from './world/mutations/index.js';
 import type { GameLoop, EnginePersistence } from './index.js';
 
 /** A no-op MemoryStore used when no real memory subsystem is wired. */
@@ -126,6 +132,12 @@ export interface EngineCore {
    * (spec 022, AC-1). `undefined` until the scheduler system is registered.
    */
   scheduler?: import('./systems/pper-scheduler.js').PPERScheduler;
+  /** Runtime scene mutation funnel (spec 030, Req 1). Always created. */
+  mutationService: SceneMutationServiceImpl;
+  /** Dormant-agent store backing despawn/respawn (spec 030, Req 7/8). Always created. */
+  dormantStore: DormantAgentStore;
+  /** YAAM event log for agent-scoped persistence (spec 030, Req 12). Always created. */
+  yaamEventLog: YaamEventLog;
 }
 
 /** Build all engine subsystems and bridges (no spec-mandated systems registered yet). */
@@ -152,6 +164,17 @@ export function createEngineCore(
 
   // SocialManager (spec 019, Req 1) — always created; depends only on AgentManager.
   const socialManager = new SocialManager(agentManager);
+
+  // Dynamic world (spec 030, Req 1): the single mutation funnel + dormancy.
+  const dormantStore = new DormantAgentStore();
+  const yaamEventLog = new YaamEventLog();
+  const mutationService = new SceneMutationServiceImpl({
+    registry: smartObjectRegistry,
+    sceneManager,
+    agentManager,
+    dormantStore,
+    yaamLog: yaamEventLog,
+  });
 
   const bridges = {
     perception: new PerceptionDataProviderImpl(
@@ -195,6 +218,7 @@ export function createEngineCore(
           smartObjectRegistry,
           sceneManager,
           vectorStore,
+          mutationService,
         })
       : undefined;
 
@@ -213,6 +237,9 @@ export function createEngineCore(
     clock: clock,
     ...(persistence !== undefined ? { persistence } : {}),
     socialManager,
+    mutationService,
+    dormantStore,
+    yaamEventLog,
   };
 }
 
@@ -238,6 +265,9 @@ export function assembleGameLoop(
   // Precedence (spec 022, Req 2/4): explicit arg > scene-level config > default.
   const resolvedSchedulerConfig: PPERSchedulerConfig =
     schedulerConfig ?? core.sceneSchedulerConfig ?? defaultPPERSchedulerConfig();
+  // (0) SceneMutations — FIRST, so queued mutations land at the tick boundary
+  // before any other system observes the world (spec 030, Req 1).
+  core.gameLoop.registerSystem(new SceneMutationSystem(core.mutationService));
   core.gameLoop.registerSystem(core.spatial); // (1) SpatialSystem
   core.gameLoop.registerSystem(new DriveDecaySystem(core.agentManager, core.driveSystem)); // (2) DriveDecaySystem
   core.gameLoop.registerSystem(new ObjectStateSystem(core.smartObjectRegistry)); // (3) ObjectStateSystem (spec 018)
@@ -287,6 +317,12 @@ export interface AssembledEngine {
   persistence?: EnginePersistence;
   /** Social manager (spec 019, Req 5). */
   socialManager: SocialManager;
+  /** Runtime scene mutation funnel (spec 030, Req 1). */
+  mutationService: SceneMutationServiceImpl;
+  /** Dormant-agent store (spec 030, Req 7/8). */
+  dormantStore: DormantAgentStore;
+  /** YAAM event log (spec 030, Req 12). */
+  yaamEventLog: YaamEventLog;
   /** The PPER scheduler (spec 022, AC-1/AC-2). */
   scheduler?: import('./systems/pper-scheduler.js').PPERScheduler;
 }
@@ -316,6 +352,9 @@ export function createEngine(
     ...(core.persistence !== undefined ? { persistence: core.persistence } : {}),
     socialManager: core.socialManager,
     ...(core.scheduler !== undefined ? { scheduler: core.scheduler } : {}),
+    mutationService: core.mutationService,
+    dormantStore: core.dormantStore,
+    yaamEventLog: core.yaamEventLog,
   };
 }
 
@@ -326,16 +365,37 @@ export function loadScene(core: EngineCore, scene: SceneDefinition): void {
     core.sceneSchedulerConfig = { maxConcurrentCycles: scene.maxConcurrentCycles };
   }
 
-  // Rooms.
+  // Rooms — deep-copied so runtime mutations (spec 030) never touch the
+  // authoring artifact: SceneDefinition objects are immutable.
   const roomMap = new Map<string, Room>();
   for (const room of scene.rooms) {
-    roomMap.set(room.id, room);
+    roomMap.set(room.id, {
+      ...room,
+      connections: [...room.connections],
+      objectIds: [...room.objectIds],
+    });
   }
   core.sceneManager = new SceneManagerImpl(core.agentManager, roomMap);
+  // Rebind the mutation funnel to the fresh scene manager (spec 030, Req 1) —
+  // the service must operate on the rooms the engine actually uses.
+  core.mutationService.setSceneManager(core.sceneManager);
 
-  // Objects.
+  // Objects — deep-copied for the same reason: runtime room moves and state
+  // patches must not leak into the SceneDefinition (spec 030 constraint).
   for (const object of scene.objects) {
-    core.smartObjectRegistry.register(object);
+    core.smartObjectRegistry.register({
+      ...object,
+      state: { ...object.state },
+      affordances: object.affordances.map((a) => ({ ...a })),
+      ...(object.compoundActions
+        ? {
+            compoundActions: object.compoundActions.map((ca) => ({
+              ...ca,
+              steps: ca.steps.map((s) => ({ ...s })),
+            })),
+          }
+        : {}),
+    });
   }
 
   // Agents — spawn at their startRoomId when present, else the first room (spec 013, Req 2).

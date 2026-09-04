@@ -31,6 +31,15 @@ export interface SmartObjectRegistry {
   updateState(objectId: string, newState: Record<string, unknown>): void;
   /** Shallow-merge a state patch into an object's state (spec 018, Req 17). No-op if object doesn't exist. */
   applyStatePatch(objectId: string, patch: Record<string, unknown>): void;
+  /** Remove an object entirely (spec 030, Req 4). Unregisters its affordances and clears state patches. */
+  remove(objectId: string): void;
+  /** Relocate an object to another room (spec 030, Req 4). */
+  setRoom(objectId: string, roomId: string): void;
+  /**
+   * Install (or clear) the movement affordance filter (spec 030, Req 10).
+   * Returns `true` to keep an affordance, `false` to filter it from room queries.
+   */
+  setMovementFilter(filter: ((roomId: string, engineEffect: string) => boolean) | null): void;
 }
 
 // ── Affordance Registry ───────────────────────────────────────────────────────
@@ -67,6 +76,18 @@ export interface SceneManager {
   moveAgent(agentId: string, toRoomId: string): void;
   /** Get the room an agent is currently in. */
   getAgentRoom(agentId: string): import('@evol-hive/shared').Room | null;
+  /** Open/close the connection between two rooms (spec 030, Req 9). */
+  setConnectionOpen(roomA: string, roomB: string, open: boolean): void;
+  /** Add a connection between two rooms (spec 030, Req 9). */
+  addConnection(roomA: string, roomB: string): void;
+  /** Remove a connection between two rooms entirely (spec 030, Req 9 'remove'). */
+  removeConnection(roomA: string, roomB: string): void;
+  /** Whether a direct (open) connection exists between the two rooms. */
+  hasConnection(roomA: string, roomB: string): boolean;
+  /** Whether the pair is connected but currently closed (spec 030, Req 9). */
+  isPairClosed(roomA: string, roomB: string): boolean;
+  /** TopologyGuard (spec 030, Req 10): whether a movement action is blocked from a room. */
+  isMovementBlocked(agentId: string, action: string, fromRoom: string): boolean;
 }
 
 // ── Re-exports ────────────────────────────────────────────────────────────────

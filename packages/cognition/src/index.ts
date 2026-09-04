@@ -157,6 +157,8 @@ export interface GuardrailEngine {
   validateAction(
     action: string,
     plan: import('@evol-hive/shared').AgentPlan | null,
+    /** Optional context for topology-aware validation (spec 030, Req 10). */
+    context?: import('@evol-hive/shared').PlanValidationContext,
   ): import('@evol-hive/shared').PlanValidationResult;
 }
 

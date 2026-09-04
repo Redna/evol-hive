@@ -125,6 +125,71 @@ export const defaultCognitiveTools: CognitiveTool[] = [
       additionalProperties: false,
     },
   },
+  // ── Dynamic world tool (spec 030, Req 13) ───────────────────────────────
+  {
+    name: 'modify_scene',
+    description:
+      'Propose a structural change to the world (add/remove/move an object, spawn/despawn an agent, or change a room connection). Proposals are validated by the engine; invalid proposals are rejected with an actionable error so you can self-correct. Rate limited per PPER cycle.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        op: {
+          type: 'string',
+          enum: [
+            'add_object',
+            'remove_object',
+            'move_object',
+            'spawn_agent',
+            'despawn_agent',
+            'set_connection_state',
+          ],
+          description: 'The mutation operation to propose.',
+        },
+        object: {
+          type: 'object',
+          description:
+            'For add_object: the SmartObject to add ({ id, name, type, state, affordances, roomId }).',
+        },
+        objectId: {
+          type: 'string',
+          description: 'For remove_object/move_object: the ID of the object.',
+        },
+        toRoomId: {
+          type: 'string',
+          description: 'For move_object: the destination room ID.',
+        },
+        profile: {
+          type: 'object',
+          description:
+            'For spawn_agent: the AgentProfile { id, name, description, traits, initialDrives, startRoomId? }.',
+        },
+        dormantAgentId: {
+          type: 'string',
+          description:
+            'For spawn_agent: re-spawn a dormant agent by ID instead of a fresh profile.',
+        },
+        agentId: {
+          type: 'string',
+          description: 'For despawn_agent: the ID of the agent to despawn.',
+        },
+        roomA: {
+          type: 'string',
+          description: 'For set_connection_state: one endpoint room ID.',
+        },
+        roomB: {
+          type: 'string',
+          description: 'For set_connection_state: the other endpoint room ID.',
+        },
+        action: {
+          type: 'string',
+          enum: ['open', 'close', 'insert', 'remove'],
+          description: 'For set_connection_state: the connection action.',
+        },
+      },
+      required: ['op'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 /**

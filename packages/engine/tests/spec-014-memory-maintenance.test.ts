@@ -269,7 +269,7 @@ class FakeOrchestrator implements PPEROrchestratorPort {
 }
 
 describe('AC-45: assembleGameLoop registers MemoryMaintenanceSystem when decay service provided', () => {
-  it('registers memory-maintenance as the 5th system', () => {
+  it('registers memory-maintenance after the scene-mutation system (spec 030)', () => {
     const core = createEngineCore(makeConfig());
     const decay = new FakeDecayService();
     const reflection = new FakeReflectionLoop();
@@ -280,6 +280,7 @@ describe('AC-45: assembleGameLoop registers MemoryMaintenanceSystem when decay s
     });
     const names = core.gameLoop.systemNames();
     expect(names).toEqual([
+      'scene-mutations',
       'spatial',
       'drive-decay',
       'object-state',
@@ -290,11 +291,17 @@ describe('AC-45: assembleGameLoop registers MemoryMaintenanceSystem when decay s
 });
 
 describe('AC-46: assembleGameLoop does NOT register memory-maintenance when no decay service', () => {
-  it('keeps the original 4 systems (backward-compatible)', () => {
+  it('keeps the deterministic systems (now 5 with scene-mutations, spec 030)', () => {
     const core = createEngineCore(makeConfig());
     assembleGameLoop(core, new FakeOrchestrator());
     const names = core.gameLoop.systemNames();
-    expect(names).toEqual(['spatial', 'drive-decay', 'object-state', 'pper-scheduler']);
+    expect(names).toEqual([
+      'scene-mutations',
+      'spatial',
+      'drive-decay',
+      'object-state',
+      'pper-scheduler',
+    ]);
   });
 });
 
