@@ -165,7 +165,8 @@ export const defaultCognitiveTools: CognitiveTool[] = [
         },
         dormantAgentId: {
           type: 'string',
-          description: 'For spawn_agent: re-spawn a dormant agent by ID instead of a fresh profile.',
+          description:
+            'For spawn_agent: re-spawn a dormant agent by ID instead of a fresh profile.',
         },
         agentId: {
           type: 'string',

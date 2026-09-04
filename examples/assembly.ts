@@ -29,6 +29,8 @@ import type {
   LLMActionResponse,
   FormulatePlanResult,
   ReflectLLMResponse,
+  GuardrailConfig,
+  TopologyGuard,
 } from '@evol-hive/shared';
 import { defaultMemoryDecayConfig, defaultReflectionConfig } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload, AffordanceClassifier } from '@evol-hive/cognition';
@@ -246,11 +248,33 @@ export function assembleCognitionStack(
   const maxToolCallIterations =
     maxToolCallIterationsEnv !== undefined ? Number(maxToolCallIterationsEnv) : undefined;
 
+  // ── Guardrails (spec 019, Req 10; spec 030, Req 14) ──────────────────────
+  const guardrailConfig: GuardrailConfig = {
+    affordanceMasking: true,
+    contextualForcing: true,
+    planValidation: true,
+    ...(process.env['LLM_MAX_SCENE_MUTATIONS_PER_CYCLE'] !== undefined
+      ? { maxSceneMutationsPerCycle: Number(process.env['LLM_MAX_SCENE_MUTATIONS_PER_CYCLE']) }
+      : {}),
+  };
+  // Topology-aware plan validation (spec 030, Req 10): the adapter reads the
+  // core's CURRENT scene manager, staying correct across loadScene swaps.
+  const topologyGuard: TopologyGuard = {
+    isMovementBlocked: (agentId: string, action: string, fromRoom: string): boolean =>
+      core.sceneManager.isMovementBlocked(agentId, action, fromRoom),
+  };
+  const guardrail = new GuardrailEngineImpl({ config: guardrailConfig, topologyGuard });
+
   // CognitiveToolExecutor (spec 019, Req 9) — only needed for real LLM (tool call loop).
+  // The mutation port wires the modify_scene tool to the engine's mutation
+  // funnel (spec 030, Req 13); the per-cycle budget comes from the guardrail
+  // config (Req 14a).
   const cognitiveToolExecutor = useRealLLM
     ? new CognitiveToolExecutorImpl({
         stateDataProvider: core.bridges.reflect,
         socialBridge: social,
+        mutationPort: core.mutationService,
+        maxSceneMutationsPerCycle: guardrailConfig.maxSceneMutationsPerCycle ?? 1,
       })
     : undefined;
 
@@ -274,13 +298,6 @@ export function assembleCognitionStack(
   const classifier: AffordanceClassifier = useRealEmbeddings
     ? new AffordanceClassifierImpl(memory.embeddingProvider, defaultClassifierConfig())
     : makeMockClassifier();
-
-  // ── Guardrails (spec 019, Req 10) ─────────────────────────────────────────
-  const guardrail = new GuardrailEngineImpl({
-    affordanceMasking: true,
-    contextualForcing: true,
-    planValidation: true,
-  });
 
   // ── PPER orchestrator ─────────────────────────────────────────────────────
   const orchestrator = createPPEROrchestrator({

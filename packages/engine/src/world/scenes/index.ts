@@ -95,14 +95,10 @@ export class SceneManagerImpl implements SceneManager {
     const a = this.rooms.get(roomA);
     const b = this.rooms.get(roomB);
     if (!a) {
-      throw new Error(
-        `Cannot update connection: room '${roomA}' does not exist.`,
-      );
+      throw new Error(`Cannot update connection: room '${roomA}' does not exist.`);
     }
     if (!b) {
-      throw new Error(
-        `Cannot update connection: room '${roomB}' does not exist.`,
-      );
+      throw new Error(`Cannot update connection: room '${roomB}' does not exist.`);
     }
     const key = this.pairKey(roomA, roomB);
     if (open) {

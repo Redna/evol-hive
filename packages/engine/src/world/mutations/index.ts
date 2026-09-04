@@ -9,10 +9,7 @@
  */
 
 export { SceneMutationServiceImpl } from './scene-mutation-service.js';
-export type {
-  SceneMutationServiceOptions,
-  DormancyMemoryPort,
-} from './scene-mutation-service.js';
+export type { SceneMutationServiceOptions, DormancyMemoryPort } from './scene-mutation-service.js';
 export { DormantAgentStore } from './dormant-agent-store.js';
 export { YaamEventLog, agentStateLabel, agentMemoryLabel } from './yaam-event-log.js';
 export type { YaamEvent, YaamReplayedNode } from './yaam-event-log.js';

@@ -42,11 +42,7 @@ import type { SceneManagerImpl } from '../scenes/index.js';
 import type { AffordanceResolutionCache } from '../affordances/cache.js';
 import type { AffordanceHandler } from '../index.js';
 import { DormantAgentStore } from './dormant-agent-store.js';
-import {
-  YaamEventLog,
-  agentMemoryLabel,
-  agentStateLabel,
-} from './yaam-event-log.js';
+import { YaamEventLog, agentMemoryLabel, agentStateLabel } from './yaam-event-log.js';
 
 /**
  * Synchronous memory adapter for dormancy (design note D4): exports the
@@ -200,7 +196,8 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
         break;
       }
       case 'remove_object': {
-        const removeId = (mutation.payload as import('@evol-hive/shared').RemoveObjectPayload).objectId;
+        const removeId = (mutation.payload as import('@evol-hive/shared').RemoveObjectPayload)
+          .objectId;
         if (this.registry.get(removeId) === null) {
           throw new SceneMutationError(
             'unknown_object',
@@ -272,7 +269,10 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
             );
           }
         }
-        if (profile.startRoomId !== undefined && this.sceneManager.getRoom(profile.startRoomId) === null) {
+        if (
+          profile.startRoomId !== undefined &&
+          this.sceneManager.getRoom(profile.startRoomId) === null
+        ) {
           throw new SceneMutationError(
             'unknown_room',
             `Cannot spawn agent '${profile.id}': start room '${profile.startRoomId}' does not exist.`,
@@ -282,7 +282,8 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
         break;
       }
       case 'despawn_agent': {
-        const despawnId = (mutation.payload as import('@evol-hive/shared').DespawnAgentPayload).agentId;
+        const despawnId = (mutation.payload as import('@evol-hive/shared').DespawnAgentPayload)
+          .agentId;
         if (this.agentManager.getState(despawnId) === null) {
           throw new SceneMutationError(
             'unknown_agent',
@@ -293,8 +294,12 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
         break;
       }
       case 'set_connection_state': {
-        const { roomA, roomB, action } = mutation.payload as import('@evol-hive/shared').SetConnectionStatePayload;
-        if (this.sceneManager.getRoom(roomA) === null || this.sceneManager.getRoom(roomB) === null) {
+        const { roomA, roomB, action } =
+          mutation.payload as import('@evol-hive/shared').SetConnectionStatePayload;
+        if (
+          this.sceneManager.getRoom(roomA) === null ||
+          this.sceneManager.getRoom(roomB) === null
+        ) {
           const missing = this.sceneManager.getRoom(roomA) === null ? roomA : roomB;
           throw new SceneMutationError(
             'unknown_room',
@@ -505,8 +510,7 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
     if (!profile) return; // unreachable — validated at propose
     this.agentManager.spawn(profile);
     // Seed location: profile.startRoomId, default: the first valid room (Req 6).
-    const startRoom =
-      profile.startRoomId ?? this.sceneManager.getAllRooms()[0]?.id ?? '';
+    const startRoom = profile.startRoomId ?? this.sceneManager.getAllRooms()[0]?.id ?? '';
     this.agentManager.updateState(profile.id, {
       location: startRoom,
       lastPerceptionTick: 0,

@@ -369,14 +369,11 @@ export function loadScene(core: EngineCore, scene: SceneDefinition): void {
   // authoring artifact: SceneDefinition objects are immutable.
   const roomMap = new Map<string, Room>();
   for (const room of scene.rooms) {
-    roomMap.set(
-      room.id,
-      {
-        ...room,
-        connections: [...room.connections],
-        objectIds: [...room.objectIds],
-      },
-    );
+    roomMap.set(room.id, {
+      ...room,
+      connections: [...room.connections],
+      objectIds: [...room.objectIds],
+    });
   }
   core.sceneManager = new SceneManagerImpl(core.agentManager, roomMap);
   // Rebind the mutation funnel to the fresh scene manager (spec 030, Req 1) —
