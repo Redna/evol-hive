@@ -494,6 +494,18 @@ export interface ExecuteDataProvider {
   setSystemFeedback(agentId: string, feedback: string): void;
   /** Set the agent's `isThinking` flag (Section 9.1). */
   setThinking(agentId: string, isThinking: boolean): void;
+  /**
+   * Resolve a compound action ID to the smart object in the given room that
+   * defines it (spec 028, Req 1). Returns `null` when no object in the room
+   * defines a compound action with that ID. Optional so existing custom
+   * `ExecuteDataProvider` implementations compile and behave unchanged — when
+   * absent, compound step targets are skipped with feedback like any other
+   * unresolvable affordance (spec 028, Req 3).
+   */
+  resolveCompoundAction?(
+    roomId: string,
+    compoundActionId: string,
+  ): { objectId: string; compoundAction: CompoundAction } | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
