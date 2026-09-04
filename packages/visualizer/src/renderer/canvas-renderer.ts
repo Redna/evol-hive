@@ -30,6 +30,36 @@ const DRIVES: { key: keyof VisualizerAgent['drives']; label: string; color: stri
 type RenderContext = CanvasRenderingContext2D;
 
 /**
+ * Format an object state key/value line for the object chip (issue #105).
+ * Numeric values are rounded to 1 decimal (state rules decay by fractions,
+ * which used to render as "95.666666674" and overflow the chip). The VALUE is
+ * always visible — the KEY is truncated first, then the whole line is clamped
+ * to the 60px chip width with an ellipsis.
+ */
+export function formatStateLine(key: string, val: unknown, maxWidthPx = 56): string {
+  let valueText: string;
+  if (typeof val === 'number') {
+    valueText = String(Math.round(val * 10) / 10);
+  } else if (typeof val === 'string' || typeof val === 'boolean') {
+    valueText = String(val);
+  } else {
+    valueText = JSON.stringify(val);
+  }
+  // Approximate rendered width (10px sans-serif ≈ 5.5px/char in Node; on the
+  // browser we could measureText, but approximation keeps this DOM-free).
+  const approxWidth = (s: string): number => s.length * 5.5;
+  const maxKeyChars = 10;
+  let shortKey = key.length > maxKeyChars ? key.slice(0, maxKeyChars) : key;
+  let line = `${shortKey}: ${valueText}`;
+  // If still too wide, shrink the key further (value stays visible).
+  while (approxWidth(line) > maxWidthPx && shortKey.length > 1) {
+    shortKey = shortKey.slice(0, -1);
+    line = `${shortKey}: ${valueText}`;
+  }
+  return line;
+}
+
+/**
  * Draws the full simulation scene to a `<canvas>` element's 2D context
  * (spec 023, Req 12). The renderer is stateless — each `render()` call clears
  * the canvas and redraws everything from the provided `VisualizerState`.
@@ -172,11 +202,11 @@ export class CanvasRenderer {
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.fillText(obj.name.slice(0, 8), ox + 2, oy + 2);
-      // State text — first key/value pair.
+      // State text — first key/value pair, rounded and clamped to the chip.
       const stateEntries = Object.entries(obj.state);
       if (stateEntries.length > 0) {
         const [key, val] = stateEntries[0]!;
-        ctx.fillText(`${key}: ${val}`, ox + 2, oy + 16);
+        ctx.fillText(formatStateLine(key, val), ox + 2, oy + 16);
       }
     });
   }

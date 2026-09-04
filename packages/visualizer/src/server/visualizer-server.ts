@@ -405,7 +405,17 @@ CanvasRenderer.prototype.render = function (state) {
       ctx.fillStyle = '#2a2a4a'; ctx.fillRect(ox, oy, 60, 30);
       ctx.fillStyle = '#c0c0d0'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText(obj.name.slice(0, 8), ox + 2, oy + 2);
-      var e = Object.entries(obj.state)[0]; if (e) ctx.fillText(e[0] + ': ' + e[1], ox + 2, oy + 16);
+      var e = Object.entries(obj.state)[0];
+      if (e) {
+        // Issue #105: round numeric values to 1 decimal (state-rule decay used
+        // to render "95.666666674" and overflow the chip) and truncate the KEY
+        // so the value stays visible inside the 60px chip.
+        var k = e[0], v = e[1];
+        var vt = (typeof v === 'number') ? String(Math.round(v * 10) / 10) : String(v);
+        var line = k.slice(0, 10) + ': ' + vt;
+        while (line.length * 5.5 > 56 && k.length > 1) { k = k.slice(0, -1); line = k + ': ' + vt; }
+        ctx.fillText(line, ox + 2, oy + 16);
+      }
     });
   });
   var positions = new Map();
