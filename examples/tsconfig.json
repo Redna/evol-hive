@@ -4,6 +4,13 @@
     "noEmit": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["./coffee-shop.ts", "./scene-helpers.ts", "./tests/**/*.ts", "./vitest.config.ts"],
+  "include": [
+    "./coffee-shop.ts",
+    "./scene-helpers.ts",
+    "./dynamic-world.ts",
+    "./dynamic-world-sim.ts",
+    "./tests/**/*.ts",
+    "./vitest.config.ts"
+  ],
   "exclude": ["./minimal-scene.ts", "./morning-routine.ts", "./office-day.ts"]
 }

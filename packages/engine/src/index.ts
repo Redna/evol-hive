@@ -97,6 +97,9 @@ export * from './systems/object-state.js';
 export * from './social/message-queue.js';
 export * from './social/social-manager.js';
 
+// Dynamic scene mutations — spec 030 (examples need the service type)
+export * from './world/mutations/index.js';
+
 // Visualizer adapter — spec 023
 export * from './visualizer/data-adapter.js';
 

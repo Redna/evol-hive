@@ -56,9 +56,7 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
   name: 'Dynamic World Demo',
   rooms: [garden, workshop],
   objects: [
-    makeObject('planter-1', 'Planter', 'furniture', 'garden', [
-      aff('plant_seeds', 'Plant seeds'),
-    ]),
+    makeObject('planter-1', 'Planter', 'furniture', 'garden', [aff('plant_seeds', 'Plant seeds')]),
     makeObject('gate-1', 'Gate', 'doorway', 'garden', [aff('open_gate', 'Open gate')]),
     makeObject('workbench-1', 'Workbench', 'furniture', 'workshop', [
       aff('work', 'Work'),
