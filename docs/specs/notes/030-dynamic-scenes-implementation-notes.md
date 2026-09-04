@@ -4,7 +4,7 @@
 > `feature/030-dynamic-scenes-living-worlds`. (YAAM daemon/JSON-RPC API is not
 > available in this environment — using the documented docs/notes fallback.)
 
-## Status: COMPLETE — all tests green, PR opened
+## Status: COMPLETE — all tests green, PR #120 opened (review pending)
 
 ## What was built (maps to spec Reqs / ACs)
 
@@ -57,6 +57,7 @@
 - shared 266 ✓ · engine 627 ✓ (7 spec-030 files) · cognition 615 ✓
   (spec-030 file) · visualizer/memory/cli/examples ✓ — `pnpm -r run test` all green
 - typecheck ✓ lint ✓ format:check ✓ build ✓
+- Final state: 1722 tests passing workspace-wide; branch head 32c737e (7 commits on the PR)
 
 ## Necessary existing-test adjustments (documented for review)
 - 4 system-order assertions (assembly, spec-014 ×2, spec-022): new EngineSystem
