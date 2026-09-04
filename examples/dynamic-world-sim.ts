@@ -218,8 +218,9 @@ async function main(): Promise<void> {
 
   // Cognition stack (real LLM) or no-op orchestrator (mock), + game loop.
   let orchestrator: PPEROrchestratorPort;
-  let tokenTotal:
-    { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
+  let tokenReporter:
+    | { getTotalUsage(): { promptTokens: number; completionTokens: number; totalTokens: number } }
+    | undefined;
   if (useRealLLM && memory !== undefined) {
     const stack = assembleCognitionStack(core, undefined, { memory });
     orchestrator = stack.orchestrator;
@@ -234,9 +235,8 @@ async function main(): Promise<void> {
           }
         : undefined,
     );
-    // Report tokens at the end via the stack's reporter.
-    const reporter = stack.tokenUsageReporter;
-    tokenTotal = reporter.getTotalUsage();
+    // Reporter is cumulative — read totals at END of run.
+    tokenReporter = stack.tokenUsageReporter;
   } else {
     orchestrator = new NoopOrchestrator();
     assembleGameLoop(core, orchestrator);
@@ -287,9 +287,10 @@ async function main(): Promise<void> {
     const all = await memory.vectorStore.exportAll();
     log(`[memory] ${all.length} memory node(s)`);
   }
-  if (tokenTotal && tokenTotal.totalTokens > 0) {
+  if (tokenReporter) {
+    const total = tokenReporter.getTotalUsage();
     log(
-      `[tokens] prompt=${tokenTotal.promptTokens} completion=${tokenTotal.completionTokens} total=${tokenTotal.totalTokens}`,
+      `[tokens] prompt=${total.promptTokens} completion=${total.completionTokens} total=${total.totalTokens}`,
     );
   }
 
