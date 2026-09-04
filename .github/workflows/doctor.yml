@@ -4,6 +4,10 @@ on:
   check_run:
     types: [completed]
 
+concurrency:
+  group: agent-pipeline
+  cancel-in-progress: false
+
 jobs:
   diagnose:
     if: |
