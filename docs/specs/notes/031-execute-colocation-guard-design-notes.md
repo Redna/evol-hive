@@ -55,3 +55,54 @@ guarantee must not depend on which resolution path ran or on cache freshness.
 Spec 031 therefore pairs (a) an authoritative live-state check in physics with
 (b) plan-time staleness detection, and adds AC-10 locking mutation/registry
 consistency as a regression net.
+
+---
+
+## Implementation record (spec 031 COMPLETE — 2025 session, PR #123)
+
+> YAAM daemon still unresponsive at close (engine pegged on events.jsonl
+> ingest; RPC silent). Recorded here per the re-append protocol above.
+
+**Branch** `feature/031-execute-colocation-guard` → **PR #123** (issue #121).
+Status: all ACs implemented; `pnpm test` green (all 7 packages), typecheck /
+lint / format:check / build clean. INDEX.md → 🔍 In Review.
+
+**What was built (by requirement):**
+- Req 1/2 — `PhysicsSystemImpl` co-location guard after object resolution:
+  live `object.roomId` vs live agent location via injected
+  `AgentLocationResolver` (`(agentId) => agentManager.getState(agentId)?.location`,
+  wired in `packages/engine/src/assembly.ts`); inert when unwired
+  (back-compat). Exact failureReason per Req 2. No handler, no mutation (AC-1/2/13).
+- Req 3 — compound sub-steps inherit the guard (all funnel through physics);
+  `ExecuteServiceImpl.executeCompoundAction` aborts with compound-aware
+  co-location message via new `resolveAffordanceAnywhere` lookup when a
+  mid-compound move strands a sub-step (AC-4).
+- Req 4 — plain path: when room-scoped resolution fails, global lookup
+  distinguishes "moved" (co-location failure → feedback loop, no skip, no
+  advance) from "nowhere" (skip path preserved). `resolveAffordanceAnywhere?`
+  added as OPTIONAL `ExecuteDataProvider` method (spec-028 optional-method
+  pattern); engine bridge implements it over `SmartObjectRegistry.getAll()`.
+- Req 5 — `AffordanceGuard` bridge interface in shared (next to
+  `TopologyGuard`); engine implements on `SmartObjectRegistryImpl`
+  (`isAffordanceAvailableInRoom` via `getByRoom`); wired in
+  `examples/assembly.ts`; carried in `PlanValidationContext.affordanceGuard`
+  (context, not constructor — per AC-6 call shape).
+- Req 6/7 — `GuardrailEngineImpl.validateAction` rejects stale physical steps
+  after the topology check; `go_to_*` explicitly skipped (AC-8); reason
+  template per spec; zero plan mutation (AC-9).
+- Wiring — `PPEROrchestratorOptions.affordanceGuard` → `ExecuteServiceImpl`
+  options → validateAction context; `examples/assembly.ts` adapter reads live
+  `core.smartObjectRegistry`.
+
+**Test layout (written first):** engine `tests/spec-031-colocation-guard.test.ts`
+(10), cognition `tests/spec-031-colocation-guard.test.ts` (17), examples
+`tests/spec-031-colocation-guard.e2e.test.ts` (5 — real bridges + real
+mutation funnel + real GuardrailEngineImpl; no LLM). All 14 ACs covered.
+
+**Gotchas for future sessions:**
+- Fresh checkout must `pnpm build` before `pnpm test` (tests import built
+  `@evol-hive/shared` / `@evol-hive/cognition` dist).
+- `packages/engine/tests/richer-scenes.test.ts` `execute()` helper now walks
+  the agent to the object's room before direct physics calls — the guard made
+  cross-room handler tests fail (correctly).
+- The e2e test imports `AffordanceHandler` from `@evol-hive/engine` (not shared).
