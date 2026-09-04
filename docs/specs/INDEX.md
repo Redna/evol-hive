@@ -61,8 +61,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      27
 ✅ Done:          17
 🔨 In Development: 0
-🔍 In Review:      4
-📝 Drafted:        5
+🔍 In Review:      5
+📝 Drafted:        4
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
