@@ -4,49 +4,77 @@
 > `feature/030-dynamic-scenes-living-worlds`. (YAAM daemon/JSON-RPC API is not
 > available in this environment — using the documented docs/notes fallback.)
 
-## Status: IN PROGRESS — tests written first (TDD)
+## Status: COMPLETE — all tests green, PR opened
 
-## Plan (maps to spec Reqs)
-1. **shared** `src/types/mutations.ts`: `SceneMutationType`/payloads, `SceneMutationEvent`
-   `{seq,tick,type,payload,source}`, `SceneMutationError` (rule + offendingIds),
-   `SceneMutationProposal`/`Result`/`Port` (bridge, engine implements, cognition consumes),
-   `DormantAgentSnapshot`, `DynamicWorldSnapshot`, `TopologyGuard`.
-   Edit `persistence.ts`: `SaveState.dynamic?`, `SAVE_FORMAT_VERSION` 1→2 (load accepts 1+2).
-   Edit `cognition.ts`: `CognitiveToolName`+`'modify_scene'`, `GuardrailConfig.maxSceneMutationsPerCycle?`,
-   `CognitiveToolExecutor.executeModifyScene?`, `PlanValidationContext`.
-2. **engine**: registry `remove`/`setRoom` + movement filter (cross-door affordances);
-   SceneManager `setConnectionOpen`/`addConnection`/`hasConnection` + `TopologyGuard`
-   (`go_to_<room>` parsing); `world/mutations/` = SceneMutationServiceImpl (validate→queue→
-   apply at tick boundary, append-only log, getMutations(sinceSeq?)), DormantAgentStore,
-   YaamEventLog (UPSERT_NODE/DELETE_NODE JSONL), SceneMutationSystem (applies pending each tick);
-   persistence saves/restores `dynamic`; assembly wires all + loadScene deep-clones rooms/objects
-   (SceneDefinition immutability constraint).
-3. **cognition**: `modify_scene` tool schema; executor budget (default 1/cycle,
-   `resetSceneMutationBudget`); orchestrator `onCycleStart` hook; execute-service passes
-   `{agentId, fromRoom}` to validateAction; GuardrailEngineImpl optional TopologyGuard;
-   openai-client dispatch + COGNITIVE_TOOL_NAMES.
-4. **visualizer**: data-adapter optional mutationService → `getMutationDeltas(sinceSeq?)`
-   (snapshot already reads live registries each frame).
-5. **examples**: `examples/dynamic-world.ts` demo scene.
+## What was built (maps to spec Reqs / ACs)
 
-## Key decisions
-- Scheduler registration = AgentManager registration (PPERScheduler iterates getActiveAgents).
-- Closed connections: removed from Room.connections adjacency, pair remembered for reopen;
-  doorway object kept with `state.open=false` (design note D2).
-- Dormancy memories: sync `DormancyMemoryPort` adapter keeps mutation apply synchronous;
-  cross-session persistence via YAAM JSONL replay (Req 12).
-- Load = derived snapshot (live rooms/objects + dormant + log restored) — spec's
-  "equivalent derived DynamicWorldSnapshot" alternative.
+**shared** (`src/types/mutations.ts` + edits):
+- `SceneMutationType`/payloads, `SceneMutationEvent {seq,tick,type,payload,source}`,
+  `SceneMutationError` (rule + offendingIds + actionable message) — Req 2/3
+- `SceneMutationPort` bridge (engine implements, cognition consumes) — Req 13
+- `DormantAgentSnapshot`, `DynamicWorldSnapshot`, `TopologyGuard`
+- `SaveState.dynamic?` (absent for static scenes → byte-identical, AC-11),
+  `SAVE_FORMAT_VERSION` 1→2, `MIN_SUPPORTED_SAVE_FORMAT_VERSION=1` — Req 11
+- `CognitiveToolName` + `'modify_scene'`, `GuardrailConfig.maxSceneMutationsPerCycle?`,
+  `CognitiveToolExecutor.executeModifyScene?`, `PlanValidationContext` — Req 13/14
 
-## Files touched
-(see git log on branch feature/030-dynamic-scenes-living-worlds)
+**engine** (`src/world/mutations/` + registry/scene manager/persistence/assembly):
+- `SceneMutationServiceImpl` — the single funnel: propose→validate→queue→apply
+  at tick boundary; append-only log + `getMutations(sinceSeq?)` (Req 1/2);
+  validation rules incl. drive range, duplicate ids, orphan-free objectIds,
+  zero-connection rule (Req 3); doorway state mirroring (Req 9);
+  `createDoorwayEffect(objectId,'open_door'|'close_door')` handlers (Req 9)
+- `SceneMutationSystem` registered FIRST in `assembleGameLoop` (Req 1)
+- Registry `remove()`/`setRoom()` + movement filter for closed doors (Req 4/10)
+- `SceneManagerImpl` `setConnectionOpen`/`addConnection`/`removeConnection`/
+  `hasConnection`/`isPairClosed` + `TopologyGuard.isMovementBlocked` (Req 9/10);
+  closed pairs remembered for reopen
+- `DormantAgentStore` + despawn exports full state (Req 7); respawn from
+  dormantAgentId restores drives/goal/plan/location/memories (Req 8/AC-3)
+- `YaamEventLog` — despawn writes agent-scoped `UPSERT_NODE` (state summary +
+  memories), respawn writes `DELETE_NODE`; JSONL replayable in fresh session
+  (Req 12/AC-10); coarse-grained (design note D4)
+- Persistence saves/restores `dynamic` (log + dormant), v1 loads OK (AC-7/11)
+- `loadScene` deep-clones rooms/objects — SceneDefinition stays immutable;
+  mutation service rebound via `setSceneManager`
+- `VisualizerDataAdapter.getMutationDeltas(sinceSeq?)`; snapshot reads live
+  registries per frame (Req 15/AC-6); canvas renderer is stateless redraw
 
-## Test files (written FIRST, before implementation)
-- packages/shared/tests/spec-030-mutation-types.test.ts
-- packages/engine/tests/spec-030-scene-mutations.test.ts (AC-1, AC-5, AC-8)
-- packages/engine/tests/spec-030-agent-lifecycle.test.ts (AC-2, AC-3)
-- packages/engine/tests/spec-030-topology.test.ts (AC-4, Req 9)
-- packages/engine/tests/spec-030-persistence.test.ts (AC-7, AC-11)
-- packages/engine/tests/spec-030-yaam-events.test.ts (AC-10)
-- packages/engine/tests/spec-030-visualizer-deltas.test.ts (AC-6)
-- packages/cognition/tests/spec-030-modify-scene-tool.test.ts (AC-5, AC-9)
+**cognition**:
+- `modify_scene` in `defaultCognitiveTools` with strict op-enum schema (Req 13)
+- Executor: `mutationPort` + `executeModifyScene` (proposals only, Req 14b),
+  per-agent-per-cycle rate limit default 1 (Req 14a/AC-9),
+  `resetSceneMutationBudget` (wired via orchestrator `onCycleStart` hook)
+- `GuardrailEngineImpl` optional `TopologyGuard` — blocked movement rejected
+  by plan validation (§10 mechanism 3, Req 10/AC-4); execute-service passes
+  `{agentId, fromRoom}`; modify_scene has cognitive-tool parity (Req 14c)
+- openai-client dispatches modify_scene mid-loop like other cognitive tools
+
+**examples**: `dynamic-world.ts` demo scene + carry/gate helpers;
+`assembly.ts` wires mutationPort + TopologyGuard adapter + env-tunable budget.
+
+## Test results (TDD: tests written first, committed failing)
+- shared 266 ✓ · engine 627 ✓ (7 spec-030 files) · cognition 615 ✓
+  (spec-030 file) · visualizer/memory/cli/examples ✓ — `pnpm -r run test` all green
+- typecheck ✓ lint ✓ format:check ✓ build ✓
+
+## Necessary existing-test adjustments (documented for review)
+- 4 system-order assertions (assembly, spec-014 ×2, spec-022): new EngineSystem
+  `scene-mutations` registers first — any new system changes these lists.
+- spec-017-persistence: 2 version literals (error.expected, file content) now
+  track `SAVE_FORMAT_VERSION` — spec 030 Req 11 mandates the 1→2 bump.
+- shared persistence-types: same 2 version literals.
+
+## Key decisions (aligned with design notes D1–D6)
+- Closed connections removed from Room.connections adjacency, pair remembered
+  in SceneManager for reopen (D2 — connections stay source of truth).
+- Dormancy is synchronous via `DormancyMemoryPort` adapter (app wires vector
+  store); cross-session persistence via YAAM JSONL replay (Req 12).
+- Load uses the derived-snapshot approach (live world + log + dormant
+  restored) — the spec's "equivalent derived DynamicWorldSnapshot" alternative.
+- Propose-time validation (immediate LLM feedback); queue applies at tick
+  boundary deterministically.
+
+## Remaining follow-ups (none blocking)
+- Optional: compaction strategy for the YAAM log is the memory pipeline's
+  existing concern (unchanged by this feature).
