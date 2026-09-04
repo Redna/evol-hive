@@ -55,9 +55,7 @@ function makeHarness(): Harness {
   };
   const registry = new SmartObjectRegistryImpl();
   const agentManager = new AgentManagerImpl();
-  const roomMap = new Map<string, Room>([
-    ['room_a', roomA],
-  ]);
+  const roomMap = new Map<string, Room>([['room_a', roomA]]);
   const sceneManager = new SceneManagerImpl(agentManager, roomMap);
   registry.register(makeObject('desk-1', 'room_a'));
 
@@ -141,9 +139,7 @@ describe('Mid-run spawn (spec 030, AC-2 / Req 6)', () => {
           const plan: AgentInternalState['currentPlan'] = {
             id: 'plan-1',
             description: 'work at the desk',
-            steps: [
-              { description: 'work', completed: true, targetAffordance: 'work' },
-            ],
+            steps: [{ description: 'work', completed: true, targetAffordance: 'work' }],
             currentStepIndex: 0,
             createdAt: 0,
           };

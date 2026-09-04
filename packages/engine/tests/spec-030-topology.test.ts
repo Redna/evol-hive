@@ -46,7 +46,11 @@ function makeDoorway(id: string, roomId: string, targets: string[]): SmartObject
 }
 
 /** office ↔ lab (with doorway objects), office ↔ lounge. */
-function makeScene(): { registry: SmartObjectRegistryImpl; sceneManager: SceneManagerImpl; agentManager: AgentManagerImpl } {
+function makeScene(): {
+  registry: SmartObjectRegistryImpl;
+  sceneManager: SceneManagerImpl;
+  agentManager: AgentManagerImpl;
+} {
   const office: Room = {
     id: 'office',
     name: 'Office',
@@ -179,10 +183,7 @@ describe('Connection state management (spec 030, AC-4 / Req 9)', () => {
 
     const agentManager = new AgentManagerImpl();
     const roomMap = new Map<string, Room>([
-      [
-        'office',
-        { ...officeScene, connections: [...officeScene.connections], objectIds: [] },
-      ],
+      ['office', { ...officeScene, connections: [...officeScene.connections], objectIds: [] }],
       ['lab', { id: 'lab', name: 'Lab', description: '', connections: ['office'], objectIds: [] }],
       ['garden', { id: 'garden', name: 'Garden', description: '', connections: [], objectIds: [] }],
     ]);

@@ -229,9 +229,9 @@ describe('plan validation rejects movement through closed doors (spec 030, AC-4 
       { affordanceMasking: true, contextualForcing: true, planValidation: true },
       openGuard,
     );
-    expect(guardrail.validateAction('go_to_lab', plan, { agentId: 'a1', fromRoom: 'office' }).valid).toBe(
-      true,
-    );
+    expect(
+      guardrail.validateAction('go_to_lab', plan, { agentId: 'a1', fromRoom: 'office' }).valid,
+    ).toBe(true);
   });
 
   it('ExecuteServiceImpl surfaces the rejection as a deviation (reflection tick trigger)', async () => {

@@ -16,10 +16,7 @@ import { AgentManagerImpl } from '../src/agents/state/index.js';
 import { SmartObjectRegistryImpl } from '../src/world/objects/index.js';
 import { SceneManagerImpl } from '../src/world/scenes/index.js';
 import { AffordanceResolutionCache } from '../src/world/affordances/cache.js';
-import {
-  SceneMutationServiceImpl,
-  DormantAgentStore,
-} from '../src/world/mutations/index.js';
+import { SceneMutationServiceImpl, DormantAgentStore } from '../src/world/mutations/index.js';
 import { SceneMutationSystem } from '../src/world/mutations/index.js';
 import { SceneMutationError } from '@evol-hive/shared';
 import type { SceneDefinition, Room, SceneMutationEvent } from '@evol-hive/shared';
@@ -433,7 +430,10 @@ describe('Event-sourcing determinism (spec 030, AC-8 / Req 2)', () => {
       payload: { object: makeObject('crate-1', 'room_a', ['carry']) },
     });
     h1.service.applyPending(1);
-    h1.service.propose({ type: 'move_object', payload: { objectId: 'crate-1', toRoomId: 'room_b' } });
+    h1.service.propose({
+      type: 'move_object',
+      payload: { objectId: 'crate-1', toRoomId: 'room_b' },
+    });
     h1.service.applyPending(2);
     h1.service.propose({
       type: 'set_connection_state',

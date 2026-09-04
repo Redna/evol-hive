@@ -50,7 +50,13 @@ describe('Engine assembly factory (AC-11)', () => {
 
     // Inspect the registered systems order via the game loop.
     const names = engine.gameLoop.systemNames();
-    expect(names).toEqual(['scene-mutations', 'spatial', 'drive-decay', 'object-state', 'pper-scheduler']);
+    expect(names).toEqual([
+      'scene-mutations',
+      'spatial',
+      'drive-decay',
+      'object-state',
+      'pper-scheduler',
+    ]);
   });
 
   it('createEngine exposes agentManager, sceneManager, and bridges', () => {

@@ -16,10 +16,7 @@ import { AgentManagerImpl } from '../src/agents/state/index.js';
 import { SmartObjectRegistryImpl } from '../src/world/objects/index.js';
 import { SceneManagerImpl } from '../src/world/scenes/index.js';
 import { EnginePersistenceImpl } from '../src/persistence/engine-persistence.js';
-import {
-  SceneMutationServiceImpl,
-  DormantAgentStore,
-} from '../src/world/mutations/index.js';
+import { SceneMutationServiceImpl, DormantAgentStore } from '../src/world/mutations/index.js';
 import type { SceneDefinition } from '@evol-hive/shared';
 
 // ── Fixture ──────────────────────────────────────────────────────────────────
@@ -28,7 +25,12 @@ function aff(id: string) {
   return { id, label: id, engineEffect: id, preconditions: [], effects: {} };
 }
 
-function makeObject(id: string, roomId: string, affordanceIds: string[], type = 'furniture'): SmartObject {
+function makeObject(
+  id: string,
+  roomId: string,
+  affordanceIds: string[],
+  type = 'furniture',
+): SmartObject {
   return { id, name: id, type, state: {}, affordances: affordanceIds.map(aff), roomId };
 }
 
@@ -128,7 +130,10 @@ describe('Save/restore of mutated scenes (spec 030, AC-7 / Req 11)', () => {
 
   it('round-trips mutations: moved object, closed door, dormant agent', async () => {
     // 1. Apply a sequence of mutations.
-    h.service.propose({ type: 'move_object', payload: { objectId: 'crate-1', toRoomId: 'room_b' } });
+    h.service.propose({
+      type: 'move_object',
+      payload: { objectId: 'crate-1', toRoomId: 'room_b' },
+    });
     h.service.applyPending(1);
     h.service.propose({
       type: 'set_connection_state',
@@ -173,7 +178,10 @@ describe('Save/restore of mutated scenes (spec 030, AC-7 / Req 11)', () => {
   it('the original base SceneDefinition is unchanged by mutations + save/load', async () => {
     const pristine = JSON.stringify(h.scene);
 
-    h.service.propose({ type: 'move_object', payload: { objectId: 'crate-1', toRoomId: 'room_b' } });
+    h.service.propose({
+      type: 'move_object',
+      payload: { objectId: 'crate-1', toRoomId: 'room_b' },
+    });
     h.service.applyPending(1);
     h.service.propose({
       type: 'set_connection_state',

@@ -295,7 +295,13 @@ describe('AC-46: assembleGameLoop does NOT register memory-maintenance when no d
     const core = createEngineCore(makeConfig());
     assembleGameLoop(core, new FakeOrchestrator());
     const names = core.gameLoop.systemNames();
-    expect(names).toEqual(['scene-mutations', 'spatial', 'drive-decay', 'object-state', 'pper-scheduler']);
+    expect(names).toEqual([
+      'scene-mutations',
+      'spatial',
+      'drive-decay',
+      'object-state',
+      'pper-scheduler',
+    ]);
   });
 });
 
