@@ -77,18 +77,19 @@ jobs:
         run: |
           set -x
 
-          # Find the spec file for this issue — try INDEX.md, then grep, then fallback
+          # Find the spec file for this issue — INDEX.md, then grep. NO fallback
+          # to "latest spec": that once made the agent implement a stale spec
+          # for the wrong issue (PR #116). If there's no spec, say so and stop —
+          # the Architect must draft one first.
           export SPEC_FILE=$(grep "issues/${ISSUE_NUMBER}" docs/specs/INDEX.md 2>/dev/null | grep -oP '\d{3}-[^]]*\.md' | head -1)
 
           if [ -z "$SPEC_FILE" ]; then
             export SPEC_FILE=$(grep -rl "#${ISSUE_NUMBER}" docs/specs/*.md 2>/dev/null | grep -v INDEX | grep -v TEMPLATE | head -1)
+            SPEC_FILE=$(basename "${SPEC_FILE:-}")
+            export SPEC_FILE
           fi
 
-          if [ -z "$SPEC_FILE" ]; then
-            export SPEC_FILE=$(ls docs/specs/[0-9]*.md 2>/dev/null | sort | tail -1)
-          fi
-
-          if [ -z "$SPEC_FILE" ]; then
+          if [ -z "$SPEC_FILE" ] || [ "$SPEC_FILE" = "INDEX.md" ]; then
             echo "No spec found for issue #${ISSUE_NUMBER}"
             gh issue comment $ISSUE_NUMBER --body "⚠️ No spec file found. The Architect must draft a spec first."
             exit 1
@@ -104,8 +105,13 @@ jobs:
           # theory — the last readings before a shutdown signal are captured;
           # (b) keep log output flowing while pi waits on the first LLM token.
           (
+            N=0
             while true; do
-              echo "[heartbeat] $(date -u +%H:%M:%S) mem=$(free -m | awk 'NR==2{print $3"/"$2"MB"}') disk=$(df -h / | awk 'NR==2{print $5" used"}') load=$(cut -d' ' -f1-3 /proc/loadavg)"
+              N=$((N+1))
+              echo "[heartbeat] $(date -u +%H:%M:%S) mem=$(free -m | awk 'NR==2{print $3"/"$2"MB"}') swap=$(free -m | awk 'NR==3{print $3"/"$2"MB"}') disk=$(df -h / | awk 'NR==2{print $5" used"}') load=$(cut -d' ' -f1-3 /proc/loadavg)"
+              if [ $((N % 3)) -eq 0 ]; then
+                ps aux --sort=-rss | awk 'NR<=4 && NR>1 {printf "[topmem] %s %sMB %s\n", $1, int($6/1024), $11}' | head -3
+              fi
               sleep 20
             done
           ) &

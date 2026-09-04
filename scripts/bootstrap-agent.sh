@@ -78,6 +78,20 @@ s['httpIdleTimeoutMs'] = 600000
 json.dump(s, open(p, 'w'), indent=2)
 "
 
+# Add swap: hosted runners sit at ~93% memory (15.2/16GB) with the agent
+# stack loaded (pi + yaam + ONNX + pnpm). Any spike then OOM-kills the job —
+# "The runner has received a shutdown signal" at scattered 4-13 min marks.
+# 4GB of swap absorbs spikes so the runner survives.
+if [ -z "${SKIP_SWAP:-}" ] && ! swapon --show | grep -q .; then
+  echo "=== Adding 4GB swap ==="
+  sudo fallocate -l 4G /swapfile \
+    && sudo chmod 600 /swapfile \
+    && sudo mkswap /swapfile > /dev/null \
+    && sudo swapon /swapfile \
+    && echo "Swap active: $(swapon --show | tail -1)" \
+    || echo "⚠️ Swap setup failed — continuing without"
+fi
+
 # Install project dependencies
 echo "=== Installing project deps ==="
 pnpm install --frozen-lockfile

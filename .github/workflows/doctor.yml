@@ -83,8 +83,13 @@ jobs:
           # disproves OOM-based runner reclamation and keeps the job log active
           # while pi waits on the first LLM token.
           (
+            N=0
             while true; do
-              echo "[heartbeat] $(date -u +%H:%M:%S) mem=$(free -m | awk 'NR==2{print $3"/"$2"MB"}') disk=$(df -h / | awk 'NR==2{print $5" used"}') load=$(cut -d' ' -f1-3 /proc/loadavg)"
+              N=$((N+1))
+              echo "[heartbeat] $(date -u +%H:%M:%S) mem=$(free -m | awk 'NR==2{print $3"/"$2"MB"}') swap=$(free -m | awk 'NR==3{print $3"/"$2"MB"}') disk=$(df -h / | awk 'NR==2{print $5" used"}') load=$(cut -d' ' -f1-3 /proc/loadavg)"
+              if [ $((N % 3)) -eq 0 ]; then
+                ps aux --sort=-rss | awk 'NR<=4 && NR>1 {printf "[topmem] %s %sMB %s\n", $1, int($6/1024), $11}' | head -3
+              fi
               sleep 20
             done
           ) &
