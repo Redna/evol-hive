@@ -12,6 +12,7 @@ import type {
   AgentInternalState,
   Affordance,
   AffordanceResult,
+  CompoundAction,
   ExecuteDataProvider,
   PlanStep,
 } from '@evol-hive/shared';
@@ -76,6 +77,29 @@ export class ExecuteDataProviderImpl implements ExecuteDataProvider {
       const affordance = object.affordances.find((a: Affordance) => a.id === affordanceId);
       if (affordance) {
         return { objectId: object.id, affordance };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Resolve a compound action ID to the smart object in the given room that
+   * defines it (spec 028, Req 2). Linear scan over the room's objects — same
+   * complexity as `resolveAffordance`. Returns the first object whose
+   * `compoundActions` contains an entry with the requested ID, or `null` when
+   * no match is found. Plain-affordance resolution above is unchanged.
+   */
+  resolveCompoundAction(
+    roomId: string,
+    compoundActionId: string,
+  ): { objectId: string; compoundAction: CompoundAction } | null {
+    const objects = this.smartRegistry.getByRoom(roomId);
+    for (const object of objects) {
+      const compoundAction = object.compoundActions?.find(
+        (c: CompoundAction) => c.id === compoundActionId,
+      );
+      if (compoundAction) {
+        return { objectId: object.id, compoundAction };
       }
     }
     return null;

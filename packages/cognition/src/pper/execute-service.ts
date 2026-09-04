@@ -18,7 +18,12 @@
  * next tick.
  */
 
-import type { ExecuteResult, ExecuteDataProvider } from '@evol-hive/shared';
+import type {
+  AffordanceResult,
+  CompoundAction,
+  ExecuteResult,
+  ExecuteDataProvider,
+} from '@evol-hive/shared';
 import type { GuardrailEngine } from '../index.js';
 
 /** Constructor options for {@link ExecuteServiceImpl}. */
@@ -87,6 +92,17 @@ export class ExecuteServiceImpl {
       // Resolve the affordance to a specific object in the agent's room.
       const resolved = dataProvider.resolveAffordance(agentState.location, step.targetAffordance);
       if (!resolved) {
+        // Compound fallback (spec 028, Req 3): when plain resolution fails, the
+        // step target may be a compound action planned by the LLM. Attempt
+        // compound resolution — when the provider implements it and resolves
+        // the ID, run the compound's sub-steps sequentially. Otherwise the
+        // pre-change skip behavior below is preserved unchanged.
+        const compound =
+          dataProvider.resolveCompoundAction?.(agentState.location, step.targetAffordance) ?? null;
+        if (compound) {
+          return await this.executeCompoundAction(agentId, agentState.location, compound);
+        }
+
         // Skip steps with unresolvable affordances (LLM may plan actions that
         // don't map to real affordances). Advance to the next step and continue.
         dataProvider.advanceStep(agentId);
@@ -148,6 +164,98 @@ export class ExecuteServiceImpl {
       const message = err instanceof Error ? err.message : String(err);
       return { success: false, error: message, planComplete: false };
     }
+  }
+
+  /**
+   * Execute a compound action's sub-steps sequentially (spec 028, Req 4–7).
+   *
+   * Each sub-step runs through the existing single-affordance path — resolve,
+   * check preconditions, execute. On full success the merged drive changes
+   * (numeric sum of the sub-steps' drive changes) are applied once and the
+   * plan advances exactly once (Req 5). On any sub-step failure the compound
+   * aborts immediately: remaining sub-steps are not attempted, drive changes
+   * are not applied, the plan step is not advanced, and system feedback names
+   * the compound action and the failed sub-step (Req 6/7). Nested compound
+   * actions are not supported (Req 4) — a sub-step that only resolves as a
+   * compound action is treated as an execution failure with no recursion.
+   */
+  private async executeCompoundAction(
+    agentId: string,
+    roomId: string,
+    compound: { objectId: string; compoundAction: CompoundAction },
+  ): Promise<ExecuteResult> {
+    const { dataProvider } = this.options;
+    const { compoundAction } = compound;
+    const steps = compoundAction.steps;
+    const mergedDrives: Partial<Record<string, number>> = {};
+
+    for (let i = 0; i < steps.length; i++) {
+      const subStep = steps[i]!;
+
+      /** Failure message naming the compound action and the failed sub-step. */
+      const abortMessage = (reason: string): string =>
+        `Compound action '${compoundAction.id}' aborted at step ${i + 1}/${steps.length} ('${subStep.affordanceId}'): ${reason}.`;
+
+      /** Abort: no remaining sub-steps, no drive changes, no plan advance (Req 6/7). */
+      const abort = (reason: string): ExecuteResult => {
+        const message = abortMessage(reason);
+        dataProvider.setSystemFeedback(agentId, message);
+        dataProvider.setThinking(agentId, false);
+        return { success: false, error: message, planComplete: false };
+      };
+
+      // Resolve the sub-step to a plain affordance on the compound's owning
+      // object (it lives in the same room). Sub-steps must map to plain
+      // affordances — nested compound actions are not supported (Req 4).
+      const subResolved = dataProvider.resolveAffordance(roomId, subStep.affordanceId);
+      if (!subResolved) {
+        const nested = dataProvider.resolveCompoundAction?.(roomId, subStep.affordanceId);
+        if (nested) {
+          return abort('nested compound actions are not supported');
+        }
+        return abort(`affordance '${subStep.affordanceId}' not found in room '${roomId}'`);
+      }
+
+      // Check preconditions for the sub-step.
+      const preconditionResult = dataProvider.checkPreconditions(
+        subStep.affordanceId,
+        subResolved.objectId,
+      );
+      if (!preconditionResult.satisfied) {
+        const failedList = preconditionResult.failed.join(', ');
+        return abort(`preconditions not met: ${failedList}`);
+      }
+
+      // Execute the sub-step.
+      const result = await dataProvider.executeAffordance(
+        subResolved.objectId,
+        subStep.affordanceId,
+        agentId,
+      );
+      if (!result.success) {
+        return abort(result.failureReason ?? 'Affordance execution failed.');
+      }
+
+      // Accumulate drive changes — applied once on full compound success (Req 5).
+      for (const [drive, delta] of Object.entries(result.driveChanges ?? {})) {
+        mergedDrives[drive] = (mergedDrives[drive] ?? 0) + (delta ?? 0);
+      }
+    }
+
+    // Full success: apply the merged drive changes once (if non-empty),
+    // advance the plan step exactly once, and report completion (Req 5).
+    if (Object.keys(mergedDrives).length > 0) {
+      dataProvider.applyDriveChanges(agentId, mergedDrives);
+    }
+
+    dataProvider.advanceStep(agentId);
+
+    const planComplete = dataProvider.isPlanComplete(agentId);
+    const aggregate: AffordanceResult =
+      Object.keys(mergedDrives).length > 0
+        ? { success: true, driveChanges: mergedDrives }
+        : { success: true };
+    return { success: true, result: aggregate, planComplete };
   }
 }
 
