@@ -11,13 +11,18 @@
  */
 
 import type { AgentSnapshot, SaveState, WorldSnapshot } from '@evol-hive/shared';
-import { SAVE_FORMAT_VERSION, SaveFormatVersionError } from '@evol-hive/shared';
+import {
+  SAVE_FORMAT_VERSION,
+  MIN_SUPPORTED_SAVE_FORMAT_VERSION,
+  SaveFormatVersionError,
+} from '@evol-hive/shared';
 import type { VectorStore } from '@evol-hive/memory';
 import { promises as fs } from 'node:fs';
 import type { GameLoopImpl } from '../loop/index.js';
 import type { AgentManagerImpl } from '../agents/state/index.js';
 import type { SmartObjectRegistryImpl } from '../world/objects/index.js';
 import type { SceneManagerImpl } from '../world/scenes/index.js';
+import type { SceneMutationServiceImpl } from '../world/mutations/scene-mutation-service.js';
 
 /** Constructor dependencies for {@link EnginePersistenceImpl} (spec 017, Req 14). */
 export interface EnginePersistenceOptions {
@@ -26,6 +31,8 @@ export interface EnginePersistenceOptions {
   smartObjectRegistry: SmartObjectRegistryImpl;
   sceneManager: SceneManagerImpl;
   vectorStore: VectorStore;
+  /** Optional mutation service — persists the dynamic world (spec 030, Req 11). */
+  mutationService?: SceneMutationServiceImpl;
 }
 
 /**
@@ -39,6 +46,7 @@ export class EnginePersistenceImpl {
   private readonly smartObjectRegistry: SmartObjectRegistryImpl;
   private readonly sceneManager: SceneManagerImpl;
   private readonly vectorStore: VectorStore;
+  private readonly mutationService: SceneMutationServiceImpl | undefined;
 
   constructor(options: EnginePersistenceOptions) {
     this.gameLoop = options.gameLoop;
@@ -46,6 +54,7 @@ export class EnginePersistenceImpl {
     this.smartObjectRegistry = options.smartObjectRegistry;
     this.sceneManager = options.sceneManager;
     this.vectorStore = options.vectorStore;
+    this.mutationService = options.mutationService;
   }
 
   /** Serialize the full game state to a `SaveState` object (spec 017, Req 14). */
@@ -69,7 +78,7 @@ export class EnginePersistenceImpl {
     // Memories — all nodes, embeddings preserved as-is.
     const memories = await this.vectorStore.exportAll();
 
-    return {
+    const state: SaveState = {
       formatVersion: SAVE_FORMAT_VERSION,
       savedAt: Date.now(),
       gameLoop: {
@@ -81,11 +90,29 @@ export class EnginePersistenceImpl {
       world,
       memories,
     };
+
+    // Dynamic world (spec 030, Req 11): mutation log + dormant agents. Only
+    // included when the world actually mutated — static scenes produce
+    // byte-identical saves (spec 030, AC-11).
+    if (this.mutationService?.hasDynamicState()) {
+      state.dynamic = {
+        mutationLog: this.mutationService.exportLog(),
+        dormantAgents: Object.values(this.mutationService.exportDormant()),
+      };
+    }
+
+    return state;
   }
 
   /** Restore the full game state from a `SaveState` (spec 017, Req 14, Req 28). */
   async load(state: SaveState): Promise<void> {
-    if (state.formatVersion !== SAVE_FORMAT_VERSION) {
+    // Spec 030, Req 11: the format version was bumped (1 → 2) for the
+    // optional `dynamic` field. Old (v1) saves still load — absence of
+    // dynamic data is equivalent to zero mutations replayed.
+    if (
+      state.formatVersion !== SAVE_FORMAT_VERSION &&
+      state.formatVersion !== MIN_SUPPORTED_SAVE_FORMAT_VERSION
+    ) {
       throw new SaveFormatVersionError(SAVE_FORMAT_VERSION, state.formatVersion);
     }
 
@@ -127,6 +154,19 @@ export class EnginePersistenceImpl {
 
     // Clear and rebuild memory. Embeddings are preserved as-is.
     await this.vectorStore.importAll(state.memories);
+
+    // Dynamic world (spec 030, Req 11): restore the mutation log (for
+    // event-sourcing continuity and the visualizer) and dormant agents. The
+    // live world itself was restored above from the world snapshot — the
+    // derived-snapshot approach, equivalent to rebuilding the base scene and
+    // replaying the log.
+    if (state.dynamic !== undefined) {
+      const dormantMap: Record<string, import('@evol-hive/shared').DormantAgentSnapshot> = {};
+      for (const snapshot of state.dynamic.dormantAgents) {
+        dormantMap[snapshot.profile.id] = snapshot;
+      }
+      this.mutationService?.restoreDynamic(state.dynamic.mutationLog, dormantMap);
+    }
   }
 
   /** Pretty-printed JSON serialization (spec 017, Req 14). */

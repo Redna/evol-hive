@@ -28,8 +28,8 @@ function aff(id: string) {
   return { id, label: id, engineEffect: id, preconditions: [], effects: {} };
 }
 
-function makeObject(id: string, roomId: string, affordanceIds: string[]): SmartObject {
-  return { id, name: id, type: 'furniture', state: {}, affordances: affordanceIds.map(aff), roomId };
+function makeObject(id: string, roomId: string, affordanceIds: string[], type = 'furniture'): SmartObject {
+  return { id, name: id, type, state: {}, affordances: affordanceIds.map(aff), roomId };
 }
 
 /** Two connected rooms, one movable object, one doorway, one agent profile. */
@@ -54,8 +54,8 @@ function makeScene(): SceneDefinition {
     rooms: [roomA, roomB],
     objects: [
       makeObject('crate-1', 'room_a', ['carry']),
-      makeObject('doorway-room_a', 'room_a', ['go_to_room_b']),
-      makeObject('doorway-room_b', 'room_b', ['go_to_room_a']),
+      makeObject('doorway-room_a', 'room_a', ['go_to_room_b'], 'doorway'),
+      makeObject('doorway-room_b', 'room_b', ['go_to_room_a'], 'doorway'),
     ],
     agents: [],
   };
@@ -76,9 +76,21 @@ function buildHarness(): Harness {
   const registry = new SmartObjectRegistryImpl();
   const agentManager = new AgentManagerImpl();
   const roomMap = new Map<string, Room>();
-  for (const room of scene.rooms) roomMap.set(room.id, { ...room });
+  for (const room of scene.rooms) {
+    roomMap.set(room.id, {
+      ...room,
+      connections: [...room.connections],
+      objectIds: [...room.objectIds],
+    });
+  }
   const sceneManager = new SceneManagerImpl(agentManager, roomMap);
-  for (const object of scene.objects) registry.register({ ...object });
+  for (const object of scene.objects) {
+    registry.register({
+      ...object,
+      state: { ...object.state },
+      affordances: object.affordances.map((a) => ({ ...a })),
+    });
+  }
   const dormantStore = new DormantAgentStore();
   const service = new SceneMutationServiceImpl({
     registry,
@@ -100,7 +112,6 @@ function buildHarness(): Harness {
       importAll: async () => undefined,
     } as never,
     mutationService: service,
-    dormantStore,
   });
   return { registry, sceneManager, agentManager, dormantStore, service, persistence, scene };
 }

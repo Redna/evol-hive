@@ -70,7 +70,10 @@ function makeScene(): { registry: SmartObjectRegistryImpl; sceneManager: SceneMa
   };
   const agentManager = new AgentManagerImpl();
   const roomMap = new Map<string, Room>(
-    Object.entries({ office, lab, lounge }).map(([id, room]) => [id, { ...room }]),
+    Object.entries({ office, lab, lounge }).map(([id, room]) => [
+      id,
+      { ...room, connections: [...room.connections], objectIds: [...room.objectIds] },
+    ]),
   );
   const sceneManager = new SceneManagerImpl(agentManager, roomMap);
   const registry = new SmartObjectRegistryImpl();
@@ -80,7 +83,11 @@ function makeScene(): { registry: SmartObjectRegistryImpl; sceneManager: SceneMa
     makeObject('desk-1', 'office', ['work']),
     makeObject('sofa-1', 'lounge', ['relax']),
   ]) {
-    registry.register({ ...object });
+    registry.register({
+      ...object,
+      state: { ...object.state },
+      affordances: object.affordances.map((a) => ({ ...a })),
+    });
   }
   return { registry, sceneManager, agentManager };
 }
@@ -158,15 +165,35 @@ describe('Connection state management (spec 030, AC-4 / Req 9)', () => {
   });
 
   it('base scene rooms are not mutated by connection changes (SceneDefinition immutability)', () => {
-    // Build the pristine scene object separately and capture a deep snapshot.
-    const scene = makeScene();
-    const officeRef = scene.sceneManager.getRoom('office')!;
-    const pristineConnections = JSON.stringify(officeRef.connections);
+    // Build a pristine authoring artifact and load it the way `loadScene`
+    // does (deep clone) — runtime connection changes must never leak into
+    // the SceneDefinition (constraint: immutable authoring artifacts).
+    const officeScene: Room = {
+      id: 'office',
+      name: 'Office',
+      description: '',
+      connections: ['lab', 'lounge'],
+      objectIds: [],
+    };
+    const pristine = JSON.stringify(officeScene.connections);
 
-    scene.sceneManager.setConnectionOpen('office', 'lab', false);
-    // The runtime room is a clone — mutation must not leak into the authoring
-    // artifact (constraint: never mutate SceneDefinition objects in place).
-    expect(JSON.stringify(officeRef.connections)).toBe(pristineConnections);
+    const agentManager = new AgentManagerImpl();
+    const roomMap = new Map<string, Room>([
+      [
+        'office',
+        { ...officeScene, connections: [...officeScene.connections], objectIds: [] },
+      ],
+      ['lab', { id: 'lab', name: 'Lab', description: '', connections: ['office'], objectIds: [] }],
+      ['garden', { id: 'garden', name: 'Garden', description: '', connections: [], objectIds: [] }],
+    ]);
+    const sceneManager = new SceneManagerImpl(agentManager, roomMap);
+
+    sceneManager.setConnectionOpen('office', 'lab', false);
+    sceneManager.setConnectionOpen('office', 'lab', true);
+    sceneManager.addConnection('office', 'garden');
+
+    // The authoring artifact is untouched.
+    expect(JSON.stringify(officeScene.connections)).toBe(pristine);
   });
 
   it('insert adds a new connection between two rooms', () => {

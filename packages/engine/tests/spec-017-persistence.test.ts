@@ -323,7 +323,7 @@ describe('AC-20 / AC-53: load() throws SaveFormatVersionError on version mismatc
     await expect(persistence.load(bad)).rejects.toBeInstanceOf(SaveFormatVersionError);
   });
 
-  it('error has expected=1 and actual=received version', async () => {
+  it('error has expected=SAVE_FORMAT_VERSION (2 since spec 030) and actual=received version', async () => {
     const { persistence } = makePersistence();
     const bad = {
       formatVersion: 99,
@@ -339,7 +339,7 @@ describe('AC-20 / AC-53: load() throws SaveFormatVersionError on version mismatc
     } catch (err) {
       expect(err).toBeInstanceOf(SaveFormatVersionError);
       const e = err as SaveFormatVersionError;
-      expect(e.expected).toBe(1);
+      expect(e.expected).toBe(SAVE_FORMAT_VERSION);
       expect(e.actual).toBe(99);
     }
   });
@@ -454,11 +454,11 @@ describe('AC-24: saveToFile / loadFromFile round-trip', () => {
     expect(mems[0]?.embedding).toEqual([0.1, 0.2]);
   });
 
-  it('AC-54: the written file contains "formatVersion": 1 and "savedAt":', async () => {
+  it('AC-54: the written file contains the formatVersion (2 since spec 030) and "savedAt":', async () => {
     const { persistence } = makePersistence();
     await persistence.saveToFile(tmpFile);
     const content = await fs.readFile(tmpFile, 'utf8');
-    expect(content).toContain('"formatVersion": 1');
+    expect(content).toContain(`"formatVersion": ${SAVE_FORMAT_VERSION}`);
     expect(content).toMatch(/"savedAt":\s*\d+/);
   });
 });

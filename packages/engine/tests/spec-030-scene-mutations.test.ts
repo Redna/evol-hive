@@ -11,6 +11,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { AgentProfile, SmartObject } from '@evol-hive/shared';
+import { affordancesToToolDefinitions } from '@evol-hive/shared';
 import { AgentManagerImpl } from '../src/agents/state/index.js';
 import { SmartObjectRegistryImpl } from '../src/world/objects/index.js';
 import { SceneManagerImpl } from '../src/world/scenes/index.js';
@@ -92,12 +93,24 @@ function buildHarness(scene: SceneDefinition): Harness {
   const registry = new SmartObjectRegistryImpl();
   const agentManager = new AgentManagerImpl();
   const roomMap = new Map<string, Room>();
-  for (const room of scene.rooms) roomMap.set(room.id, { ...room });
+  for (const room of scene.rooms) {
+    roomMap.set(room.id, {
+      ...room,
+      connections: [...room.connections],
+      objectIds: [...room.objectIds],
+    });
+  }
   const sceneManager = new SceneManagerImpl(agentManager, roomMap);
-  for (const object of scene.objects) registry.register({ ...object });
+  for (const object of scene.objects) {
+    registry.register({
+      ...object,
+      state: { ...object.state },
+      affordances: object.affordances.map((a) => ({ ...a })),
+    });
+  }
   const dormantStore = new DormantAgentStore();
   const cache = new AffordanceResolutionCache((roomId) =>
-    registry.getAffordancesInRoom(roomId).map((a) => ({ ...a })),
+    affordancesToToolDefinitions(registry.getAffordancesInRoom(roomId)),
   );
   const service = new SceneMutationServiceImpl({
     registry,
@@ -166,11 +179,14 @@ describe('SceneMutationService — queue & tick-boundary application (spec 030, 
       type: 'add_object',
       payload: { object: makeObject('crate-1', 'room_a', []) },
     });
+    h.service.applyPending(5);
+    // The move validates against the post-add state (propose-time validation,
+    // Req 3) — it is enqueued after the add has been applied.
     h.service.propose({
       type: 'move_object',
       payload: { objectId: 'crate-1', toRoomId: 'room_b' },
     });
-    h.service.applyPending(5);
+    h.service.applyPending(6);
 
     const log = h.service.getMutations();
     expect(log).toHaveLength(2);
@@ -179,7 +195,7 @@ describe('SceneMutationService — queue & tick-boundary application (spec 030, 
     expect(log[0]!.type).toBe('add_object');
     expect(log[1]!.type).toBe('move_object');
     expect(log[0]!.tick).toBe(5);
-    expect(log[1]!.tick).toBe(5);
+    expect(log[1]!.tick).toBe(6);
     expect(log[0]!.source).toBe('engine');
   });
 

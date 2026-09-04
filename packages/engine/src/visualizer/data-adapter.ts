@@ -30,6 +30,7 @@ import type { GameLoopImpl } from '../loop/index.js';
 import type { AgentManagerImpl } from '../agents/state/index.js';
 import type { SmartObjectRegistryImpl } from '../world/objects/index.js';
 import type { SceneManagerImpl } from '../world/scenes/index.js';
+import type { SceneMutationServiceImpl } from '../world/mutations/scene-mutation-service.js';
 import type { EnginePersistence } from '../index.js';
 
 /** Constructor dependencies for {@link VisualizerDataAdapter} (spec 023, Req 8). */
@@ -45,6 +46,8 @@ export interface VisualizerDataAdapterOptions {
   agentProfiles?: Map<string, AgentProfile>;
   /** Built-in scenes available for the `selectScene` command. */
   scenes?: Map<string, SceneDefinition>;
+  /** Optional mutation service — exposes mutation log deltas (spec 030, Req 15). */
+  mutationService?: SceneMutationServiceImpl;
 }
 
 /**
@@ -62,6 +65,7 @@ export class VisualizerDataAdapter implements VisualizerInterface {
   private readonly persistence: EnginePersistence | undefined;
   private readonly agentProfiles: Map<string, AgentProfile> | undefined;
   private readonly scenes: Map<string, SceneDefinition> | undefined;
+  private readonly mutationService: SceneMutationServiceImpl | undefined;
 
   constructor(options: VisualizerDataAdapterOptions) {
     this.gameLoop = options.gameLoop;
@@ -72,6 +76,7 @@ export class VisualizerDataAdapter implements VisualizerInterface {
     this.persistence = options.persistence;
     this.agentProfiles = options.agentProfiles;
     this.scenes = options.scenes;
+    this.mutationService = options.mutationService;
   }
 
   /** Compose a full `VisualizerState` snapshot from the engine (spec 023, Req 8). */
@@ -150,6 +155,14 @@ export class VisualizerDataAdapter implements VisualizerInterface {
       rooms,
       agents,
     };
+  }
+
+  /**
+   * Mutation log deltas since `sinceSeq` (exclusive) for the WebSocket
+   * channel (spec 030, Req 15). Empty when no mutation service is wired.
+   */
+  getMutationDeltas(sinceSeq?: number): import('@evol-hive/shared').SceneMutationEvent[] {
+    return this.mutationService?.getMutations(sinceSeq) ?? [];
   }
 
   /** Dispatch a `VisualizerCommand` to the appropriate engine method (spec 023, Req 8). */

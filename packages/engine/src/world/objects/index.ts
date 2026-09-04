@@ -18,9 +18,47 @@ import { evaluateConditions } from '../affordances/index.js';
 /** Concrete SmartObjectRegistry backed by an in-memory map. */
 export class SmartObjectRegistryImpl implements SmartObjectRegistry {
   private readonly objects = new Map<string, SmartObject>();
+  /**
+   * Optional movement filter (spec 030, Req 10): when installed, room
+   * affordance queries consult it to hide cross-door `go_to_*` affordances
+   * whose destination is unreachable through closed connections. Returns
+   * `true` to keep the affordance, `false` to filter it out.
+   */
+  private movementFilter: ((roomId: string, engineEffect: string) => boolean) | null = null;
 
   register(object: SmartObject): void {
     this.objects.set(object.id, object);
+  }
+
+  /**
+   * Remove an object entirely (spec 030, Req 4). This unregisters the
+   * object's affordances from tool availability (the room affordance queries
+   * no longer see them) and drops any accumulated state patches — the whole
+   * object record is gone. No-op when the object does not exist.
+   */
+  remove(objectId: string): void {
+    this.objects.delete(objectId);
+  }
+
+  /**
+   * Relocate an object to another room (spec 030, Req 4). Updates the
+   * object's `roomId`. No-op when the object does not exist.
+   */
+  setRoom(objectId: string, roomId: string): void {
+    const object = this.objects.get(objectId);
+    if (object) {
+      this.objects.set(objectId, { ...object, roomId });
+    }
+  }
+
+  /**
+   * Install (or clear with `null`) the movement affordance filter used by
+   * room affordance queries (spec 030, Req 10). Typically wired by the
+   * `SceneMutationService` so closed connections hide `go_to_<room>`
+   * affordances in the closed direction.
+   */
+  setMovementFilter(filter: ((roomId: string, engineEffect: string) => boolean) | null): void {
+    this.movementFilter = filter;
   }
 
   get(objectId: string): SmartObject | null {
@@ -46,6 +84,9 @@ export class SmartObjectRegistryImpl implements SmartObjectRegistry {
     const result: Affordance[] = [];
     for (const object of this.getByRoom(roomId)) {
       for (const affordance of object.affordances) {
+        if (this.movementFilter && !this.movementFilter(roomId, affordance.engineEffect)) {
+          continue; // movement affordance filtered by connection state (spec 030, Req 10)
+        }
         result.push(affordance);
       }
     }
@@ -61,6 +102,9 @@ export class SmartObjectRegistryImpl implements SmartObjectRegistry {
     const result: Affordance[] = [];
     for (const object of this.getByRoom(roomId)) {
       for (const affordance of object.affordances) {
+        if (this.movementFilter && !this.movementFilter(roomId, affordance.engineEffect)) {
+          continue; // movement affordance filtered by connection state (spec 030, Req 10)
+        }
         if (!affordance.conditions || affordance.conditions.length === 0) {
           result.push(affordance);
         } else if (evaluateConditions(object.state, affordance.conditions)) {
