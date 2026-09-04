@@ -89,6 +89,73 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
   ],
 };
 
+// ── Scene-specific affordance handlers ──────────────────────────────────────
+
+/**
+ * Handlers for the dynamic-world demo (spec 030): without these, every
+ * garden/workshop action fails on execution or restores no drives, leaving
+ * the LLM no reason to navigate — a stalemate. These give both rooms a
+ * working drive-restoration loop so plans can actually succeed:
+ *
+ *   garden:  plant_seeds (+curiosity), water_plants (+curiosity, consumes water)
+ *   workshop: work, take_tool (enables build_planter), build_planter (+curiosity)
+ *   both:    go_to_* via the builtin doorway plugin (movement)
+ */
+export function createDynamicWorldHandlers(): Record<string, AffordanceHandler> {
+  return {
+    plant_seeds: async (_objectId, _agentId, state) => {
+      const planted = (state['seeds_planted'] as number) ?? 0;
+      if (planted >= 3) {
+        return { success: false, failureReason: 'The planter is full.' };
+      }
+      return {
+        success: true,
+        newState: { ...state, seeds_planted: planted + 1 },
+        driveChanges: { curiosity: 12, comfort: 4 },
+      };
+    },
+    water_plants: async (_objectId, _agentId, state) => {
+      const water = (state['water_level'] as number) ?? 0;
+      if (water <= 0) {
+        return { success: false, failureReason: 'The watering can is empty.' };
+      }
+      return {
+        success: true,
+        newState: { ...state, water_level: water - 1 },
+        driveChanges: { curiosity: 10, comfort: 5 },
+      };
+    },
+    work: async (_objectId, _agentId, state) => {
+      const items = (state['items_built'] as number) ?? 0;
+      return {
+        success: true,
+        newState: { ...state, items_built: items + 1 },
+        driveChanges: { curiosity: 6, energy: -4, comfort: -3 },
+      };
+    },
+    take_tool: async (objectId, agentId, state) => {
+      return {
+        success: true,
+        newState: { ...state, taken_by: agentId, taken_from: objectId },
+        driveChanges: { curiosity: 8 },
+      };
+    },
+    build_planter: async (_objectId, _agentId, state) => {
+      if (state['taken_by'] === undefined) {
+        return {
+          success: false,
+          failureReason: 'Take a tool from the toolbox first.',
+        };
+      }
+      return {
+        success: true,
+        newState: { ...state, planters_built: ((state['planters_built'] as number) ?? 0) + 1 },
+        driveChanges: { curiosity: 20, comfort: 8 },
+      };
+    },
+  };
+}
+
 // ── Runtime mutation helpers ────────────────────────────────────────────────
 
 /** A portable object the `carry` affordance can move between rooms. */

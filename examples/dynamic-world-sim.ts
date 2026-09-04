@@ -42,7 +42,12 @@ import {
 import type { EngineCore } from '@evol-hive/engine';
 import { VisualizerServer } from '@evol-hive/visualizer';
 import { assembleCognitionStack, buildMemorySubsystem } from './assembly.ts';
-import { DYNAMIC_WORLD_SCENE, createCarryEffect, createGateHandlers } from './dynamic-world.ts';
+import {
+  DYNAMIC_WORLD_SCENE,
+  createCarryEffect,
+  createGateHandlers,
+  createDynamicWorldHandlers,
+} from './dynamic-world.ts';
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -211,6 +216,9 @@ async function main(): Promise<void> {
     registerHandlerPlugin(plugin);
   }
   autoRegisterHandlers(core, DYNAMIC_WORLD_SCENE);
+  for (const [effect, handler] of Object.entries(createDynamicWorldHandlers())) {
+    core.affordanceRegistry.registerHandler(effect, handler);
+  }
   core.affordanceRegistry.registerHandler('carry', createCarryEffect(core.mutationService));
   for (const [effect, handler] of Object.entries(createGateHandlers(core.mutationService))) {
     core.affordanceRegistry.registerHandler(effect, handler);
