@@ -65,8 +65,10 @@ function buildPhysics(agentManager: AgentManagerImpl): {
 } {
   const registry = new SmartObjectRegistryImpl();
   const affordances = new AffordanceRegistryImpl(registry);
-  const physics = new PhysicsSystemImpl(registry, affordances, (agentId) =>
-    agentManager.getState(agentId)?.location,
+  const physics = new PhysicsSystemImpl(
+    registry,
+    affordances,
+    (agentId) => agentManager.getState(agentId)?.location,
   );
   return { registry, affordances, physics };
 }
@@ -215,7 +217,10 @@ describe('move_object mutation/registry consistency (spec 031, Req 8 — AC-10)'
     const garden = makeRoom(GARDEN, [WORKSHOP]);
     const workshop = makeRoom(WORKSHOP, [GARDEN]);
     const roomMap = new Map<string, Room>([
-      [GARDEN, { ...garden, connections: [...garden.connections], objectIds: [...garden.objectIds] }],
+      [
+        GARDEN,
+        { ...garden, connections: [...garden.connections], objectIds: [...garden.objectIds] },
+      ],
       [
         WORKSHOP,
         { ...workshop, connections: [...workshop.connections], objectIds: [...workshop.objectIds] },

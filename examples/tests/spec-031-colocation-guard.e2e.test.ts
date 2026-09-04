@@ -15,9 +15,9 @@
  * No LLM is involved — the Execute phase is deterministic (AC-14).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { Affordance, AffordanceHandler, Room, SmartObject } from '@evol-hive/shared';
+import type { Affordance, Room, SmartObject } from '@evol-hive/shared';
 import { createEngineCore, loadScene } from '@evol-hive/engine';
-import type { EngineCore } from '@evol-hive/engine';
+import type { AffordanceHandler, EngineCore } from '@evol-hive/engine';
 import { ExecuteServiceImpl, GuardrailEngineImpl } from '@evol-hive/cognition';
 import type { TopologyGuard, AffordanceGuard } from '@evol-hive/shared';
 
