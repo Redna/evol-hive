@@ -106,10 +106,13 @@ class FakeExecuteDataProvider implements ExecuteDataProvider {
   agentState: AgentInternalState | null = makeAgentState();
   currentStep: PlanStep | null = makeStep();
   planComplete = false;
+  /** Resolution template: objectId + affordance shape returned for room-scoped hits. */
   resolvedAffordance: { objectId: string; affordance: Affordance } | null = {
     objectId: 'toolbox-1',
     affordance: takeTool,
   };
+  /** Affordance IDs currently resolvable in the agent's room (live view). */
+  roomAffordanceIds: Set<string> = new Set(['take_tool']);
   compoundAction: { objectId: string; compoundAction: CompoundAction } | null = null;
   preconditionResult: { satisfied: boolean; failed: string[] } = { satisfied: true, failed: [] };
   affordanceResult: AffordanceResult = { success: true, driveChanges: { energy: 5 } };
@@ -117,6 +120,8 @@ class FakeExecuteDataProvider implements ExecuteDataProvider {
   anywhereResult: { objectId: string; objectName: string; roomId: string } | null = null;
   /** When true, room-scoped resolution fails (the object left the room). */
   moved = false;
+  /** When true, executeAffordance simulates a mid-compound move after the first sub-step. */
+  moveAfterFirstExecution = false;
 
   getAgentStateCalls: string[] = [];
   advanceStepCalls: string[] = [];
@@ -142,8 +147,12 @@ class FakeExecuteDataProvider implements ExecuteDataProvider {
     affordanceId: string,
   ): { objectId: string; affordance: Affordance } | null {
     void roomId;
-    void affordanceId;
-    return this.moved ? null : this.resolvedAffordance;
+    if (this.moved || this.resolvedAffordance === null) return null;
+    if (!this.roomAffordanceIds.has(affordanceId)) return null;
+    return {
+      objectId: this.resolvedAffordance.objectId,
+      affordance: { ...this.resolvedAffordance.affordance, id: affordanceId },
+    };
   }
   resolveCompoundAction(
     roomId: string,
@@ -175,7 +184,9 @@ class FakeExecuteDataProvider implements ExecuteDataProvider {
     this.executeAffordanceCalls.push({ objectId, affordanceId, agentId });
     // Simulate a mid-compound move_object mutation: after the first sub-step
     // runs, the object is no longer in the agent's room.
-    if (this.compoundAction !== null) this.moved = true;
+    if (this.moveAfterFirstExecution && this.executeAffordanceCalls.length === 1) {
+      this.moved = true;
+    }
     return this.affordanceResult;
   }
   advanceStep(agentId: string): void {
@@ -206,13 +217,14 @@ describe('ExecuteServiceImpl co-location failure (spec 031, Req 4 — AC-3)', ()
 
   beforeEach(() => {
     provider = new FakeExecuteDataProvider();
-    provider.resolvedAffordance = null; // room-scoped resolution fails…
+    provider.roomAffordanceIds = new Set(); // room-scoped resolution fails…
     provider.anywhereResult = {
       objectId: 'toolbox-1',
       objectName: 'Toolbox',
       roomId: WORKSHOP, // …because the object is now in the workshop
     };
     provider.compoundAction = null;
+    provider.agentState = makeAgentState({ currentPlan: makePlan() });
     service = new ExecuteServiceImpl({ dataProvider: provider });
   });
 
@@ -247,6 +259,20 @@ describe('ExecuteServiceImpl co-location failure (spec 031, Req 4 — AC-3)', ()
     expect(result.stepSkipped).toBe(true);
     expect(provider.advanceStepCalls).toHaveLength(1);
   });
+
+  it('compound fallback runs before the skip path when the compound is still in the room', async () => {
+    // Compound still present: roomAffordanceIds empty, compound resolvable.
+    provider.roomAffordanceIds = new Set(['take_tool', 'tighten_bolt']);
+    provider.moved = false;
+    provider.currentStep = makeStep({ targetAffordance: 'repair_sequence' });
+    provider.compoundAction = { objectId: 'toolbox-1', compoundAction: repairCompound };
+    provider.anywhereResult = null;
+    const result = await service.execute(AGENT_ID);
+
+    expect(result.success).toBe(true);
+    expect(provider.executeAffordanceCalls).toHaveLength(2);
+    expect(provider.advanceStepCalls).toEqual([AGENT_ID]);
+  });
 });
 
 // ── AC-4 — compound abort on mid-compound relocation (Req 3, 4) ──────────────
@@ -257,7 +283,11 @@ describe('Compound action aborts on mid-compound co-location failure (spec 031, 
 
   beforeEach(() => {
     provider = new FakeExecuteDataProvider();
-    provider.resolvedAffordance = null; // compound fallback path
+    // The compound step target does NOT resolve room-scoped (it is a
+    // compound, not a plain affordance); its sub-steps do — until the
+    // mid-compound mutation moves the owning object.
+    provider.roomAffordanceIds = new Set(['take_tool', 'tighten_bolt']);
+    provider.currentStep = makeStep({ targetAffordance: 'repair_sequence' });
     provider.compoundAction = { objectId: 'toolbox-1', compoundAction: repairCompound };
     // Sub-step 1 resolves while the object is still here (moved flips to true
     // after the first executeAffordance call — the mid-compound mutation).
@@ -267,6 +297,10 @@ describe('Compound action aborts on mid-compound co-location failure (spec 031, 
       objectName: 'Toolbox',
       roomId: WORKSHOP,
     };
+    provider.agentState = makeAgentState({ currentPlan: makePlan('repair_sequence') });
+    // The world moves mid-compound: after sub-step 1 executes, the owning
+    // object is relocated to the workshop.
+    provider.moveAfterFirstExecution = true;
     service = new ExecuteServiceImpl({ dataProvider: provider });
   });
 

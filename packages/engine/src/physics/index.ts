@@ -13,6 +13,13 @@ import type { SmartObjectRegistry } from '../world/index.js';
 import type { AffordanceRegistryImpl } from '../world/affordances/index.js';
 
 /**
+ * Live agent-location resolver (spec 031, Req 1). Returns the agent's CURRENT
+ * room at execution time — never a cached or perception-time snapshot. Wired
+ * in `assembly.ts` from the live agent state.
+ */
+export type AgentLocationResolver = (agentId: string) => string | undefined;
+
+/**
  * Concrete PhysicsSystem. Executes affordances by:
  * 1. Looking up the SmartObject via `SmartObjectRegistry.get`.
  * 2. Finding the Affordance on the object.
@@ -23,10 +30,20 @@ import type { AffordanceRegistryImpl } from '../world/affordances/index.js';
 export class PhysicsSystemImpl implements PhysicsSystem {
   readonly name = 'physics';
 
+  /**
+   * Live agent-location resolver (spec 031, Req 1). `undefined` when not
+   * wired (bare constructions) — the co-location guard is then inert,
+   * preserving pre-031 behavior for existing constructions.
+   */
+  private readonly agentLocationResolver: AgentLocationResolver | undefined;
+
   constructor(
     private readonly smartObjectRegistry: SmartObjectRegistry,
     private readonly affordanceRegistry: AffordanceRegistryImpl,
-  ) {}
+    agentLocationResolver?: AgentLocationResolver,
+  ) {
+    this.agentLocationResolver = agentLocationResolver;
+  }
 
   /** No-op tick update (physics is event-driven, not tick-driven). */
   update(_tick: GameTick): void {
@@ -46,6 +63,22 @@ export class PhysicsSystemImpl implements PhysicsSystem {
     const object = this.smartObjectRegistry.get(objectId);
     if (!object) {
       return { success: false, failureReason: 'Object not found' };
+    }
+
+    // 1.5 Execute-time co-location guard (spec 031, Req 1): the object's
+    // CURRENT room must equal the agent's LIVE location — dynamic scenes
+    // (spec 030 move_object) can relocate targets after plan formation, and
+    // resolution source or perception-time validity cannot be trusted
+    // (AC-13). On mismatch: graceful failure, handler never invoked, no
+    // state mutation (AC-2). The check is O(1) — one live agent-state read.
+    if (this.agentLocationResolver !== undefined) {
+      const agentLocation = this.agentLocationResolver(agentId);
+      if (agentLocation !== undefined && object.roomId !== agentLocation) {
+        return {
+          success: false,
+          failureReason: `The ${object.name} (${objectId}) is no longer here — it moved to the ${object.roomId}.`,
+        };
+      }
     }
 
     // 2. Find the Affordance on the object.

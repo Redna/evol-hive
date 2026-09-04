@@ -23,6 +23,7 @@ import type {
   CompoundAction,
   ExecuteResult,
   ExecuteDataProvider,
+  AffordanceGuard,
 } from '@evol-hive/shared';
 import type { GuardrailEngine } from '../index.js';
 
@@ -31,6 +32,14 @@ export interface ExecuteServiceOptions {
   dataProvider: ExecuteDataProvider;
   /** Optional guardrail engine for plan validation (spec 016, Req 11). */
   guardrail?: GuardrailEngine;
+  /**
+   * Optional affordance guard for stale-step detection (spec 031, Req 5).
+   * Implemented by the engine (backed by `SmartObjectRegistry.getByRoom`) and
+   * carried in the plan-validation context; when present, plan validation
+   * rejects steps whose target affordance is no longer available in the
+   * agent's room (§10 mechanism 3 → reflection tick).
+   */
+  affordanceGuard?: AffordanceGuard;
 }
 
 /** Concrete ExecuteService that orchestrates deterministic affordance execution. */
@@ -78,9 +87,11 @@ export class ExecuteServiceImpl {
       // Req 10 — blocked steps trigger a reflection tick).
       const guardrail = this.options.guardrail;
       if (guardrail !== undefined) {
+        const { affordanceGuard } = this.options;
         const validation = guardrail.validateAction(step.targetAffordance, agentState.currentPlan, {
           agentId,
           fromRoom: agentState.location,
+          ...(affordanceGuard !== undefined ? { affordanceGuard } : {}),
         });
         if (!validation.valid) {
           const reason = validation.reason ?? 'Action deviates from plan';
@@ -107,6 +118,20 @@ export class ExecuteServiceImpl {
           dataProvider.resolveCompoundAction?.(agentState.location, step.targetAffordance) ?? null;
         if (compound) {
           return await this.executeCompoundAction(agentId, agentState.location, compound);
+        }
+
+        // Co-location failure (spec 031, Req 4): the affordance exists on an
+        // object that has MOVED to another room since plan formation. This is
+        // world knowledge the agent must reflect on — treat it exactly like a
+        // handler failure (system feedback + unfreeze + no step advance), and
+        // keep the step-skip path for unresolvable affordances unreachable
+        // here. The failureReason matches the physics guard's message (Req 2).
+        const relocated = dataProvider.resolveAffordanceAnywhere?.(step.targetAffordance);
+        if (relocated && relocated.roomId !== agentState.location) {
+          const failureReason = `The ${relocated.objectName} (${relocated.objectId}) is no longer here — it moved to the ${relocated.roomId}.`;
+          dataProvider.setSystemFeedback(agentId, failureReason);
+          dataProvider.setThinking(agentId, false);
+          return { success: false, error: failureReason, planComplete: false };
         }
 
         // Skip steps with unresolvable affordances (LLM may plan actions that
@@ -218,6 +243,16 @@ export class ExecuteServiceImpl {
         const nested = dataProvider.resolveCompoundAction?.(roomId, subStep.affordanceId);
         if (nested) {
           return abort('nested compound actions are not supported');
+        }
+        // Co-location failure (spec 031, Req 3): a mid-compound move_object of
+        // the compound's owning object (or of a sub-step target) aborts the
+        // compound at this sub-step with the co-location failureReason,
+        // following the spec 028 Req 6/7 abort semantics.
+        const relocated = dataProvider.resolveAffordanceAnywhere?.(subStep.affordanceId);
+        if (relocated && relocated.roomId !== roomId) {
+          return abort(
+            `The ${relocated.objectName} (${relocated.objectId}) is no longer here — it moved to the ${relocated.roomId}`,
+          );
         }
         return abort(`affordance '${subStep.affordanceId}' not found in room '${roomId}'`);
       }

@@ -105,6 +105,26 @@ export class ExecuteDataProviderImpl implements ExecuteDataProvider {
     return null;
   }
 
+  /**
+   * Resolve an affordance ID to its owning smart object in ANY room (spec 031,
+   * Req 4 support). Scan over all registered objects — lets the cognition
+   * Execute phase distinguish "the affordance's object left the agent's room"
+   * (co-location failure) from "the affordance does not exist anywhere"
+   * (unresolvable — skip path preserved).
+   */
+  resolveAffordanceAnywhere(affordanceId: string): {
+    objectId: string;
+    objectName: string;
+    roomId: string;
+  } | null {
+    for (const object of this.smartRegistry.getAll()) {
+      if (object.affordances.some((a: Affordance) => a.id === affordanceId)) {
+        return { objectId: object.id, objectName: object.name, roomId: object.roomId };
+      }
+    }
+    return null;
+  }
+
   checkPreconditions(
     affordanceId: string,
     objectId: string,
