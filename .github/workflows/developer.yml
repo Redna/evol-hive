@@ -7,6 +7,11 @@ on:
         description: "Issue number to implement"
         required: true
         type: string
+      retry_count:
+        description: "Internal: number of automatic retries used"
+        required: false
+        type: string
+        default: "0"
 
 concurrency:
   group: agent-pipeline
@@ -94,6 +99,19 @@ jobs:
           # Interpolate variables into the task template
           TASK_CONTENT=$(ISSUE_NUMBER=$ISSUE_NUMBER SPEC_FILE=$SPEC_FILE envsubst < .pi/tasks/implement.md)
 
+          # Resource heartbeat: logs memory/disk every 20s to the job log and a
+          # file. Two purposes: (a) prove/disprove the runner-reclamation-by-OOM
+          # theory — the last readings before a shutdown signal are captured;
+          # (b) keep log output flowing while pi waits on the first LLM token.
+          (
+            while true; do
+              echo "[heartbeat] $(date -u +%H:%M:%S) mem=$(free -m | awk 'NR==2{print $3"/"$2"MB"}') disk=$(df -h / | awk 'NR==2{print $5" used"}') load=$(cut -d' ' -f1-3 /proc/loadavg)"
+              sleep 20
+            done
+          ) &
+          HEARTBEAT_PID=$!
+          trap 'kill $HEARTBEAT_PID 2>/dev/null || true' EXIT
+
           # Run the agent
           pi -p "$TASK_CONTENT" \
             --append-system-prompt "$(cat .pi/agents/developer.md)" \
@@ -129,3 +147,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_RUN_ID: ${{ github.run_id }}
+
+      # GitHub-hosted runners intermittently cancel these long, mostly-idle
+      # agent jobs ("The runner has received a shutdown signal", no auto-retry,
+      # ~50% of runs — see issue #112 follow-up). Re-dispatch once on failure;
+      # the retry_count input prevents infinite loops.
+      - name: Auto-retry on runner cancellation
+        if: failure() && github.event.inputs.retry_count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
+        run: |
+          echo "Job failed — re-dispatching developer (retry 1/1) for issue #${ISSUE_NUMBER}"
+          gh workflow run developer.yml \
+            --ref main \
+            -f issue_number="${ISSUE_NUMBER}" \
+            -f retry_count="1"
+          echo "Re-dispatched."

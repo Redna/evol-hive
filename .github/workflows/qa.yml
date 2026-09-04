@@ -9,6 +9,11 @@ on:
         description: "PR number to verify (fallback if pull_request event didn't fire)"
         required: true
         type: string
+      retry_count:
+        description: "Internal: number of automatic retries used"
+        required: false
+        type: string
+        default: "0"
 
 concurrency:
   group: agent-pipeline
@@ -82,6 +87,18 @@ jobs:
 
           # Interpolate PR_NUMBER into the task template
           TASK_CONTENT=$(PR_NUMBER=$PR_NUMBER envsubst < .pi/tasks/qa-verify.md)
+
+          # Resource heartbeat: log memory/disk/load every 20s — proves or
+          # disproves OOM-based runner reclamation and keeps the job log active
+          # while pi waits on the first LLM token.
+          (
+            while true; do
+              echo "[heartbeat] $(date -u +%H:%M:%S) mem=$(free -m | awk 'NR==2{print $3"/"$2"MB"}') disk=$(df -h / | awk 'NR==2{print $5" used"}') load=$(cut -d' ' -f1-3 /proc/loadavg)"
+              sleep 20
+            done
+          ) &
+          HEARTBEAT_PID=$!
+          trap 'kill $HEARTBEAT_PID 2>/dev/null || true' EXIT
 
           pi -p "$TASK_CONTENT" \
             --append-system-prompt "$(cat .pi/agents/qa-tester.md)" \
