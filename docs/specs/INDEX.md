@@ -61,8 +61,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      27
 ✅ Done:          17
 🔨 In Development: 0
-🔍 In Review:      3
-📝 Drafted:        6
+🔍 In Review:      4
+📝 Drafted:        5
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -78,6 +78,6 @@ Architecture sections fully implemented: 11/11
 | [024](024-social-tool-invocation-fix.md) | Social Tool Invocation Fix — Make LLM Call `talk_to` Directly When Agents Are Present | §6, §8, §9, §10 | 📝 Drafted | [#98](https://github.com/Redna/evol-hive/issues/98) | — | cognition |
 | [025](025-memory-entry-flatten-and-fallback.md) | Memory Entry — Flatten Schema & Auto-Fallback | §6, §8, §11 | 📝 Drafted | [#99](https://github.com/Redna/evol-hive/issues/99) | — | shared, cognition |
 | [026](026-memory-entry-fix.md) | Memory Entry Fix — Flatten Reflect Schema & Auto-Fallback Memory Generation | §6, §7, §8, §11 | 📝 Drafted | [#99](https://github.com/Redna/evol-hive/issues/99) | — | shared, cognition, engine |
-| [027](027-real-llm-visualizer-demo.md) | Real-LLM Visualizer Demo — Wire PPER Cycles into the Canvas Visualizer | §2, §4, §6, §9, §10 | 📝 Drafted | [#106](https://github.com/Redna/evol-hive/issues/106) | — | examples |
+| [027](027-real-llm-visualizer-demo.md) | Real-LLM Visualizer Demo — Wire PPER Cycles into the Canvas Visualizer | §2, §4, §6, §9, §10 | 🔍 In Review | [#106](https://github.com/Redna/evol-hive/issues/106) | [#113](https://github.com/Redna/evol-hive/pull/113) | examples |
 | [028](028-compound-action-execution.md) | Compound Action Execution — Execute Compound Actions Planned by the LLM | §4, §6, §9 | 📝 Drafted | [#108](https://github.com/Redna/evol-hive/issues/108) | — | shared, engine, cognition |
 | [029](029-visualizer-state-text-overflow.md) | Visualizer Object State Text — Round Decimals & Truncate Overflow | §2, §4 | 📝 Drafted | [#105](https://github.com/Redna/evol-hive/issues/105) | — | visualizer |
