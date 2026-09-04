@@ -118,13 +118,51 @@ jobs:
           HEARTBEAT_PID=$!
           trap 'kill $HEARTBEAT_PID 2>/dev/null || true' EXIT
 
-          # Run the agent
-          pi -p "$TASK_CONTENT" \
-            --append-system-prompt "$(cat .pi/agents/developer.md)" \
-            --model ollama/glm-5.3-flash \
-            --thinking medium \
-            --tools read,write,edit,bash \
+          # Run the agent with a continuation loop. pi print-mode exits whenever
+          # the model emits a text-only response instead of a tool call — common
+          # with glm-5.3-flash mid-implementation (it narrates "Now add X" and
+          # quits). Each pass resumes from the pushed branch + YAAM notes, so
+          # checkpointed work survives; uncommitted work does not.
+          PI_ARGS=(
+            -p "$TASK_CONTENT"
+            --append-system-prompt "$(cat .pi/agents/developer.md)"
+            --model ollama/glm-5.3-flash
+            --thinking medium
+            --tools read,write,edit,bash
             --verbose
+          )
+          PR_CREATED=0
+          for PASS in 1 2 3; do
+            echo "=== Agent pass $PASS/3 ==="
+            pi "${PI_ARGS[@]}"
+            PI_EXIT=$?
+            echo "pi exited (code $PI_EXIT) — checking goal state"
+            # Goal reached? An open PR whose branch has implementation commits.
+            PR_NUM=$(gh pr list --state open --json number,headRefName \
+              --jq "[] | map(select(.headRefName | test(\"feature/${ISSUE_NUMBER}[-_]|feature-0*${ISSUE_NUMBER}\"))) | .[0].number // empty")
+            if [ -n "$PR_NUM" ]; then
+              COMMITS=$(git rev-list --count origin/main.."$(gh pr view "$PR_NUM" --json headRefName --jq .headRefName)" 2>/dev/null || echo 0)
+              if [ "${COMMITS:-0}" -gt 0 ]; then
+                echo "PR #$PR_NUM exists with $COMMITS commits — implementation complete"
+                PR_CREATED=1
+                break
+              fi
+            fi
+            if [ "$PASS" = "3" ]; then
+              echo "3 passes exhausted without a complete PR"
+              break
+            fi
+            echo "Pass $PASS ended without completing the goal — re-invoking with continue.md"
+            TASK_CONTENT=$(ISSUE_NUMBER=$ISSUE_NUMBER SPEC_FILE=$SPEC_FILE envsubst < .pi/tasks/continue.md)
+            PI_ARGS=(
+              -p "$TASK_CONTENT"
+              --append-system-prompt "$(cat .pi/agents/developer.md)"
+              --model ollama/glm-5.3-flash
+              --thinking medium
+              --tools read,write,edit,bash
+              --verbose
+            )
+          done
 
       - name: Push agent commits
         env:
