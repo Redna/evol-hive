@@ -126,6 +126,30 @@ export class GuardrailEngineImpl implements GuardrailEngine {
       }
     }
 
+    // Affordance co-location validation (spec 031, Req 6): when the context
+    // carries an affordance guard and the action's target affordance is no
+    // longer available in the agent's current room, the plan is stale —
+    // reject to force a reflection tick and early re-planning (§10 mechanism
+    // 3). Movement actions are never rejected here (spec 031 AC-8):
+    // movement gating remains exclusively TopologyGuard behavior (spec 030,
+    // Req 10) — doorway objects live in the agent's room, so the universal
+    // check would be safe, but the explicit skip keeps the dimensions
+    // cleanly separated. Advisory-grade only (Req 7): rejection produces a
+    // validation result — no plan mutation, no step advance, no state
+    // clears; re-planning belongs to the Reflect phase (spec 003, Req 25).
+    if (
+      context?.affordanceGuard !== undefined &&
+      context.fromRoom !== undefined &&
+      !action.startsWith('go_to_')
+    ) {
+      if (!context.affordanceGuard.isAffordanceAvailableInRoom(action, context.fromRoom)) {
+        return {
+          valid: false,
+          reason: `The '${action}' target is no longer in '${context.fromRoom}'. The plan is stale — reflect and choose a different action.`,
+        };
+      }
+    }
+
     // Determine the current step's targetAffordance.
     const currentStep = plan.steps[plan.currentStepIndex];
     const stepTarget = currentStep?.targetAffordance;

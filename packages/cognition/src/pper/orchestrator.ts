@@ -32,6 +32,7 @@ import type {
 } from '@evol-hive/shared';
 import { defaultPPERErrorConfig } from '@evol-hive/shared';
 import type { LLMClient, GuardrailEngine } from '../index.js';
+import type { AffordanceGuard } from '@evol-hive/shared';
 import type { AffordanceClassifier } from '../classifier/index.js';
 import {
   PerceptionServiceImpl,
@@ -55,6 +56,13 @@ export interface PPEROrchestratorOptions {
   errorConfig?: PPERErrorConfig;
   /** Optional guardrail engine for cognitive guardrails (spec 016, Req 12). */
   guardrail?: GuardrailEngine;
+  /**
+   * Optional affordance guard for stale-step detection (spec 031, Req 5).
+   * Forwarded to the Execute phase's plan-validation context; implemented by
+   * the engine (backed by `SmartObjectRegistry.getByRoom`) and wired in the
+   * application assembly.
+   */
+  affordanceGuard?: AffordanceGuard;
   /**
    * Optional batch plan service for multi-agent Plan-phase batching (spec 022,
    * Req 9, AC-7). When absent, the orchestrator uses the existing per-agent
@@ -109,6 +117,9 @@ export class PPEROrchestratorImpl {
     this.executeService = new ExecuteServiceImpl({
       dataProvider: options.executeProvider,
       ...(guardrail !== undefined ? { guardrail } : {}),
+      ...(options.affordanceGuard !== undefined
+        ? { affordanceGuard: options.affordanceGuard }
+        : {}),
     });
     this.reflectService = new ReflectServiceImpl({
       reflectBuilder: new ReflectBuilderImpl(),

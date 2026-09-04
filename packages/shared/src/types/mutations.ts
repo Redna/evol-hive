@@ -189,6 +189,22 @@ export interface TopologyGuard {
   isMovementBlocked(agentId: string, action: string, fromRoom: string): boolean;
 }
 
+/**
+ * Bridge interface (defined in `shared` per ADR-0001) for affordance
+ * co-location plan validation (spec 031, Req 5). The engine implements it
+ * (backed by `SmartObjectRegistry.getByRoom`); the cognition guardrails
+ * consume it via `PlanValidationContext` to reject plan steps whose target
+ * affordance is no longer available in the agent's room (§10 mechanism 3 →
+ * reflection tick). Mirrors the `TopologyGuard` pattern (spec 030, Req 10).
+ */
+export interface AffordanceGuard {
+  /**
+   * `true` when at least one smart object currently in `roomId` defines
+   * `affordanceId` (live registry read — no caching across ticks).
+   */
+  isAffordanceAvailableInRoom(affordanceId: string, roomId: string): boolean;
+}
+
 // ── modify_scene cognitive tool (Req 13) ─────────────────────────────────────
 
 /**

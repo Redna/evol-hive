@@ -153,7 +153,14 @@ export function createEngineCore(
   const planManager = new PlanManagerImpl(agentManager, clockFn);
   const smartObjectRegistry = new SmartObjectRegistryImpl();
   const affordanceRegistry = new AffordanceRegistryImpl(smartObjectRegistry);
-  const physics = new PhysicsSystemImpl(smartObjectRegistry, affordanceRegistry);
+  // Execute-time co-location guard (spec 031, Req 1): the resolver reads the
+  // LIVE agent state at execution time — never a cached or perception-time
+  // location, which is exactly what goes stale under dynamic scenes (spec 030).
+  const physics = new PhysicsSystemImpl(
+    smartObjectRegistry,
+    affordanceRegistry,
+    (agentId) => agentManager.getState(agentId)?.location,
+  );
   const spatial = new SpatialSystemImpl({
     agentManager,
     registry: smartObjectRegistry,

@@ -31,6 +31,7 @@ import type {
   ReflectLLMResponse,
   GuardrailConfig,
   TopologyGuard,
+  AffordanceGuard,
 } from '@evol-hive/shared';
 import { defaultMemoryDecayConfig, defaultReflectionConfig } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload, AffordanceClassifier } from '@evol-hive/cognition';
@@ -263,6 +264,13 @@ export function assembleCognitionStack(
     isMovementBlocked: (agentId: string, action: string, fromRoom: string): boolean =>
       core.sceneManager.isMovementBlocked(agentId, action, fromRoom),
   };
+  // Affordance co-location plan validation (spec 031, Req 5): the adapter
+  // reads the core's live smart-object registry — objects move at runtime
+  // (spec 030 move_object), so the guard must never trust a cached view.
+  const affordanceGuard: AffordanceGuard = {
+    isAffordanceAvailableInRoom: (affordanceId: string, roomId: string): boolean =>
+      core.smartObjectRegistry.isAffordanceAvailableInRoom(affordanceId, roomId),
+  };
   const guardrail = new GuardrailEngineImpl({ config: guardrailConfig, topologyGuard });
 
   // CognitiveToolExecutor (spec 019, Req 9) — only needed for real LLM (tool call loop).
@@ -308,6 +316,7 @@ export function assembleCognitionStack(
     classifier,
     llmClient,
     guardrail,
+    affordanceGuard,
   });
 
   // ── Memory decay + reflection (spec 019, Req 13) ──────────────────────────

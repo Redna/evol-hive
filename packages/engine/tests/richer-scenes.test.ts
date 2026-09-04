@@ -85,6 +85,13 @@ async function execute(
   affordanceId: string,
   agentId: string,
 ): Promise<AffordanceResult> {
+  // Walk the agent to the object's room first (spec 031): the execute-time
+  // co-location guard rejects affordances on objects in other rooms, so a
+  // direct handler test must have the agent standing where the object is.
+  const object = core.smartObjectRegistry.get(objectId);
+  if (object) {
+    core.agentManager.updateState(agentId, { location: object.roomId });
+  }
   return core.physics.executeAffordance(objectId, affordanceId, agentId);
 }
 

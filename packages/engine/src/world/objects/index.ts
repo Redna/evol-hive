@@ -143,6 +143,17 @@ export class SmartObjectRegistryImpl implements SmartObjectRegistry {
   }
 
   /**
+   * AffordanceGuard backing (spec 031, Req 5): `true` when at least one
+   * object currently in `roomId` defines `affordanceId`. Live registry read
+   * via `getByRoom` — no caching across ticks (spec 003, Req 23).
+   */
+  isAffordanceAvailableInRoom(affordanceId: string, roomId: string): boolean {
+    return this.getByRoom(roomId).some((object) =>
+      object.affordances.some((affordance) => affordance.id === affordanceId),
+    );
+  }
+
+  /**
    * Performs a shallow merge of `patch` into the object's existing `state`
    * (spec 018, Req 17). No-op if the object does not exist.
    */

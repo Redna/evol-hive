@@ -18,7 +18,7 @@ import type {
   CompoundAction,
   ObjectDependency,
 } from './affordance.js';
-import type { ModifySceneToolResult } from './mutations.js';
+import type { ModifySceneToolResult, AffordanceGuard } from './mutations.js';
 import type {
   AgentInternalState,
   AgentPlan,
@@ -354,11 +354,19 @@ export interface PlanValidationResult {
  * identity and current room so topology-aware guardrails can reject movement
  * through closed connections (§10 mechanism 3). Existing two-argument calls
  * remain valid — the context is optional.
+ *
+ * Spec 031 (Req 5) adds the optional `affordanceGuard`: implemented by the
+ * engine (backed by `SmartObjectRegistry.getByRoom`) and wired in assembly;
+ * the guardrails consume it to reject plan steps whose target affordance is
+ * no longer available in the agent's room (stale-plan detection, §10
+ * mechanism 3 → reflection tick).
  */
 export interface PlanValidationContext {
   agentId: string;
   /** The agent's current room, when known. */
   fromRoom?: string;
+  /** Optional affordance guard for stale-step detection (spec 031, Req 5). */
+  affordanceGuard?: AffordanceGuard;
 }
 
 /** Forcing directive injected when the agent has no plan (spec 016, Req 4). */
@@ -534,6 +542,20 @@ export interface ExecuteDataProvider {
     roomId: string,
     compoundActionId: string,
   ): { objectId: string; compoundAction: CompoundAction } | null;
+  /**
+   * Resolve an affordance ID to its owning smart object in ANY room (spec 031,
+   * Req 4 support). Room-scoped `resolveAffordance` fails when the target has
+   * moved; this global lookup distinguishes "the object left the room"
+   * (co-location failure — never silently skipped) from "the affordance does
+   * not exist anywhere" (unresolvable — skip path preserved). Optional so
+   * existing custom `ExecuteDataProvider` implementations compile and behave
+   * unchanged (mirrors the `resolveCompoundAction` pattern, spec 028 Req 3).
+   */
+  resolveAffordanceAnywhere?(affordanceId: string): {
+    objectId: string;
+    objectName: string;
+    roomId: string;
+  } | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
