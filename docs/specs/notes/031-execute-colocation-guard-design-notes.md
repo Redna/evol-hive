@@ -106,3 +106,35 @@ mutation funnel + real GuardrailEngineImpl; no LLM). All 14 ACs covered.
   the agent to the object's room before direct physics calls — the guard made
   cross-room handler tests fail (correctly).
 - The e2e test imports `AffordanceHandler` from `@evol-hive/engine` (not shared).
+
+---
+
+## QA record (spec 031 — PR #123 verification, 2025 session)
+
+> YAAM daemon RPC write path still unresponsive at QA time (engine pegged at
+> ~125% CPU / 58% MEM ingesting the now-1.7 GB `events.jsonl`; `upsert_node`
+> times out — search RPCs still work). Recorded here per the re-append
+> protocol. Workspace: `feature-031-execute-colocation-guard`.
+
+**Verdict: APPROVED.** All 14 ACs covered; 34 spec-031 tests (engine 11,
+cognition 17, e2e 6). Gates: `pnpm test` 1758 passed / 0 failed (7 packages);
+typecheck, lint, format:check clean. Issue #121 → `Status: In Review/QA`.
+QA report: PR #123 comment 5545783135.
+
+**Gaps found by QA and closed (commit `a3fbaab`):**
+- **AC-2** — spec requires `AgentInternalState.drives` AND `SmartObject.state`
+  unchanged on co-location failure; only the object state was asserted. Added
+  engine test asserting drives identical + no `driveChanges` produced.
+- **AC-3** — plain-path failure did not assert `applyDriveChanges` is never
+  called (only the compound-abort test did). Added the assertion.
+- **AC-5** — suite only checked `getSystemFeedback` + `isThinking`; added an
+  integration test running the real `PassivePerceptionAssembler` over the real
+  engine bridges + `PlanBuilderImpl`, asserting the failureReason reaches the
+  next perception tick and renders into the Plan-phase LLM context
+  (`System feedback: …`, §9.2).
+- Housekeeping — e2e test file was missing a trailing newline (the PR body's
+  "format:check clean" claim was inaccurate pre-fix; corrected).
+
+**QA takeaway for future specs:** AC-2-style "no side effects" criteria should
+enumerate *every* state surface named in the AC text (object state, agent
+drives, feedback) — partial assertions on one surface passed review here.
