@@ -18,6 +18,7 @@ import type {
   CompoundAction,
   ObjectDependency,
 } from './affordance.js';
+import type { ModifySceneToolResult } from './mutations.js';
 import type {
   AgentInternalState,
   AgentPlan,
@@ -154,7 +155,8 @@ export type CognitiveToolName =
   | 'talk_to'
   | 'observe_agent'
   | 'help'
-  | 'ignore';
+  | 'ignore'
+  | 'modify_scene';
 
 /** A cognitive tool the LLM can invoke instead of a physical action. */
 export interface CognitiveTool {
@@ -311,6 +313,15 @@ export interface CognitiveToolExecutor {
   executeHelp(agentId: string, targetAgentId: string): Promise<SocialToolResult>;
   /** Execute ignore: degrade the relationship and social drive (spec 018, Req 11). */
   executeIgnore(agentId: string, targetAgentId: string): Promise<SocialToolResult>;
+  /**
+   * Execute modify_scene: enqueue a scene mutation proposal (spec 030, Req 13).
+   * Optional so existing implementations compile unchanged; when absent, the
+   * tool loop reports the tool as unavailable.
+   */
+  executeModifyScene?(
+    agentId: string,
+    args: Record<string, unknown>,
+  ): Promise<ModifySceneToolResult>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -325,12 +336,29 @@ export interface GuardrailConfig {
   contextualForcing: boolean;
   /** Reject physical actions deviating from active_plan, forcing reflection. */
   planValidation: boolean;
+  /**
+   * Max `modify_scene` proposals per agent per PPER cycle (spec 030, Req 14d).
+   * Optional — consumers default to 1 when absent.
+   */
+  maxSceneMutationsPerCycle?: number;
 }
 
 /** The result of plan validation (spec 016, Req 3). */
 export interface PlanValidationResult {
   valid: boolean;
   reason?: string;
+}
+
+/**
+ * Optional context for plan validation (spec 030, Req 10). Carries the agent
+ * identity and current room so topology-aware guardrails can reject movement
+ * through closed connections (§10 mechanism 3). Existing two-argument calls
+ * remain valid — the context is optional.
+ */
+export interface PlanValidationContext {
+  agentId: string;
+  /** The agent's current room, when known. */
+  fromRoom?: string;
 }
 
 /** Forcing directive injected when the agent has no plan (spec 016, Req 4). */
