@@ -1,8 +1,9 @@
 name: Architect
 
 on:
-  issues:
-    types: [labeled]
+  # dispatch-only: the issues:labeled hook caused self-retrigger loops (the
+  # Architect labels the issue "Status: Ready for Dev" mid-run, firing itself
+  # again with empty event context — see duplicate PR #119).
   workflow_dispatch:
     inputs:
       issue_number:
