@@ -57,6 +57,12 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
   rooms: [garden, workshop],
   objects: [
     makeObject('planter-1', 'Planter', 'furniture', 'garden', [aff('plant_seeds', 'Plant seeds')]),
+    // Referenced by garden.objectIds — was missing (the runtime move_object
+    // proposal was rejected with "no object with ID 'toolbox-1'").
+    makeObject('toolbox-1', 'Toolbox', 'tool', 'garden', [
+      aff('take_tool', 'Take a tool'),
+      aff('observe', 'Observe'),
+    ]),
     makeObject('gate-1', 'Gate', 'doorway', 'garden', [aff('open_gate', 'Open gate')]),
     makeObject('workbench-1', 'Workbench', 'furniture', 'workshop', [
       aff('work', 'Work'),
