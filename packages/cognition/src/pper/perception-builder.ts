@@ -11,7 +11,7 @@
  * agent's name and behavioral tendencies.
  */
 
-import type { AgentProfile, PerceptionResult, Relationship } from '@evol-hive/shared';
+import type { AgentProfile, PerceptionResult, Relationship, SelfModel } from '@evol-hive/shared';
 import {
   queryMemoryTool,
   updateInternalStateTool,
@@ -20,6 +20,7 @@ import {
   helpTool,
   ignoreTool,
   formatPersona,
+  selfModelToPromptText,
   GUARDRAIL_FORCING_DIRECTIVE,
   affordancesToToolDefinitions,
 } from '@evol-hive/shared';
@@ -174,8 +175,11 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       tools = tools.filter((t) => t.function.name !== 'formulate_plan');
     }
 
-    // System prompt: persona-prefixed or generic (spec 012, Req 7).
-    let systemPrompt = buildSystemPrompt(persona);
+    // System prompt: persona-prefixed or generic (spec 012, Req 7). Spec 033
+    // (R11/AC-13): when an evolved self-model exists, its narrative/traits/
+    // goals are appended AFTER the spawn persona so the LLM sees the live,
+    // evolved identity (the profile stays the immutable seed/fallback).
+    let systemPrompt = buildSystemPrompt(persona, perceptionResult.selfModel);
 
     // Contextual forcing directive (spec 016, Req 10).
     if (noPlan && forcingEnabled) {
@@ -192,16 +196,31 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
   }
 }
 
-function buildSystemPrompt(persona: AgentProfile | null | undefined): string {
+function buildSystemPrompt(
+  persona: AgentProfile | null | undefined,
+  selfModel?: SelfModel,
+): string {
+  const parts: string[] = [];
   if (persona) {
     const personaText = formatPersona(persona);
-    return [
-      `You are ${persona.name}, ${personaText}.`,
-      'You perceive your surroundings passively and choose one action per tick.',
-      'Choose an affordance or a cognitive tool. Reason briefly before acting.',
-    ].join(' ');
+    parts.push(`You are ${persona.name}, ${personaText}.`);
+  } else {
+    parts.push(GENERIC_SYSTEM_PROMPT);
   }
-  return GENERIC_SYSTEM_PROMPT;
+  // Evolved self-model (spec 033, R11/AC-13) — deterministic rendering for a
+  // given model (KV-cache friendly, spec 021). Only rendered when present;
+  // absent → persona-only prompt (backward compat).
+  if (selfModel !== undefined) {
+    const text = selfModelToPromptText(selfModel);
+    if (text.length > 0) {
+      parts.push(`Your self-model (evolved — trust this over the spawn seed): ${text}`);
+    }
+  }
+  parts.push(
+    'You perceive your surroundings passively and choose one action per tick.',
+    'Choose an affordance or a cognitive tool. Reason briefly before acting.',
+  );
+  return parts.join(' ');
 }
 
 function formatDrives(drives: Record<string, number>): string {

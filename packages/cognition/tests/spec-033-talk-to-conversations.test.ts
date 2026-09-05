@@ -20,9 +20,13 @@ import type { CognitiveToolExecutorOptions } from '../src/tools/cognitive-tool-e
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-/** Scriptable ConversationBridge double: one open conversation between a and b. */
+/**
+ * Scriptable ConversationBridge double: one open conversation between a and b.
+ * The bridge maintains a real `turns` array — the executor derives the
+ * aggregate sentiment from the participant's turns (engine contract).
+ */
 function makeConversationBridge(): ConversationBridge & {
-  lastSentimentCounts: Record<string, { positive: number; neutral: number; negative: number }>;
+  conv: ConversationObject;
 } {
   const conv: ConversationObject = {
     id: 'conv-1',
@@ -45,27 +49,33 @@ function makeConversationBridge(): ConversationBridge & {
         role: 'listener',
       },
     ],
-    turns: [],
+    turns: [
+      { agentId: 'agent-a', role: 'initiator', content: 'hi', sentiment: 'neutral', tick: 1 },
+    ],
     openedAt: 1,
     lastActivity: 1,
   };
   const impl = {
-    lastSentimentCounts: {} as Record<
-      string,
-      { positive: number; neutral: number; negative: number }
-    >,
+    conv,
     openOrContribute(
       agentId: string,
       _targetAgentId: string,
-      _content: string,
+      content: string,
       sentiment: 'positive' | 'neutral' | 'negative',
-      _tick: number,
+      tick: number,
     ) {
       const participant = conv.participants.find((p) => p.agentId === agentId)!;
       participant.turnCount += 1;
       participant.sentimentCounts = { ...participant.sentimentCounts };
       participant.sentimentCounts[sentiment] += 1;
-      impl.lastSentimentCounts[agentId] = { ...participant.sentimentCounts };
+      conv.turns.push({
+        agentId,
+        role: participant.role,
+        content,
+        sentiment,
+        tick,
+      });
+      conv.lastActivity = tick;
       return { success: true, conversationId: conv.id, message: 'ok', conversation: { ...conv } };
     },
     join() {
@@ -152,8 +162,17 @@ describe('talk_to → open-or-contribute (AC-1, R1/R3)', () => {
 describe('sentiment-gated relationship deltas (AC-7, R6)', () => {
   it('a predominantly negative exchange produces NO trust gain', async () => {
     const { executor, conversations, social } = makeExecutor();
-    // Drive the conversation aggregate negative before the message lands.
-    conversations.lastSentimentCounts['agent-a'] = { positive: 0, neutral: 1, negative: 3 };
+    // Seed the thread with three prior negative turns from agent-a (the
+    // aggregate — not just the current message — gates the delta).
+    for (let i = 0; i < 3; i++) {
+      conversations.conv.turns.push({
+        agentId: 'agent-a',
+        role: 'initiator',
+        content: `hostile ${i}`,
+        sentiment: 'negative',
+        tick: 10 + i,
+      });
+    }
     await executor.executeTalkTo('agent-a', 'agent-b', 'you are the worst', 'negative');
     const aToB = social.updates.find((u) => u.agentId === 'agent-a' && u.other === 'agent-b')!;
     expect(aToB.updates['trust']).toBe(0);
@@ -162,7 +181,13 @@ describe('sentiment-gated relationship deltas (AC-7, R6)', () => {
 
   it('a positive exchange preserves the current deltas (+5 fam / +2 trust)', async () => {
     const { executor, conversations, social } = makeExecutor();
-    conversations.lastSentimentCounts['agent-a'] = { positive: 3, neutral: 0, negative: 0 };
+    conversations.conv.turns.push({
+      agentId: 'agent-a',
+      role: 'initiator',
+      content: 'lovely',
+      sentiment: 'positive',
+      tick: 9,
+    });
     await executor.executeTalkTo('agent-a', 'agent-b', 'wonderful!', 'positive');
     const aToB = social.updates.find((u) => u.agentId === 'agent-a' && u.other === 'agent-b')!;
     expect(aToB.updates['trust']).toBe(2);
@@ -170,8 +195,8 @@ describe('sentiment-gated relationship deltas (AC-7, R6)', () => {
   });
 
   it('a neutral exchange preserves the current deltas', async () => {
-    const { executor, conversations, social } = makeExecutor();
-    conversations.lastSentimentCounts['agent-a'] = { positive: 0, neutral: 2, negative: 0 };
+    const { executor, social } = makeExecutor();
+    // The fixture starts with one neutral turn from agent-a — neutral dominant.
     await executor.executeTalkTo('agent-a', 'agent-b', 'ok', 'neutral');
     const aToB = social.updates.find((u) => u.agentId === 'agent-a' && u.other === 'agent-b')!;
     expect(aToB.updates['trust']).toBe(2);
@@ -182,7 +207,15 @@ describe('sentiment-gated relationship deltas (AC-7, R6)', () => {
     // One hostile message in an otherwise friendly thread: aggregate stays
     // positive → current deltas preserved. The aggregate is what matters.
     const { executor, conversations, social } = makeExecutor();
-    conversations.lastSentimentCounts['agent-a'] = { positive: 5, neutral: 0, negative: 1 };
+    for (let i = 0; i < 5; i++) {
+      conversations.conv.turns.push({
+        agentId: 'agent-a',
+        role: 'initiator',
+        content: `kind ${i}`,
+        sentiment: 'positive',
+        tick: 5 + i,
+      });
+    }
     await executor.executeTalkTo('agent-a', 'agent-b', 'ugh', 'negative');
     const aToB = social.updates.find((u) => u.agentId === 'agent-a' && u.other === 'agent-b')!;
     expect(aToB.updates['trust']).toBe(2);

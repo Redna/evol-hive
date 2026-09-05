@@ -26,6 +26,7 @@ const COGNITIVE_TOOL_NAMES = new Set([
   'formulate_plan',
   'query_memory',
   'update_internal_state',
+  'update_self_model',
   'talk_to',
   'observe_agent',
   'help',

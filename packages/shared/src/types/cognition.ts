@@ -230,6 +230,12 @@ export interface SocialToolResult {
   success: boolean;
   message: string;
   relationshipUpdated: boolean;
+  /**
+   * `true` when the exchange was recorded on a conversation object via the
+   * open-or-contribute mapping (spec 033, R1/R3). Absent when no conversation
+   * bridge is wired (legacy behavior).
+   */
+  conversationUpdated?: boolean;
   /** Present only for observe_agent: the observed agent's details. */
   observedAgent?: {
     name: string;

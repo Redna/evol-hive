@@ -76,8 +76,8 @@ describe('executeUpdateSelfModel (AC-8, R12)', () => {
     expect(bridge.applied).toHaveLength(1);
     expect(bridge.applied[0]!.deltas.map((d) => d.type)).toEqual([
       'trait_add',
-      'narrative_edit',
       'goal_add',
+      'narrative_edit',
     ]);
     expect(result.message).toContain('identity');
   });

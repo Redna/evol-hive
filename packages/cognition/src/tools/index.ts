@@ -57,6 +57,24 @@ export const defaultCognitiveTools: CognitiveTool[] = [
       additionalProperties: false,
     },
   },
+  // Identity self-model tool (spec 033, R12).
+  {
+    name: 'update_self_model',
+    description:
+      'Propose slow, bounded edits to your own identity self-model (traits, self-narrative, long-term goals). Use sparingly — guarded, rate-limited, audited; not for reacting to a single message.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        addTraits: { type: 'array', items: { type: 'string' } },
+        removeTraits: { type: 'array', items: { type: 'string' } },
+        narrative: { type: 'string' },
+        addGoals: { type: 'array', items: { type: 'string' } },
+        removeGoals: { type: 'array', items: { type: 'string' } },
+        reason: { type: 'string', description: 'Why you are changing (audit trail).' },
+      },
+      additionalProperties: false,
+    },
+  },
   // ── Social cognitive tools (spec 018, Req 15) ────────────────────────────
   {
     name: 'talk_to',
