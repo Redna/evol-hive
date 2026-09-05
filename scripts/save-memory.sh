@@ -78,4 +78,25 @@ done
 cd - >/dev/null
 git worktree remove "$WORKTREE" --force 2>/dev/null || rm -rf "$WORKTREE"
 
+# ── Size-triggered compaction (incident 2026-09-05 19:26) ────────────────────
+# Old-daemon runs appended amplified deltas until the memory branch reached
+# 637MB; the next restore ingested all of it and the runner died (the daemon
+# fix caps NEW events, not replay of an already-bloated file). Compaction now
+# triggers whenever the memory branch exceeds the threshold instead of only
+# on the daily cron.
+MEM_FILE=$(git ls-tree origin/memory events.jsonl 2>/dev/null | awk '{print $4}')
+MEM_SIZE=$(git cat-file -s "$(git rev-parse origin/memory:events.jsonl 2>/dev/null)" 2>/dev/null || echo 0)
+THRESHOLD=$((100 * 1048576))  # 100MB
+if [ "${MEM_SIZE:-0}" -gt "$THRESHOLD" ]; then
+  SIZE_MB=$((MEM_SIZE / 1048576))
+  echo "Memory branch is ${SIZE_MB}MB (> 100MB) — triggering compaction."
+  if [ -n "${GH_PAT:-}" ]; then
+    gh workflow run compaction.yml --ref main || echo "⚠️ Compaction trigger failed — branch stays bloated until the next cron run."
+  else
+    echo "⚠️ No GH_PAT available to trigger compaction — branch stays bloated until the next cron run."
+  fi
+else
+  echo "Memory branch size OK ($((MEM_SIZE / 1048576))MB)."
+fi
+
 echo "Memory save complete."
