@@ -5,7 +5,7 @@
  * asynchronous reflection/consolidation.
  */
 
-import type { MemorySnippet } from './cognition.js';
+import type { MemoryEntryInput, MemorySnippet } from './cognition.js';
 
 /** A single memory node in the vector store. */
 export interface MemoryNode {
@@ -144,3 +144,28 @@ export const defaultMemoryDecayConfig: MemoryDecayConfig = {
   pruneThreshold: 0.5,
   decayIntervalTicks: 100,
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spec 035 — Write-time composite importance (Req 14)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The write-time context handed to an importance composer (spec 035, Req 14). */
+export interface ImportanceCompositionContext {
+  agentId: string;
+  /** The simulation timestamp of the write. */
+  timestamp: number;
+  /** The memory content (used for related-content utility folding). */
+  content: string;
+}
+
+/**
+ * An injected importance composer (spec 035, Req 14): when wired into the
+ * `MemoryStoreImpl` options, `MemoryNode.importance` at write time is the
+ * composite (predicted prior ⊕ drive-delta magnitude ⊕ downstream utility ⊕
+ * LLM 1–10 as one feature) instead of the raw LLM-assigned score. Implemented
+ * in cognition; the memory package only sees this function type (ADR-0001).
+ */
+export type ImportanceComposer = (
+  entry: MemoryEntryInput,
+  context: ImportanceCompositionContext,
+) => number;

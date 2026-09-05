@@ -47,7 +47,7 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [§2](../architecture/02-system-overview.md) | System Overview | 008, 013, 017, 022 | ✅ Documented |
 | [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002, 008, 012, 017, 022, 032, 033 | ✅ Implemented |
 | [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001, 003, 008, 013, 018, 019, 022, 031, 032, 033 | ✅ Implemented |
-| [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) | 001, 006, 007, 018 | ✅ Implemented |
+| [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) + Trainable System 1 Heads | 001, 006, 007, 018, 035 | ✅ Implemented |
 | [§6](../architecture/06-pper-loop.md) | PPER Loop | 001-004, 006, 008, 012, 017, 025, 026, 031, 032, 033 | ✅ Implemented |
 | [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 011 (tool calling), 019 (affordance-as-tools), 025, 026 | ✅ Implemented |
 | [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002, 011, 015, 025, 026, 032, 033 | ✅ Implemented |
@@ -58,10 +58,10 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      29
+Total specs:      30
 ✅ Done:          17
 🔨 In Development: 0
-🔍 In Review:      6
+🔍 In Review:      7
 📝 Drafted:        5
 🚫 Blocked:        0
 ⛔ Superseded:     2
@@ -86,3 +86,4 @@ Architecture sections fully implemented: 11/11
 | [032](032-dynamic-world-drive-restoration.md) | Dynamic-World Demo — Drive Restoration Affordances & Long-Run Equilibrium | §3, §4, §6, §8 | 🔍 In Review | [#125](https://github.com/Redna/evol-hive/issues/125) | [#127](https://github.com/Redna/evol-hive/pull/127) | examples |
 | [033](033-conversations-identity-evolution.md) | Conversations as Perceivable Temporal Objects & Identity Evolution — Dialogue Threads, Self-Model, Cross-Session Continuity | §2, §3, §4, §6, §8, §10, §11 | 🔍 In Review | [#128](https://github.com/Redna/evol-hive/issues/128) | [#131](https://github.com/Redna/evol-hive/pull/131) | shared, engine, cognition, memory, visualizer, examples |
 | [034](034-drive-affordance-hints-hunger-chain.md) | Drive→Affordance Matching Hints + Hunger Restoration Chain — Close the Drive-Hint Gap & the Plant→Eat Loop | §3, §4, §6, §8 | 🔍 In Review | [#130](https://github.com/Redna/evol-hive/issues/130) | [#133](https://github.com/Redna/evol-hive/pull/133) | cognition, examples |
+| [035](035-system1-trainable-heads.md) | System 1 — Trainable React/Ignore Gating + Trainable Importance Head | §5, §6, §11 | 🔍 In Review | [#132](https://github.com/Redna/evol-hive/issues/132) | [#136](https://github.com/Redna/evol-hive/pull/136) | shared, cognition, engine, memory, training |

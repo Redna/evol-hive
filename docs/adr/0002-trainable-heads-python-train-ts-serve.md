@@ -2,7 +2,14 @@
 
 ## Status
 
-Proposed (referenced by issue #132 — System 1 trainable heads)
+**Accepted** (implemented by spec 035 — System 1 trainable React/Ignore gating + trainable importance head, issue #132; supersedes the Proposed status of 2026-09-05)
+
+> Amendment (spec 035): runtime inference for the heads is a **pure TS
+> dot-product + sigmoid over a versioned JSON weight snapshot** — a linear
+> probe needs no graph execution. The ONNX export remains the Python↔TS
+> interface for offline-trained baselines (parity checks, architecture
+> research). "MLP with a real framework" stays the documented last resort if
+> linear capacity proves insufficient.
 
 ## Context
 

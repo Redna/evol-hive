@@ -51,7 +51,7 @@ import { createEngineCore, assembleGameLoop, loadScene } from '@evol-hive/engine
 import type { AssembledEngine, EngineCore, EnginePersistence } from '@evol-hive/engine';
 import { SocialManager } from '@evol-hive/engine';
 import { registerAffordanceHandlers, registerCoffeeShopHandlers } from './scene-helpers.ts';
-import { assembleCognitionStack, buildMemorySubsystem } from './assembly.ts';
+import { assembleCognitionStack, assembleSystem1, buildMemorySubsystem } from './assembly.ts';
 
 // Re-export for convenience and testability (spec 019, Req 16–18).
 export { registerCoffeeShopHandlers } from './scene-helpers.ts';
@@ -537,6 +537,17 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
     mockLLMClient: new CoffeeShopMockLLMClient(),
   });
 
+  // ── System 1 trainable heads (spec 035) — fail-open unless an artifact is
+  //    provided via SYSTEM1_GATE_ARTIFACT; session logs via SYSTEM1_SESSION_LOG_DIR.
+  const system1 = assembleSystem1(core, memory, {
+    ...(process.env['SYSTEM1_GATE_ARTIFACT'] !== undefined
+      ? { gateArtifactPath: process.env['SYSTEM1_GATE_ARTIFACT'] }
+      : {}),
+    ...(process.env['SYSTEM1_SESSION_LOG_DIR'] !== undefined
+      ? { sessionLogDir: process.env['SYSTEM1_SESSION_LOG_DIR'] }
+      : {}),
+  });
+
   // ── Auto-save (Req 11) ────────────────────────────────────────────────────
   const autoSaveConfig = buildAutoSaveConfig();
   core.autoSaveConfig = autoSaveConfig;
@@ -553,6 +564,15 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
         }
       : undefined,
     { config: autoSaveConfig },
+    undefined,
+    {
+      gate: system1.gate,
+      outcomeRecorder: system1.outcomeRecorder,
+      featureRefresher: system1.featureRefresher,
+      ...(system1.identityTrigger !== undefined
+        ? { identityTrigger: system1.identityTrigger }
+        : {}),
+    },
   );
 
   const persistence: EnginePersistence | undefined = core.persistence;

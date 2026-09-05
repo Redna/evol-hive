@@ -32,9 +32,19 @@ import type {
   GuardrailConfig,
   TopologyGuard,
   AffordanceGuard,
+  System1GatePort,
+  System1IdentityTriggerPort,
+  System1OutcomeProbePort,
+  System1OutcomeRecorderPort,
+  GateWeightArtifact,
 } from '@evol-hive/shared';
-import { defaultMemoryDecayConfig, defaultReflectionConfig } from '@evol-hive/shared';
-import type { LLMClient, LLMContextPayload, AffordanceClassifier } from '@evol-hive/cognition';
+import { defaultMemoryDecayConfig, defaultReflectionConfig, defaultSystem1GateConfig } from '@evol-hive/shared';
+import type {
+  LLMClient,
+  LLMContextPayload,
+  AffordanceClassifier,
+  IdentityProposalProvider,
+} from '@evol-hive/cognition';
 import {
   createPPEROrchestrator,
   OpenAICompatibleLLMClient,
@@ -45,6 +55,17 @@ import {
   defaultClassifierConfig,
   ConsolidationProviderImpl,
   TokenUsageReporter,
+  IdentityConsolidationServiceImpl,
+  InMemorySampleLogWriter,
+  JsonlSessionSampleLog,
+  LinearImportanceHead,
+  makeFileSampleLogWriter,
+  ReactGateHead,
+  SalienceAccumulator,
+  SalienceWeightedIdentityService,
+  System1FeatureServiceImpl,
+  System1GateServiceImpl,
+  makeFileArtifactLoader,
   type PPEROrchestratorImpl,
 } from '@evol-hive/cognition';
 import type {
@@ -60,7 +81,7 @@ import {
   ReflectionLoopImpl,
 } from '@evol-hive/memory';
 import type { EngineCore } from '@evol-hive/engine';
-import { SocialManager } from '@evol-hive/engine';
+import { SocialManager, System1AgentTracker, System1OutcomeRecorderImpl } from '@evol-hive/engine';
 
 // ── Mock embedding provider (no network, deterministic) ─────────────────────
 
@@ -355,5 +376,171 @@ export function assembleCognitionStack(
     ...(reflectionLoop !== undefined ? { reflectionLoop } : {}),
     decayConfig,
     orchestrator,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// System 1 trainable heads (spec 035, issue #132) — application wiring
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Options for {@link assembleSystem1}. */
+export interface System1AssemblyOptions {
+  /**
+   * Path to the versioned gate artifact. When omitted, the gate fails OPEN
+   * (every tick cycles — today's behavior) after a single warning (Req 6).
+   * Point this at `training/artifacts/*.json` (see `training/README.md`).
+   */
+  gateArtifactPath?: string;
+  /**
+   * Directory for per-agent JSONL session sample logs (Req 9). When omitted,
+   * samples land in an in-memory sink (introspection only).
+   */
+  sessionLogDir?: string;
+  /**
+   * LLM proposal provider for the salience-weighted identity hook (Req 16/17).
+   * When omitted, a zero-proposal provider is used (identity never drifts —
+   * the machinery is wired, the LLM path stays off).
+   */
+  identityProposalProvider?: IdentityProposalProvider;
+}
+
+/** The assembled System 1 pieces — pass the ports to {@link assembleGameLoop}. */
+export interface System1Assembled {
+  gate: System1GatePort;
+  outcomeRecorder: System1OutcomeRecorderPort;
+  featureRefresher: System1FeatureServiceImpl;
+  identityTrigger?: System1IdentityTriggerPort;
+  /** Hot-swap a dream-updated artifact into the live gate (Req 12). */
+  hotSwapGateArtifact: (artifact: GateWeightArtifact) => void;
+  gateHead: ReactGateHead;
+  importanceHead: LinearImportanceHead;
+  salience: SalienceWeightedIdentityService;
+  sampleLog: JsonlSessionSampleLog;
+}
+
+/** Zero-proposal identity provider (used when no LLM provider is wired). */
+const nullIdentityProposalProvider: IdentityProposalProvider = {
+  async proposeIdentityDeltas() {
+    return { deltas: [] };
+  },
+};
+
+/**
+ * Builds the System 1 services (cognition side) + the engine-side outcome
+ * probe and wires them into the port shape {@link assembleGameLoop} consumes.
+ * Gating is fail-open by construction: no artifact → every tick cycles
+ * (spec 035, Req 6), so enabling this wiring is behavior-safe.
+ */
+export function assembleSystem1(
+  core: EngineCore,
+  memory: { embeddingProvider: MemEmbeddingProvider; vectorStore: InMemoryVectorStore },
+  options: System1AssemblyOptions = {},
+): System1Assembled {
+  // ── Gate + importance heads (lazy artifact load, fail-open) ──────────────
+  const gateHead = new ReactGateHead({
+    loader: options.gateArtifactPath
+      ? makeFileArtifactLoader(options.gateArtifactPath)
+      : async () => null,
+    threshold: defaultSystem1GateConfig().threshold,
+  });
+  void gateHead.ensureLoaded(); // best-effort; fail-open until the artifact lands
+
+  const importanceHead = new LinearImportanceHead({
+    loader: options.gateArtifactPath
+      ? makeFileArtifactLoader(options.gateArtifactPath)
+      : async () => null,
+  });
+  void importanceHead.ensureLoaded();
+
+  // ── Feature service (cached features; scalar sync + embedding async) ─────
+  const featureService = new System1FeatureServiceImpl({
+    embeddingProvider: memory.embeddingProvider,
+    recentMemories: {
+      async getRecentMemoryEmbeddings(agentId, k) {
+        const nodes = await memory.vectorStore.queryByAgent(agentId);
+        return nodes
+          .sort((a, b) => b.timestamp - a.timestamp)
+          .slice(0, k)
+          .map((n) => n.embedding);
+      },
+    },
+  });
+
+  const gate = new System1GateServiceImpl({ head: gateHead, featureSource: featureService });
+
+  // ── Session sample log (Req 9): per-agent JSONL or in-memory ─────────────
+  const sampleLog = options.sessionLogDir
+    ? new JsonlSessionSampleLog(makeFileSampleLogWriter(options.sessionLogDir))
+    : new JsonlSessionSampleLog(new InMemorySampleLogWriter());
+
+  // ── Outcome probe (engine state → OutcomeSnapshot) ────────────────────────
+  const tracker = new System1AgentTracker();
+  const probe: System1OutcomeProbePort = {
+    async snapshot(agentId) {
+      const state = core.agentManager.getState(agentId);
+      const plan = state?.currentPlan ?? null;
+      let memoryCount = 0;
+      try {
+        memoryCount = (await memory.vectorStore.countByAgent(agentId)) ?? 0;
+      } catch {
+        memoryCount = 0;
+      }
+      let conversationTurns = 0;
+      for (const conversation of core.conversationManager.listConversationsInRoom(
+        state?.location ?? '',
+      )) {
+        const me = conversation.participants.find((p) => p.agentId === agentId);
+        if (me && conversation.status !== 'closed') {
+          conversationTurns = Math.max(conversationTurns, me.turnCount);
+        }
+      }
+      const mutations = core.mutationService.getMutations();
+      const lastSeq = mutations.length > 0 ? (mutations[mutations.length - 1]?.seq ?? 0) : 0;
+      return {
+        planId: plan?.id ?? null,
+        planStepIndex: plan?.currentStepIndex ?? 0,
+        drives: state?.drives ?? {},
+        memoryCount,
+        conversationTurns,
+        mutationSeq: lastSeq,
+      };
+    },
+  };
+
+  const outcomeRecorder = new System1OutcomeRecorderImpl({
+    probe,
+    sink: sampleLog,
+    tracker,
+    featureSource: featureService,
+  });
+  core.system1Tracker = tracker;
+
+  // ── Salience-weighted identity hook (Req 16/17) ──────────────────────────
+  const salience = new SalienceWeightedIdentityService({
+    inner: new IdentityConsolidationServiceImpl({
+      selfModelBridge: core.selfModelManager,
+      provider: options.identityProposalProvider ?? nullIdentityProposalProvider,
+    }),
+    accumulator: new SalienceAccumulator(),
+  });
+  const identityTrigger: System1IdentityTriggerPort = {
+    tick(agentId: string): void {
+      if (!salience.shouldConsolidateMidSession(agentId)) return;
+      void salience.consolidateMidSession(agentId, []).catch(() => {
+        // A failed mid-session pass must never break the loop.
+      });
+    },
+  };
+
+  return {
+    gate,
+    outcomeRecorder,
+    featureRefresher: featureService,
+    identityTrigger,
+    hotSwapGateArtifact: (artifact) => gateHead.hotSwap(artifact),
+    gateHead,
+    importanceHead,
+    salience,
+    sampleLog,
   };
 }

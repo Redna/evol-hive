@@ -1,0 +1,29 @@
+{
+  "kind": "react-gate",
+  "headVersion": 1,
+  "featureSchemaVersion": 1,
+  "bias": -0.06372081516972254,
+  "scalarWeights": {
+    "driveEnergy": -0.1082051578354044,
+    "driveHunger": 0.12623935080793922,
+    "driveSocial": 0.0,
+    "driveComfort": 0.0,
+    "driveCuriosity": 0.0,
+    "deltaEnergy": -0.10820515783539635,
+    "deltaHunger": 0.14427354378053672,
+    "deltaSocial": 0.0,
+    "deltaComfort": 0.0,
+    "deltaCuriosity": 0.0,
+    "novelty": 0.2885470875610813,
+    "messagePending": 0.0043455886680884275,
+    "conversationOpen": 0.0,
+    "conversationTurns": 0.0,
+    "nearbyObjectStateChange": 0.36068385945133397,
+    "worldMutation": 0.005383341185840884,
+    "driveThresholdCrossing": 0.0026916705929204863,
+    "ticksSinceLastCycle": 0.2885470875610812
+  },
+  "embeddingWeights": null,
+  "trainedAt": "2026-09-05T23:32:55.410537+00:00",
+  "source": "training/train_react_gate.py ridge \u03bb=0.1"
+}
