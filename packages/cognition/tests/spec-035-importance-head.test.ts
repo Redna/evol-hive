@@ -112,7 +112,8 @@ describe('Spec 035 — composite importance (Req 14 / AC-7, deterministic fixtur
       downstreamUtility: 0.25,
       llmScore: 6,
     });
-    expect(composite).toBeCloseTo(expected, 9);
+    // The composite is stored at 2-decimal precision (documented).
+    expect(composite).toBeCloseTo(expected, 2);
   });
 
   it('clamps the composite to 1..10', () => {

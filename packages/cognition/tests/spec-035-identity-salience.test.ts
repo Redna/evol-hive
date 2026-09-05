@@ -10,7 +10,7 @@ import type { IdentityChangeDelta, MemorySnippet } from '@evol-hive/shared';
 import {
   IdentityConsolidationServiceImpl,
   type IdentityProposalProvider,
-} from '../src/identity/index.js';
+} from '../src/identity/identity-consolidation.js';
 import {
   SalienceWeightedIdentityService,
   SalienceAccumulator,
@@ -88,20 +88,33 @@ describe('Spec 035 — salience-weighted dream pass (Req 16 / AC-8)', () => {
       provider: fixedProvider(5), // always proposes 5 deltas
       config: { maxDeltasPerSession: 10, maxConsolidationsPerSession: 3 },
     });
-    service = new SalienceWeightedIdentityService(inner, {
+    service = new SalienceWeightedIdentityService({
+      inner,
       accumulator: new SalienceAccumulator(),
       config: defaultSalienceConfig(),
     });
   });
 
   it('fixture: a high-salience session applies a larger weighted delta than a quiet session', async () => {
+    // A provider proposing the full budget, so the salience weighting (not
+    // the proposal count) is the binding constraint.
+    const generous = new SalienceWeightedIdentityService({
+      inner: new IdentityConsolidationServiceImpl({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        selfModelBridge: bridge as any,
+        provider: fixedProvider(10),
+        config: { maxDeltasPerSession: 10, maxConsolidationsPerSession: 3 },
+      }),
+      accumulator: new SalienceAccumulator(),
+      config: defaultSalienceConfig(),
+    });
     // High-salience session: accumulated 8.0 (→ norm 0.8 with normalization 10).
-    service.recordSalience('high', 8.0);
-    const highResult = await service.consolidateWithSalience('high', memories(3), []);
+    generous.recordSalience('high', 8.0);
+    const highResult = await generous.consolidateWithSalience('high', memories(3), []);
 
     // Quiet session: accumulated 1.0 (→ norm 0.1).
-    service.recordSalience('quiet', 1.0);
-    const quietResult = await service.consolidateWithSalience('quiet', memories(3), []);
+    generous.recordSalience('quiet', 1.0);
+    const quietResult = await generous.consolidateWithSalience('quiet', memories(3), []);
 
     expect(highResult.applied).toBeGreaterThan(quietResult.applied);
     expect(highResult.applied).toBe(8); // round(10 × 0.8)
@@ -131,12 +144,24 @@ describe('Spec 035 — salience-weighted dream pass (Req 16 / AC-8)', () => {
   });
 
   it('respects the spec 033 pass budget across mid-session + session-end passes', async () => {
-    service.recordSalience('a1', 10);
-    await service.consolidateWithSalience('a1', memories(2), []); // pass 1
-    await service.consolidateWithSalience('a1', memories(2), []); // pass 2
-    const third = await service.consolidateWithSalience('a1', memories(2), []); // pass 3
+    // A small provider so the pass budget (3), not the delta budget, is the
+    // binding constraint.
+    const service2 = new SalienceWeightedIdentityService({
+      inner: new IdentityConsolidationServiceImpl({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        selfModelBridge: bridge as any,
+        provider: fixedProvider(2),
+        config: { maxDeltasPerSession: 10, maxConsolidationsPerSession: 3 },
+      }),
+      accumulator: new SalienceAccumulator(),
+      config: defaultSalienceConfig(),
+    });
+    service2.recordSalience('a1', 10);
+    await service2.consolidateWithSalience('a1', memories(2), []); // pass 1
+    await service2.consolidateWithSalience('a1', memories(2), []); // pass 2
+    const third = await service2.consolidateWithSalience('a1', memories(2), []); // pass 3
     expect(third.success).toBe(true);
-    const fourth = await service.consolidateWithSalience('a1', memories(2), []); // budget = 3 → blocked
+    const fourth = await service2.consolidateWithSalience('a1', memories(2), []); // budget = 3 → blocked
     expect(fourth.success).toBe(false);
     expect(fourth.message).toMatch(/Rate limit/);
   });
@@ -145,14 +170,15 @@ describe('Spec 035 — salience-weighted dream pass (Req 16 / AC-8)', () => {
 describe('Spec 035 — mid-session consolidation trigger (Req 17 / AC-8)', () => {
   it('fires when accumulated salience crosses the threshold, then re-arms', () => {
     const cfg = { ...defaultSalienceConfig(), midSessionThreshold: 3.0 };
-    const service = new SalienceWeightedIdentityService(
-      new IdentityConsolidationServiceImpl({
+    const service = new SalienceWeightedIdentityService({
+      inner: new IdentityConsolidationServiceImpl({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         selfModelBridge: new RecordingBridge() as any,
         provider: fixedProvider(2),
       }),
-      { accumulator: new SalienceAccumulator(), config: cfg },
-    );
+      accumulator: new SalienceAccumulator(),
+      config: cfg,
+    });
 
     service.recordSalience('a1', 1.0);
     expect(service.shouldConsolidateMidSession('a1')).toBe(false);
@@ -174,14 +200,16 @@ describe('Spec 035 — mid-session consolidation trigger (Req 17 / AC-8)', () =>
       provider: fixedProvider(4),
       config: { maxDeltasPerSession: 10, maxConsolidationsPerSession: 2 },
     });
-    const service = new SalienceWeightedIdentityService(inner, {
+    const service = new SalienceWeightedIdentityService({
+      inner,
       accumulator: new SalienceAccumulator(),
       config: cfg,
     });
     service.recordSalience('a1', 10);
     await service.consolidateMidSession('a1', memories(2)); // mid-session pass 1
+    service.recordSalience('a1', 10); // the trigger re-arms after a pass
     await service.consolidateMidSession('a1', memories(2)); // pass 2
-    const blocked = await service.consolidateMidSession('a1', memories(2)); // budget exhausted
+    const blocked = await service.consolidateMidSession('a1', memories(2)); // pass budget exhausted
     expect(blocked.success).toBe(false);
     expect(bridge.applied).toHaveLength(2);
   });
@@ -190,14 +218,15 @@ describe('Spec 035 — mid-session consolidation trigger (Req 17 / AC-8)', () =>
 describe('Spec 035 — update_self_model remains the conscious override (Req 17)', () => {
   it('the salience service never touches the bridge outside a consolidation pass', async () => {
     const bridge = new RecordingBridge();
-    const service = new SalienceWeightedIdentityService(
-      new IdentityConsolidationServiceImpl({
+    const service = new SalienceWeightedIdentityService({
+      inner: new IdentityConsolidationServiceImpl({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         selfModelBridge: bridge as any,
         provider: fixedProvider(5),
       }),
-      { accumulator: new SalienceAccumulator(), config: defaultSalienceConfig() },
-    );
+      accumulator: new SalienceAccumulator(),
+      config: defaultSalienceConfig(),
+    });
     service.recordSalience('a1', 1000);
     service.recordSalience('a1', 1000);
     // No consolidation requested → no bridge writes, regardless of salience.

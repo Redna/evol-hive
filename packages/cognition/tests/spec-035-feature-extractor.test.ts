@@ -102,9 +102,14 @@ describe('Spec 035 — novelty (AC-1)', () => {
 
   it('respects the K-most-recent window (only the K newest memories count)', () => {
     const k = 2;
-    // The third (oldest) memory is orthogonal to the snapshot; with K=2 it
-    // must be ignored, so novelty is driven by the two matching memories.
-    const memories = [[1, 0, 0], [0.6, 0.8, 0], [0, 0, 1]];
+    // Memories are given in chronological order (oldest first). The first
+    // (oldest) memory is orthogonal to the snapshot; with K=2 it must be
+    // ignored, so novelty is driven by the two newest matching memories.
+    const memories = [
+      [0, 0, 1],
+      [0.6, 0.8, 0],
+      [1, 0, 0],
+    ];
     const n = computeNovelty([1, 0, 0], memories, k);
     expect(n).toBeCloseTo(0, 12);
   });
@@ -181,10 +186,17 @@ describe('Spec 035 — extractScalarFeatures (AC-1: flags toggle from engine sta
     expect(noisy.scalar.worldMutation).toBe(1);
   });
 
-  it('toggles driveThresholdCrossing and normalizes ticksSinceLastCycle', () => {
-    const noCross = extractScalarFeatures(snapshot({ driveThresholdCrossing: false }));
-    const cross = extractScalarFeatures(snapshot({ driveThresholdCrossing: true }));
+  it('toggles driveThresholdCrossing from the drive snapshots (engine state alone)', () => {
+    const base = {
+      drives: drives(50, 25, 50, 50, 50),
+      drivesAtLastCycle: drives(50, 25, 50, 50, 50),
+    };
+    const noCross = extractScalarFeatures(snapshot(base));
     expect(noCross.scalar.driveThresholdCrossing).toBe(0);
+    // Hunger 25 → 18 crosses the low threshold (20).
+    const cross = extractScalarFeatures(
+      snapshot({ ...base, drives: drives(50, 18, 50, 50, 50) }),
+    );
     expect(cross.scalar.driveThresholdCrossing).toBe(1);
   });
 

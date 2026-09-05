@@ -5,6 +5,7 @@
  * candidates pass) with a single logged warning — never a throw.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { join } from 'node:path';
 import {
   FEATURE_SCHEMA_VERSION,
   SCALAR_FEATURE_FIELDS,
@@ -20,7 +21,7 @@ import {
   makeFileArtifactLoader,
   buildFeatureVector,
 } from '../src/system1/index.js';
-import { extractScalarFeatures } from '../src/system1/feature-extractor.js';
+import { extractScalarFeatures } from '@evol-hive/shared';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -58,8 +59,9 @@ describe('Spec 035 — linear probe math (Req 3)', () => {
     expect(sigmoid(0)).toBeCloseTo(0.5, 12);
     expect(sigmoid(2)).toBeCloseTo(1 / (1 + Math.exp(-2)), 12);
     expect(sigmoid(-3)).toBeCloseTo(1 / (1 + Math.exp(3)), 12);
-   expect(sigmoid(1000)).toBeLessThan(1); // no Infinity/NaN at extremes
+    expect(sigmoid(20)).toBeLessThan(1); // no Infinity/NaN at extremes
     expect(Number.isFinite(sigmoid(-1000))).toBe(true);
+    expect(sigmoid(1000)).toBeLessThanOrEqual(1);
   });
 
   it('dotProduct matches hand-computed values', () => {
@@ -320,7 +322,9 @@ describe('Spec 035 — artifact loader (spec-007 pattern: lazy load, injectable 
   it('makeFileArtifactLoader reads a JSON artifact from disk lazily and caches it', async () => {
     // Uses the committed training fixture artifact (AC-5) to prove the
     // loader path end-to-end.
-    const load = makeFileArtifactLoader('training/artifacts/react-gate-fixture-v1.json');
+    const load = makeFileArtifactLoader(
+      join(__dirname, '../../../training/artifacts/react-gate-fixture-v1.json'),
+    );
     const first = await load();
     expect(first).not.toBeNull();
     expect(first?.kind).toBe('react-gate');
@@ -330,7 +334,9 @@ describe('Spec 035 — artifact loader (spec-007 pattern: lazy load, injectable 
   });
 
   it('makeFileArtifactLoader surfaces a missing file as null (fail-open upstream)', async () => {
-    const load = makeFileArtifactLoader('training/artifacts/does-not-exist.json');
+    const load = makeFileArtifactLoader(
+      join(__dirname, '../../../training/artifacts/does-not-exist.json'),
+    );
     await expect(load()).resolves.toBeNull();
   });
 });

@@ -172,3 +172,7 @@ export * from './llm/index.js';
 
 // System 0 Classifier (Section 5) — embedding-based affordance pruning
 export * from './classifier/index.js';
+
+// System 1 Trainable Heads (spec 035) — React/Ignore gate, importance head,
+// session logging, dream updates, salience-weighted identity hook
+export * from './system1/index.js';

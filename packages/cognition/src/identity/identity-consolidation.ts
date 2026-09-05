@@ -110,11 +110,18 @@ export class IdentityConsolidationServiceImpl {
     this.config = options.config ?? defaultIdentityConsolidationConfig();
   }
 
-  /** Run one consolidation pass for an agent at session end. */
+  /** Run one consolidation pass for an agent at session end.
+   *
+   * `options.maxDeltasOverride` (spec 035, Req 16) lets the salience-weighted
+   * identity service scale the per-pass delta budget with accumulated event
+   * salience — a quiet session drifts identity less. The override is always
+   * clamped to the session's remaining budget, so spec 033's bounds hold.
+   */
   async consolidate(
     agentId: string,
     sessionMemories: MemorySnippet[],
     conversationThreads: ConversationThreadSummary[],
+    options?: { maxDeltasOverride?: number },
   ): Promise<IdentityConsolidationResult> {
     // Rate limit (R13 / AC-8): max consolidation passes per session.
     const passesUsed = this.sessionPassesUsed.get(agentId) ?? 0;
@@ -136,9 +143,16 @@ export class IdentityConsolidationServiceImpl {
     const proposal = await this.provider.proposeIdentityDeltas(context);
 
     // Session budget (R13 / AC-8): at most maxDeltasPerSession per session.
+    // Spec 035 (Req 16): the salience-weighted service may further reduce the
+    // per-pass budget (never increase it) via maxDeltasOverride.
     const used = this.sessionDeltasUsed.get(agentId) ?? 0;
     const remaining = this.config.maxDeltasPerSession - used;
-    if (remaining <= 0) {
+    const override = options?.maxDeltasOverride;
+    const effectiveRemaining =
+      override !== undefined
+        ? Math.min(remaining, Math.max(0, Math.floor(override)))
+        : remaining;
+    if (effectiveRemaining <= 0) {
       this.sessionPassesUsed.set(agentId, passesUsed + 1);
       return {
         success: false,
@@ -147,7 +161,7 @@ export class IdentityConsolidationServiceImpl {
         message: `Rate limit: at most ${this.config.maxDeltasPerSession} identity change(s) per session.`,
       };
     }
-    const bounded = proposal.deltas.slice(0, remaining);
+    const bounded = proposal.deltas.slice(0, effectiveRemaining);
 
     if (bounded.length === 0) {
       this.sessionPassesUsed.set(agentId, passesUsed + 1);
