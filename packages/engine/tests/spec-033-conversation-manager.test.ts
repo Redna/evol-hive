@@ -59,7 +59,10 @@ function buildWorld(): {
   const sceneManager = new SceneManagerImpl(
     agentManager,
     new Map([
-      [GARDEN, { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] }],
+      [
+        GARDEN,
+        { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] },
+      ],
       [
         KITCHEN,
         { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] },

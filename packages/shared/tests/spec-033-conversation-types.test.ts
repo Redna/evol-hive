@@ -187,12 +187,8 @@ describe('removeParticipant (R2, R7)', () => {
 
 describe('dominantSentiment / participantSentimentCounts (AC-7, R4)', () => {
   it('returns the majority sentiment', () => {
-    expect(
-      dominantSentiment({ positive: 1, neutral: 0, negative: 3 }),
-    ).toBe('negative');
-    expect(
-      dominantSentiment({ positive: 3, neutral: 0, negative: 1 }),
-    ).toBe('positive');
+    expect(dominantSentiment({ positive: 1, neutral: 0, negative: 3 })).toBe('negative');
+    expect(dominantSentiment({ positive: 3, neutral: 0, negative: 1 })).toBe('positive');
   });
 
   it('breaks ties as neutral (deterministic)', () => {

@@ -37,11 +37,7 @@ export interface SelfModel {
  * and applied by deterministic engine code.
  */
 export type IdentityChangeType =
-  | 'trait_add'
-  | 'trait_remove'
-  | 'narrative_edit'
-  | 'goal_add'
-  | 'goal_remove';
+  'trait_add' | 'trait_remove' | 'narrative_edit' | 'goal_add' | 'goal_remove';
 
 export interface IdentityChangeDelta {
   type: IdentityChangeType;

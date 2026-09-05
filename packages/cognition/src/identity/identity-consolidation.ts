@@ -15,11 +15,7 @@
  * at session end (despawn/save boundary).
  */
 
-import type {
-  IdentityChangeDelta,
-  MemorySnippet,
-  SelfModelBridge,
-} from '@evol-hive/shared';
+import type { IdentityChangeDelta, MemorySnippet, SelfModelBridge } from '@evol-hive/shared';
 
 /** Per-participant view of a conversation thread for consolidation (R15). */
 export interface ConversationThreadParticipantSummary {

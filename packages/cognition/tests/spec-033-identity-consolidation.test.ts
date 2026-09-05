@@ -32,7 +32,11 @@ const THREAD: ConversationThreadSummary = {
   turnCount: 4,
   myRole: 'initiator',
   participants: [
-    { agentId: 'agent-b', role: 'active contributor', sentiment: { positive: 1, neutral: 0, negative: 2 } },
+    {
+      agentId: 'agent-b',
+      role: 'active contributor',
+      sentiment: { positive: 1, neutral: 0, negative: 2 },
+    },
   ],
   dominantSentiment: 'negative',
 };

@@ -85,8 +85,10 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
   private readonly affordanceCache: AffordanceResolutionCache | undefined;
   private readonly memoryPort: DormancyMemoryPort | undefined;
   private readonly yaamLog: YaamEventLog | undefined;
-  private readonly selfModelManager: import('../../agents/state/self-model-manager.js').SelfModelManager | undefined;
-  private readonly conversationManager: import('../../social/conversation-manager.js').ConversationManagerImpl | undefined;
+  private readonly selfModelManager:
+    import('../../agents/state/self-model-manager.js').SelfModelManager | undefined;
+  private readonly conversationManager:
+    import('../../social/conversation-manager.js').ConversationManagerImpl | undefined;
 
   /** Queued proposals awaiting the next tick boundary. */
   private readonly pending: SceneMutationProposal[] = [];

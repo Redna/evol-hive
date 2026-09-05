@@ -110,14 +110,17 @@ function makeSocialBridge() {
       updates;
       this.updates.push({ agentId, other, updates });
     },
-    getAgentSummary: () => ({ agentId: 'agent-b', name: 'Bob', currentActivity: 'idle', isThinking: false }),
+    getAgentSummary: () => ({
+      agentId: 'agent-b',
+      name: 'Bob',
+      currentActivity: 'idle',
+      isThinking: false,
+    }),
     getAgentDrives: () => ({ social: 40 }),
   };
 }
 
-function makeExecutor(
-  overrides: Partial<CognitiveToolExecutorOptions> = {},
-): {
+function makeExecutor(overrides: Partial<CognitiveToolExecutorOptions> = {}): {
   executor: CognitiveToolExecutorImpl;
   social: ReturnType<typeof makeSocialBridge>;
   conversations: ReturnType<typeof makeConversationBridge>;

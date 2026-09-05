@@ -207,8 +207,10 @@ export function createEngineCore(
 
   // Conversation affordance handlers (spec 033, R3): the four affordances
   // execute through the conversation manager — deterministic, no LLM (AC-14).
-  registerConversationAffordanceHandlers(conversationManager, affordanceRegistry, () =>
-    gameLoop.currentTick().tickNumber,
+  registerConversationAffordanceHandlers(
+    conversationManager,
+    affordanceRegistry,
+    () => gameLoop.currentTick().tickNumber,
   );
 
   // Dynamic world (spec 030, Req 1): the single mutation funnel + dormancy.

@@ -203,10 +203,15 @@ describe('self-model round-trip (AC-9, R14)', () => {
   it('save/load restores the evolved self-model for active agents', async () => {
     const world = buildWorld();
     world.selfModels.seedFromProfile(world.agentManager.getProfile('agent-a')!, 0);
-    world.selfModels.applySelfModelDeltas('agent-a', [
-      { type: 'trait_add', value: 'guarded' },
-      { type: 'narrative_edit', value: 'I keep my distance from Bob.' },
-    ], 50, 3);
+    world.selfModels.applySelfModelDeltas(
+      'agent-a',
+      [
+        { type: 'trait_add', value: 'guarded' },
+        { type: 'narrative_edit', value: 'I keep my distance from Bob.' },
+      ],
+      50,
+      3,
+    );
     const state = await world.persistence.save();
 
     const fresh = buildWorld();
@@ -221,9 +226,7 @@ describe('self-model round-trip (AC-9, R14)', () => {
   it('dormant respawn restores the evolved self-model (AC-9, R14)', async () => {
     const world = buildWorld();
     world.selfModels.seedFromProfile(world.agentManager.getProfile('agent-a')!, 0);
-    world.selfModels.applySelfModelDeltas('agent-a', [
-      { type: 'trait_add', value: 'wary' },
-    ], 50, 3);
+    world.selfModels.applySelfModelDeltas('agent-a', [{ type: 'trait_add', value: 'wary' }], 50, 3);
 
     // Simulate the despawn export (spec 030 path extended by spec 033 R14):
     // the dormant snapshot must carry the self-model.

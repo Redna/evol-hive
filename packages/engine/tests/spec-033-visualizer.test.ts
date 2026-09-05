@@ -47,7 +47,9 @@ function buildAdapter(): {
   const registry = new SmartObjectRegistryImpl();
   const sceneManager = new SceneManagerImpl(
     agentManager,
-    new Map([[GARDEN, { id: GARDEN, name: GARDEN, description: '', connections: [], objectIds: [] }]]),
+    new Map([
+      [GARDEN, { id: GARDEN, name: GARDEN, description: '', connections: [], objectIds: [] }],
+    ]),
   );
   const conversations = new ConversationManagerImpl({
     agentManager,

@@ -129,7 +129,10 @@ export class EnginePersistenceImpl {
     // optional `dynamic` field. Spec 033 (R10/AC-12) bumps 2 → 3 for
     // conversations + evolved self-models. Old (v1/v2) saves still load —
     // every new field is optional and absence is equivalent to defaults.
-    if (state.formatVersion < MIN_SUPPORTED_SAVE_FORMAT_VERSION || state.formatVersion > SAVE_FORMAT_VERSION) {
+    if (
+      state.formatVersion < MIN_SUPPORTED_SAVE_FORMAT_VERSION ||
+      state.formatVersion > SAVE_FORMAT_VERSION
+    ) {
       throw new SaveFormatVersionError(SAVE_FORMAT_VERSION, state.formatVersion);
     }
 

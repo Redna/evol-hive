@@ -40,7 +40,10 @@ function buildWorld(): {
   const sceneManager = new SceneManagerImpl(
     agentManager,
     new Map([
-      [GARDEN, { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] }],
+      [
+        GARDEN,
+        { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] },
+      ],
       [
         KITCHEN,
         { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] },
@@ -113,7 +116,9 @@ describe('perception eligibility filtering (AC-2, R3/R8)', () => {
 
     const participantAffordances = world.perception
       .getAvailableAffordancesInRoom(GARDEN)
-      .filter((a) => a.id === 'join' || a.id === 'contribute' || a.id === 'leave' || a.id === 'observe');
+      .filter(
+        (a) => a.id === 'join' || a.id === 'contribute' || a.id === 'leave' || a.id === 'observe',
+      );
 
     // The registry-level view is role-agnostic; eligibility is resolved
     // per-agent via the conversation manager (mirrors guardrail masking flow).

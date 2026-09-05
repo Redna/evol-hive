@@ -152,7 +152,16 @@ export function appendTurn(
     };
   });
 
-  const turns = [...conversation.turns, { agentId: turn.agentId, role, content: turn.content, sentiment: turn.sentiment, tick: turn.tick }];
+  const turns = [
+    ...conversation.turns,
+    {
+      agentId: turn.agentId,
+      role,
+      content: turn.content,
+      sentiment: turn.sentiment,
+      tick: turn.tick,
+    },
+  ];
   const capped = turns.slice(-CONVERSATION_TURN_WINDOW);
 
   return {

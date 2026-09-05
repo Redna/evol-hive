@@ -82,10 +82,14 @@ describe('validateSelfModelDeltas (AC-8, R12)', () => {
 
 describe('applySelfModelDeltas (AC-8, AC-11, R12/R13)', () => {
   it('applies trait_add / trait_remove', () => {
-    const result = applySelfModelDeltas(makeSelfModel(), [
-      { type: 'trait_add', value: 'patient' },
-      { type: 'trait_remove', value: 'curious' },
-    ], IDENTITY_MAX_DELTAS_PER_UPDATE);
+    const result = applySelfModelDeltas(
+      makeSelfModel(),
+      [
+        { type: 'trait_add', value: 'patient' },
+        { type: 'trait_remove', value: 'curious' },
+      ],
+      IDENTITY_MAX_DELTAS_PER_UPDATE,
+    );
     expect(result.applied).toHaveLength(2);
     expect(result.model.traits).toContain('patient');
     expect(result.model.traits).not.toContain('curious');
@@ -93,11 +97,15 @@ describe('applySelfModelDeltas (AC-8, AC-11, R12/R13)', () => {
   });
 
   it('applies narrative_edit, goal_add, goal_remove', () => {
-    const result = applySelfModelDeltas(makeSelfModel(), [
-      { type: 'narrative_edit', value: 'I am a gardener learning patience.' },
-      { type: 'goal_add', value: 'learn propagation' },
-      { type: 'goal_remove', value: 'make friends with the barista' },
-    ], IDENTITY_MAX_DELTAS_PER_UPDATE);
+    const result = applySelfModelDeltas(
+      makeSelfModel(),
+      [
+        { type: 'narrative_edit', value: 'I am a gardener learning patience.' },
+        { type: 'goal_add', value: 'learn propagation' },
+        { type: 'goal_remove', value: 'make friends with the barista' },
+      ],
+      IDENTITY_MAX_DELTAS_PER_UPDATE,
+    );
     expect(result.model.selfNarrative).toBe('I am a gardener learning patience.');
     expect(result.model.longTermGoals).toContain('learn propagation');
     expect(result.model.longTermGoals).not.toContain('make friends with the barista');

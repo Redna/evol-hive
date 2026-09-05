@@ -540,7 +540,9 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
  * Map flat `update_self_model` tool args to typed identity deltas
  * (spec 033, R12). Deterministic mapping — no LLM on this path.
  */
-function buildSelfModelDeltas(args: Record<string, unknown>): import('@evol-hive/shared').IdentityChangeDelta[] {
+function buildSelfModelDeltas(
+  args: Record<string, unknown>,
+): import('@evol-hive/shared').IdentityChangeDelta[] {
   const deltas: import('@evol-hive/shared').IdentityChangeDelta[] = [];
   const reason = typeof args['reason'] === 'string' ? (args['reason'] as string) : undefined;
 
@@ -554,7 +556,11 @@ function buildSelfModelDeltas(args: Record<string, unknown>): import('@evol-hive
     deltas.push({ type: 'trait_add', value: trait, ...(reason !== undefined ? { reason } : {}) });
   }
   for (const trait of strings('removeTraits')) {
-    deltas.push({ type: 'trait_remove', value: trait, ...(reason !== undefined ? { reason } : {}) });
+    deltas.push({
+      type: 'trait_remove',
+      value: trait,
+      ...(reason !== undefined ? { reason } : {}),
+    });
   }
   for (const goal of strings('addGoals')) {
     deltas.push({ type: 'goal_add', value: goal, ...(reason !== undefined ? { reason } : {}) });

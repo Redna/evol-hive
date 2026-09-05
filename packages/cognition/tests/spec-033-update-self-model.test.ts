@@ -40,7 +40,8 @@ function makeSelfModelBridge(options: { rateLimited?: boolean } = {}): SelfModel
           success: false,
           applied: 0,
           rejected: deltas.length,
-          message: 'Rate limit: the self-model may only be updated once per N ticks. Reflect first.',
+          message:
+            'Rate limit: the self-model may only be updated once per N ticks. Reflect first.',
         };
       }
       const capped = deltas.slice(0, 3);

@@ -404,7 +404,10 @@ export interface CognitiveToolExecutor {
    * The LLM only proposes — validation, bounding, rate-limiting, and auditing
    * happen engine-side via the {@link SelfModelBridge} (R13).
    */
-  executeUpdateSelfModel?(agentId: string, args: Record<string, unknown>): Promise<UpdateSelfModelToolResult>;
+  executeUpdateSelfModel?(
+    agentId: string,
+    args: Record<string, unknown>,
+  ): Promise<UpdateSelfModelToolResult>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
