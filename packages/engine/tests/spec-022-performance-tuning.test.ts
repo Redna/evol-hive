@@ -159,6 +159,7 @@ describe('AC-2: createEngine & assembleGameLoop schedulerConfig (Req 2, Req 3)',
       'spatial',
       'drive-decay',
       'object-state',
+      'conversation-lifecycle',
       'pper-scheduler',
     ]);
   });

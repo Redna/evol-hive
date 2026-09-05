@@ -16,6 +16,7 @@ import type {
   ObjectDependency,
   Relationship,
   SmartObjectSummary,
+  SelfModel,
   SocialMessage,
   PerceptionDataProvider,
 } from '@evol-hive/shared';
@@ -23,6 +24,8 @@ import type { AgentManager, DriveSystem } from '../index.js';
 import type { SmartObjectRegistry } from '../../world/index.js';
 import type { SystemFeedbackStore } from '../feedback/index.js';
 import type { SocialManager } from '../../social/social-manager.js';
+import type { ConversationManagerImpl } from '../../social/conversation-manager.js';
+import type { SelfModelManager } from '../state/self-model-manager.js';
 
 /** Constructor options for {@link PerceptionDataProviderImpl}. */
 export interface PerceptionDataProviderOptions {
@@ -42,6 +45,10 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
   private readonly driveSystem: DriveSystem;
   private readonly feedbackStore: SystemFeedbackStore;
   private socialManager: SocialManager | undefined;
+  /** Conversation lifecycle engine (spec 033) — affordance eligibility filtering. */
+  private conversationManager: ConversationManagerImpl | undefined;
+  /** Guarded identity self-model store (spec 033) — prompt injection source. */
+  private selfModelManager: SelfModelManager | undefined;
 
   constructor(
     agentManager: AgentManager,
@@ -126,6 +133,42 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
 
   getRelationships(agentId: string): Record<string, Relationship> {
     return this.socialManager?.getRelationships(agentId) ?? {};
+  }
+
+  // ── Conversation + self-model perception (spec 033) ─────────────────────
+
+  /** Wire the conversation manager for affordance eligibility filtering (R3/R8). */
+  setConversationManager(conversationManager: ConversationManagerImpl): void {
+    this.conversationManager = conversationManager;
+  }
+
+  /** Wire the self-model store (R11/AC-13). */
+  setSelfModelManager(selfModelManager: SelfModelManager): void {
+    this.selfModelManager = selfModelManager;
+  }
+
+  /**
+   * Available affordances in a room with conversation-eligibility applied
+   * (AC-2): conversation objects expose join/observe to co-located
+   * non-participants and contribute/leave to participants. Non-conversation
+   * objects pass through unchanged.
+   */
+  getEligibleAffordancesInRoom(roomId: string, agentId: string): Affordance[] {
+    const base = this.smartObjectRegistry.getAvailableAffordancesInRoom(roomId);
+    if (this.conversationManager === undefined) return base;
+    return base.filter((affordance) => {
+      const objects = this.smartObjectRegistry.getByRoom(roomId);
+      const owner = objects.find((o) => o.affordances.some((a) => a.id === affordance.id));
+      if (owner === undefined || owner.type !== 'conversation') return true;
+      return this.conversationManager!.getEligibleAffordances(owner.id, agentId).includes(
+        affordance.id,
+      );
+    });
+  }
+
+  /** The agent's evolved self-model, or `null` (persona fallback) — R11/AC-13. */
+  getSelfModel(agentId: string): SelfModel | null {
+    return this.selfModelManager?.getSelfModel(agentId) ?? null;
   }
 }
 

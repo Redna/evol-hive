@@ -72,4 +72,4 @@ export class AgentManagerImpl implements AgentManager {
   }
 }
 
-export {};
+export * from './self-model-manager.js';

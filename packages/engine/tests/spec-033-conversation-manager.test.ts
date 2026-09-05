@@ -282,6 +282,10 @@ describe('close-time consolidation (AC-4, R5)', () => {
 
   it('an active conversation is not closed before the idle timeout', () => {
     const first = world.manager.openOrContribute('agent-a', 'agent-b', 'hi', 'neutral', 11);
+    // B's contribution makes it active (AC-1)...
+    world.manager.openOrContribute('agent-b', 'agent-a', 'hello!', 'positive', 12);
+    expect(world.manager.getConversation(first.conversation!.id)!.status).toBe('active');
+    // ...and recent activity keeps it open across a sweep well before the timeout.
     world.manager.tick(11 + 1);
     expect(world.manager.getConversation(first.conversation!.id)!.status).toBe('active');
     expect(world.stored).toHaveLength(0);
@@ -353,7 +357,8 @@ describe('export/restore (AC-9, R10)', () => {
     const fresh = buildWorld();
     fresh.manager.restoreConversations(exported);
     expect(fresh.manager.getConversation(first.conversation!.id)!.status).toBe('closed');
-    expect(fresh.manager.getConversation(second.conversation!.id)!.status).toBe('active');
+    // `second` has only its initiator's turn → still open (AC-1 lifecycle)
+    expect(fresh.manager.getConversation(second.conversation!.id)!.status).toBe('open');
     // mirrors re-registered in the fresh registry
     expect(fresh.registry.get(second.conversation!.id)).not.toBeNull();
   });

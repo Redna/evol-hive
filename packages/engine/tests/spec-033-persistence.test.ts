@@ -123,7 +123,7 @@ function buildWorld(): {
   const persistence = new EnginePersistenceImpl({
     gameLoop,
     agentManager,
-    registry,
+    smartObjectRegistry: registry,
     sceneManager,
     vectorStore,
     mutationService,
@@ -157,11 +157,13 @@ describe('conversations round-trip (AC-9, R10)', () => {
   });
 
   it('save() embeds open/active conversations in DynamicWorldSnapshot', async () => {
-    world.conversations.openOrContribute('agent-a', 'agent-b', 'hi', 'neutral', 11, 'roses');
+    const opened = world.conversations.openOrContribute('agent-a', 'agent-b', 'hi', 'neutral', 11);
+    // B's contribution activates the conversation (AC-1).
+    world.conversations.openOrContribute('agent-b', 'agent-a', 'hello', 'positive', 12);
     const state = await world.persistence.save();
     expect(state.dynamic).toBeDefined();
     expect(state.dynamic!.conversations).toHaveLength(1);
-    expect(state.dynamic!.conversations![0]!.topic).toBe('roses');
+    expect(state.dynamic!.conversations![0]!.topic).toBe(opened.conversation!.topic);
     expect(state.dynamic!.conversations![0]!.status).toBe('active');
   });
 
@@ -169,6 +171,8 @@ describe('conversations round-trip (AC-9, R10)', () => {
     const first = world.conversations.openOrContribute('agent-a', 'agent-b', 'hi', 'neutral', 11);
     world.conversations.close(first.conversation!.id, 'idle');
     const second = world.conversations.openOrContribute('agent-a', 'agent-b', 'go', 'positive', 20);
+    // B's reply activates the second conversation (AC-1).
+    world.conversations.openOrContribute('agent-b', 'agent-a', 'going', 'neutral', 21);
 
     const state = await world.persistence.save();
     const fresh = buildWorld();
@@ -176,9 +180,10 @@ describe('conversations round-trip (AC-9, R10)', () => {
 
     const restoredClosed = fresh.conversations.getConversation(first.conversation!.id);
     expect(restoredClosed!.status).toBe('closed');
+    // `second` carries both agents' turns → active after restore (AC-1).
     const restoredOpen = fresh.conversations.getConversation(second.conversation!.id);
     expect(restoredOpen!.status).toBe('active');
-    expect(restoredOpen!.turns.map((t) => t.content)).toEqual(['hi', 'go']);
+    expect(restoredOpen!.turns.map((t) => t.content)).toEqual(['go', 'going']);
     // registry mirror re-registered so perception/visualizer see the object
     expect(fresh.registry.get(second.conversation!.id)).not.toBeNull();
   });
@@ -234,7 +239,8 @@ describe('self-model round-trip (AC-9, R14)', () => {
 describe('relationship persistence regression (AC-12, R16)', () => {
   it('trust/familiarity survive a save/load round-trip', async () => {
     const world = buildWorld();
-    world.socialManager.updateRelationship('agent-a', 'agent-b', { trust: 72, familiarity: 40 });
+    // updateRelationship applies DELTAS — trust seeds at 50, so +22 → 72.
+    world.socialManager.updateRelationship('agent-a', 'agent-b', { trust: 22, familiarity: 40 });
     const state = await world.persistence.save();
 
     const fresh = buildWorld();
@@ -247,12 +253,14 @@ describe('relationship persistence regression (AC-12, R16)', () => {
 
   it('trust/familiarity survive the dormant despawn/respawn path', async () => {
     const world = buildWorld();
-    world.socialManager.updateRelationship('agent-a', 'agent-b', { trust: 81, familiarity: 55 });
+    // updateRelationship applies DELTAS — trust seeds at 50, so +31 → 81.
+    world.socialManager.updateRelationship('agent-a', 'agent-b', { trust: 31, familiarity: 55 });
 
     // Despawn exports state (with relationships) into dormancy…
     const dormantState = JSON.parse(JSON.stringify(world.agentManager.getState('agent-a')));
     // …the dormant snapshot rides inside state.relationships (AgentInternalState).
     expect(dormantState.relationships['agent-b'].trust).toBe(81);
+    expect(dormantState.relationships['agent-b'].familiarity).toBe(55);
 
     // Respawn restores the state, relationships intact.
     const fresh = buildWorld();

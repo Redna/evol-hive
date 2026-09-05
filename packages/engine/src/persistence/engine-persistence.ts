@@ -20,9 +20,11 @@ import type { VectorStore } from '@evol-hive/memory';
 import { promises as fs } from 'node:fs';
 import type { GameLoopImpl } from '../loop/index.js';
 import type { AgentManagerImpl } from '../agents/state/index.js';
+import type { SelfModelManager } from '../agents/state/self-model-manager.js';
 import type { SmartObjectRegistryImpl } from '../world/objects/index.js';
 import type { SceneManagerImpl } from '../world/scenes/index.js';
 import type { SceneMutationServiceImpl } from '../world/mutations/scene-mutation-service.js';
+import type { ConversationManagerImpl } from '../social/conversation-manager.js';
 
 /** Constructor dependencies for {@link EnginePersistenceImpl} (spec 017, Req 14). */
 export interface EnginePersistenceOptions {
@@ -33,6 +35,10 @@ export interface EnginePersistenceOptions {
   vectorStore: VectorStore;
   /** Optional mutation service — persists the dynamic world (spec 030, Req 11). */
   mutationService?: SceneMutationServiceImpl;
+  /** Optional conversation manager — persists conversations (spec 033, R10). */
+  conversationManager?: ConversationManagerImpl;
+  /** Optional self-model manager — persists evolved identities (spec 033, R10/R14). */
+  selfModelManager?: SelfModelManager;
 }
 
 /**
@@ -47,6 +53,8 @@ export class EnginePersistenceImpl {
   private readonly sceneManager: SceneManagerImpl;
   private readonly vectorStore: VectorStore;
   private readonly mutationService: SceneMutationServiceImpl | undefined;
+  private readonly conversationManager: ConversationManagerImpl | undefined;
+  private readonly selfModelManager: SelfModelManager | undefined;
 
   constructor(options: EnginePersistenceOptions) {
     this.gameLoop = options.gameLoop;
@@ -55,6 +63,8 @@ export class EnginePersistenceImpl {
     this.sceneManager = options.sceneManager;
     this.vectorStore = options.vectorStore;
     this.mutationService = options.mutationService;
+    this.conversationManager = options.conversationManager;
+    this.selfModelManager = options.selfModelManager;
   }
 
   /** Serialize the full game state to a `SaveState` object (spec 017, Req 14). */
@@ -66,7 +76,12 @@ export class EnginePersistenceImpl {
     for (const agent of this.agentManager.getActiveAgents()) {
       const profile = this.agentManager.getProfile(agent.agentId);
       if (profile === null) continue; // defensive: skip agents without a profile
-      agents.push({ profile, state: agent });
+      const selfModel = this.selfModelManager?.exportForDespawn(agent.agentId) ?? null;
+      agents.push({
+        profile,
+        state: agent,
+        ...(selfModel !== null ? { selfModel } : {}),
+      });
     }
 
     // World — rooms + objects (with current runtime state).
@@ -93,11 +108,15 @@ export class EnginePersistenceImpl {
 
     // Dynamic world (spec 030, Req 11): mutation log + dormant agents. Only
     // included when the world actually mutated — static scenes produce
-    // byte-identical saves (spec 030, AC-11).
-    if (this.mutationService?.hasDynamicState()) {
+    // byte-identical saves (spec 030, AC-11). Spec 033 (R10): conversations
+    // ride in the same snapshot (open, active, AND closed — closed
+    // conversations are resumable next session).
+    const conversations = this.conversationManager?.exportConversations() ?? [];
+    if (this.mutationService?.hasDynamicState() || conversations.length > 0) {
       state.dynamic = {
-        mutationLog: this.mutationService.exportLog(),
-        dormantAgents: Object.values(this.mutationService.exportDormant()),
+        mutationLog: this.mutationService?.exportLog() ?? [],
+        dormantAgents: Object.values(this.mutationService?.exportDormant() ?? {}),
+        ...(conversations.length > 0 ? { conversations } : {}),
       };
     }
 
@@ -107,12 +126,10 @@ export class EnginePersistenceImpl {
   /** Restore the full game state from a `SaveState` (spec 017, Req 14, Req 28). */
   async load(state: SaveState): Promise<void> {
     // Spec 030, Req 11: the format version was bumped (1 → 2) for the
-    // optional `dynamic` field. Old (v1) saves still load — absence of
-    // dynamic data is equivalent to zero mutations replayed.
-    if (
-      state.formatVersion !== SAVE_FORMAT_VERSION &&
-      state.formatVersion !== MIN_SUPPORTED_SAVE_FORMAT_VERSION
-    ) {
+    // optional `dynamic` field. Spec 033 (R10/AC-12) bumps 2 → 3 for
+    // conversations + evolved self-models. Old (v1/v2) saves still load —
+    // every new field is optional and absence is equivalent to defaults.
+    if (state.formatVersion < MIN_SUPPORTED_SAVE_FORMAT_VERSION || state.formatVersion > SAVE_FORMAT_VERSION) {
       throw new SaveFormatVersionError(SAVE_FORMAT_VERSION, state.formatVersion);
     }
 
@@ -136,6 +153,11 @@ export class EnginePersistenceImpl {
         ...snapshot.state,
         isThinking: false,
       });
+      // Evolved identity self-model (spec 033, R10/AC-9). Absent in v1/v2
+      // saves — the persona seed remains the fallback (backward compat).
+      if (snapshot.selfModel !== undefined) {
+        this.selfModelManager?.restore(snapshot.profile.id, snapshot.selfModel);
+      }
     }
 
     // Clear and rebuild the world.
@@ -166,6 +188,11 @@ export class EnginePersistenceImpl {
         dormantMap[snapshot.profile.id] = snapshot;
       }
       this.mutationService?.restoreDynamic(state.dynamic.mutationLog, dormantMap);
+      // Conversations (spec 033, R10/AC-9): restore all (closed included) and
+      // re-register their smart-object mirrors for perception/visualizer.
+      if (state.dynamic.conversations !== undefined && this.conversationManager !== undefined) {
+        this.conversationManager.restoreConversations(state.dynamic.conversations);
+      }
     }
   }
 

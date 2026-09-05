@@ -55,6 +55,7 @@ describe('Engine assembly factory (AC-11)', () => {
       'spatial',
       'drive-decay',
       'object-state',
+      'conversation-lifecycle',
       'pper-scheduler',
     ]);
   });
@@ -99,6 +100,7 @@ describe('Engine assembly factory (AC-11)', () => {
       'spatial',
       'drive-decay',
       'object-state',
+      'conversation-lifecycle',
       'pper-scheduler',
     ]);
   });

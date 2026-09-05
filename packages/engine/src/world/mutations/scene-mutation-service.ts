@@ -70,6 +70,10 @@ export interface SceneMutationServiceOptions {
   memoryPort?: DormancyMemoryPort;
   /** Optional YAAM event log — despawn/respawn write agent-scoped events (Req 12). */
   yaamLog?: YaamEventLog;
+  /** Optional guarded self-model store (spec 033, R14) — dormancy carries the evolved identity. */
+  selfModelManager?: import('../../agents/state/self-model-manager.js').SelfModelManager;
+  /** Optional conversation manager (spec 033) — despawned agents leave conversations. */
+  conversationManager?: import('../../social/conversation-manager.js').ConversationManagerImpl;
 }
 
 /** The engine-internal mutation funnel (spec 030, Req 1). */
@@ -81,6 +85,8 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
   private readonly affordanceCache: AffordanceResolutionCache | undefined;
   private readonly memoryPort: DormancyMemoryPort | undefined;
   private readonly yaamLog: YaamEventLog | undefined;
+  private readonly selfModelManager: import('../../agents/state/self-model-manager.js').SelfModelManager | undefined;
+  private readonly conversationManager: import('../../social/conversation-manager.js').ConversationManagerImpl | undefined;
 
   /** Queued proposals awaiting the next tick boundary. */
   private readonly pending: SceneMutationProposal[] = [];
@@ -97,6 +103,8 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
     this.affordanceCache = options.affordanceCache;
     this.memoryPort = options.memoryPort;
     this.yaamLog = options.yaamLog;
+    this.selfModelManager = options.selfModelManager;
+    this.conversationManager = options.conversationManager;
 
     // Topology-aware perception (Req 10): cross-door `go_to_<room>` affordances
     // are only offered when the destination is reachable through an open
@@ -489,6 +497,13 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
       });
       // Memory bootstrap from the dormant snapshot (Req 8).
       this.memoryPort?.importMemories(dormant.memories);
+      // Evolved identity self-model (spec 033, R14/AC-9/AC-13): respawned
+      // dormant agents come back changed by their last session.
+      if (dormant.selfModel !== undefined) {
+        this.selfModelManager?.restore(dormant.profile.id, dormant.selfModel);
+      } else {
+        this.selfModelManager?.seedFromProfile(dormant.profile, 0);
+      }
       // Claim the dormant state in the YAAM log (Req 12).
       for (const node of dormant.memories) {
         this.yaamLog?.append({
@@ -515,6 +530,8 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
       location: startRoom,
       lastPerceptionTick: 0,
     });
+    // Seed the identity self-model from the spawn profile (spec 033, R11).
+    this.selfModelManager?.seedFromProfile(profile, 0);
     // Memory bootstrap: prior memories scoped to this agentId (e.g. from a
     // previous session via the YAAM pipeline) flow through the memory port.
     const prior = this.memoryPort?.exportMemories(profile.id) ?? [];
@@ -530,11 +547,17 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
     if (state === null || profile === null) return; // unreachable — validated
 
     const memories = this.memoryPort?.exportMemories(agentId) ?? [];
+    const selfModel = this.selfModelManager?.exportForDespawn(agentId) ?? undefined;
     this.dormantStore.put(agentId, {
       profile: structuredCloneSafe(profile),
       state: structuredCloneSafe(state),
       memories: memories.map((node) => structuredCloneSafe(node)),
+      ...(selfModel !== undefined ? { selfModel: structuredCloneSafe(selfModel) } : {}),
     });
+
+    // Spec 033 (R7): a despawned agent leaves every conversation it was in;
+    // its conversation(s) close when the last participant is gone.
+    this.conversationManager?.removeAgentEverywhere(agentId);
 
     // YAAM persistence (Req 12): state summary + key memories as agent-scoped
     // UPSERT_NODE events. Coarse-grained — only despawn/spawn boundaries write.

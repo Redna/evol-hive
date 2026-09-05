@@ -26,11 +26,13 @@ import type {
   SceneDefinition,
   PPEROrchestratorPort,
 } from '@evol-hive/shared';
+import { sentimentTint } from '@evol-hive/shared';
 import type { GameLoopImpl } from '../loop/index.js';
 import type { AgentManagerImpl } from '../agents/state/index.js';
 import type { SmartObjectRegistryImpl } from '../world/objects/index.js';
 import type { SceneManagerImpl } from '../world/scenes/index.js';
 import type { SceneMutationServiceImpl } from '../world/mutations/scene-mutation-service.js';
+import type { ConversationManagerImpl } from '../social/conversation-manager.js';
 import type { EnginePersistence } from '../index.js';
 
 /** Constructor dependencies for {@link VisualizerDataAdapter} (spec 023, Req 8). */
@@ -48,6 +50,8 @@ export interface VisualizerDataAdapterOptions {
   scenes?: Map<string, SceneDefinition>;
   /** Optional mutation service — exposes mutation log deltas (spec 030, Req 15). */
   mutationService?: SceneMutationServiceImpl;
+  /** Optional conversation manager — conversation projections (spec 033, R9). */
+  conversationManager?: ConversationManagerImpl;
 }
 
 /**
@@ -66,6 +70,7 @@ export class VisualizerDataAdapter implements VisualizerInterface {
   private readonly agentProfiles: Map<string, AgentProfile> | undefined;
   private readonly scenes: Map<string, SceneDefinition> | undefined;
   private readonly mutationService: SceneMutationServiceImpl | undefined;
+  private readonly conversationManager: ConversationManagerImpl | undefined;
 
   constructor(options: VisualizerDataAdapterOptions) {
     this.gameLoop = options.gameLoop;
@@ -77,6 +82,7 @@ export class VisualizerDataAdapter implements VisualizerInterface {
     this.agentProfiles = options.agentProfiles;
     this.scenes = options.scenes;
     this.mutationService = options.mutationService;
+    this.conversationManager = options.conversationManager;
   }
 
   /** Compose a full `VisualizerState` snapshot from the engine (spec 023, Req 8). */
@@ -102,6 +108,9 @@ export class VisualizerDataAdapter implements VisualizerInterface {
                 })),
               }
             : {}),
+          // Conversation projection (spec 033, R9/AC-10): topic + participants
+          // + sentiment-derived tint for live conversation objects.
+          ...this.conversationProjection(obj),
         }));
 
       return {
@@ -195,6 +204,34 @@ export class VisualizerDataAdapter implements VisualizerInterface {
     if (fromMap) return fromMap.name;
     const fromManager = this.agentManager.getProfile(agentId);
     return fromManager?.name ?? agentId;
+  }
+
+  /**
+   * Conversation projection for a smart object (spec 033, R9/AC-10). Returns
+   * the `{ conversation }` spread only for live conversation objects; plain
+   * objects get an empty patch (no field).
+   */
+  private conversationProjection(obj: import('@evol-hive/shared').SmartObject): {
+    conversation?: { topic: string; participants: string[]; sentimentTint: string };
+  } {
+    if (obj.type !== 'conversation') return {};
+    const conversation = this.conversationManager?.getConversation(obj.id);
+    if (conversation === undefined || conversation === null) return {};
+    const counts = { positive: 0, neutral: 0, negative: 0 };
+    for (const turn of conversation.turns) counts[turn.sentiment] += 1;
+    const dominant =
+      counts.positive > counts.neutral && counts.positive > counts.negative
+        ? 'positive'
+        : counts.negative > counts.positive && counts.negative > counts.neutral
+          ? 'negative'
+          : 'neutral';
+    return {
+      conversation: {
+        topic: conversation.topic,
+        participants: conversation.participants.map((p) => p.agentId),
+        sentimentTint: sentimentTint(dominant),
+      },
+    };
   }
 
   /**

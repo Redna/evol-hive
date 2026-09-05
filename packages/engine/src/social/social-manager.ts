@@ -11,8 +11,14 @@ import type {
   Relationship,
   SocialActionBridge,
   SocialMessage,
+  ConversationActionResult,
+  ConversationBridge,
+  ConversationObject,
+  ConversationObserveResult,
+  ConversationSentiment,
 } from '@evol-hive/shared';
 import type { AgentManager } from '../agents/index.js';
+import type { ConversationManagerImpl } from './conversation-manager.js';
 import { MessageQueue } from './message-queue.js';
 
 /** Clamp a value to the 0–100 range. */
@@ -26,10 +32,17 @@ function clamp(value: number): number {
  * `dequeueSocialMessages`, `getRelationships`) and social action execution
  * (`queueMessage`, `updateRelationship`, `getAgentSummary`, `getAgentDrives`).
  */
-export class SocialManager implements SocialActionBridge {
+export class SocialManager implements SocialActionBridge, ConversationBridge {
   private readonly messageQueue = new MessageQueue();
+  /** Conversation lifecycle engine (spec 033) — wired at assembly. */
+  private conversationManager: ConversationManagerImpl | undefined;
 
   constructor(private readonly agentManager: AgentManager) {}
+
+  /** Wire the conversation manager (spec 033, R1) — enables ConversationBridge. */
+  setConversationManager(conversationManager: ConversationManagerImpl): void {
+    this.conversationManager = conversationManager;
+  }
 
   // ── SocialActionBridge methods ─────────────────────────────────────────────
 
@@ -127,6 +140,71 @@ export class SocialManager implements SocialActionBridge {
   getRelationships(agentId: string): Record<string, Relationship> {
     const state = this.agentManager.getState(agentId);
     return state?.relationships ? { ...state.relationships } : {};
+  }
+
+  // ── ConversationBridge (spec 033, R1/R3) — delegates to ConversationManager ──
+
+  openOrContribute(
+    agentId: string,
+    targetAgentId: string,
+    content: string,
+    sentiment: ConversationSentiment,
+    tick: number,
+    topic?: string,
+  ): ConversationActionResult {
+    if (this.conversationManager === undefined) {
+      return { success: false, message: 'Conversations are not available in this environment.' };
+    }
+    return this.conversationManager.openOrContribute(
+      agentId,
+      targetAgentId,
+      content,
+      sentiment,
+      tick,
+      topic,
+    );
+  }
+
+  join(agentId: string, conversationId: string, tick: number): ConversationActionResult {
+    if (this.conversationManager === undefined) {
+      return { success: false, message: 'Conversations are not available in this environment.' };
+    }
+    return this.conversationManager.join(agentId, conversationId, tick);
+  }
+
+  leave(agentId: string, conversationId: string, tick: number): ConversationActionResult {
+    if (this.conversationManager === undefined) {
+      return { success: false, message: 'Conversations are not available in this environment.' };
+    }
+    return this.conversationManager.leave(agentId, conversationId, tick);
+  }
+
+  contribute(
+    agentId: string,
+    conversationId: string,
+    content: string,
+    sentiment: ConversationSentiment,
+    tick: number,
+  ): ConversationActionResult {
+    if (this.conversationManager === undefined) {
+      return { success: false, message: 'Conversations are not available in this environment.' };
+    }
+    return this.conversationManager.contribute(agentId, conversationId, content, sentiment, tick);
+  }
+
+  observe(agentId: string, conversationId: string): ConversationObserveResult {
+    if (this.conversationManager === undefined) {
+      return { success: false, message: 'Conversations are not available in this environment.' };
+    }
+    return this.conversationManager.observe(agentId, conversationId);
+  }
+
+  getOpenConversationBetween(agentA: string, agentB: string): ConversationObject | null {
+    return this.conversationManager?.getOpenConversationBetween(agentA, agentB) ?? null;
+  }
+
+  getEligibleAffordances(conversationId: string, agentId: string): string[] {
+    return this.conversationManager?.getEligibleAffordances(conversationId, agentId) ?? [];
   }
 }
 
