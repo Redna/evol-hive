@@ -96,6 +96,8 @@ export * from './systems/object-state.js';
 // Social (agent-to-agent perception, communication, relationships) — spec 018
 export * from './social/message-queue.js';
 export * from './social/social-manager.js';
+export * from './social/conversation-manager.js';
+export * from './systems/conversation-lifecycle.js';
 
 // Dynamic scene mutations — spec 030 (examples need the service type)
 export * from './world/mutations/index.js';

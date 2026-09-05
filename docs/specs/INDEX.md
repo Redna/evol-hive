@@ -61,8 +61,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      29
 ✅ Done:          17
 🔨 In Development: 0
-🔍 In Review:      5
-📝 Drafted:        6
+🔍 In Review:      6
+📝 Drafted:        5
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -84,4 +84,4 @@ Architecture sections fully implemented: 11/11
 | [030](030-dynamic-scenes-living-worlds.md) | Dynamic Scenes — Living Worlds (Runtime Scene Mutation) | §2, §3, §4, §6, §8, §10, §11 | 🔍 In Review | [#117](https://github.com/Redna/evol-hive/issues/117) | — | shared, engine, cognition, visualizer, examples |
 | [031](031-execute-colocation-guard.md) | Execute-Time Co-Location Guard & Stale Plan Re-Validation | §4, §6, §10 | 🔍 In Review | [#121](https://github.com/Redna/evol-hive/issues/121) | — | shared, engine, cognition |
 | [032](032-dynamic-world-drive-restoration.md) | Dynamic-World Demo — Drive Restoration Affordances & Long-Run Equilibrium | §3, §4, §6, §8 | 🔍 In Review | [#125](https://github.com/Redna/evol-hive/issues/125) | [#127](https://github.com/Redna/evol-hive/pull/127) | examples |
-| [033](033-conversations-identity-evolution.md) | Conversations as Perceivable Temporal Objects & Identity Evolution — Dialogue Threads, Self-Model, Cross-Session Continuity | §2, §3, §4, §6, §8, §10, §11 | 📝 Drafted | [#128](https://github.com/Redna/evol-hive/issues/128) | — | shared, engine, cognition, memory, visualizer, examples |
+| [033](033-conversations-identity-evolution.md) | Conversations as Perceivable Temporal Objects & Identity Evolution — Dialogue Threads, Self-Model, Cross-Session Continuity | §2, §3, §4, §6, §8, §10, §11 | 🔍 In Review | [#128](https://github.com/Redna/evol-hive/issues/128) | [#131](https://github.com/Redna/evol-hive/pull/131) | shared, engine, cognition, memory, visualizer, examples |

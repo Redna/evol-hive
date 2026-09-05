@@ -566,6 +566,9 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
     bridges: core.bridges,
     ...(persistence !== undefined ? { persistence } : {}),
     socialManager: stack.socialManager,
+    // Conversations + identity self-model (spec 033) — always created by the core.
+    conversationManager: core.conversationManager,
+    selfModelManager: core.selfModelManager,
     // Dynamic world (spec 030, Req 1): the mutation funnel + dormancy state.
     mutationService: core.mutationService,
     dormantStore: core.dormantStore,

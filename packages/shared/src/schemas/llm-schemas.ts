@@ -355,7 +355,7 @@ export const updateInternalStateTool: ToolDefinition = {
 
 // ─── Social Tool Schemas (spec 018, Req 13) ─────────────────────────────────
 
-/** Schema for the talk_to social tool (spec 018, Req 13). */
+/** Schema for the talk_to social tool (spec 018, Req 13; spec 033 R3). */
 export const talkToSchema = {
   type: 'object',
   properties: {
@@ -366,6 +366,12 @@ export const talkToSchema = {
     message: {
       type: 'string',
       description: 'The message content to send to the target agent.',
+    },
+    sentiment: {
+      type: 'string',
+      enum: ['positive', 'neutral', 'negative'],
+      description:
+        'The sentiment of your message (spec 033). Tagged at write time; a predominantly negative exchange will not build trust. Default: neutral.',
     },
   },
   required: ['targetAgentId', 'message'],
@@ -413,13 +419,13 @@ export const ignoreSchema = {
 
 // ─── Social Tool Definitions (spec 018, Req 14) ─────────────────────────────
 
-/** Tool definition for the talk_to social cognitive tool (spec 018, Req 14). */
+/** Tool definition for the talk_to social cognitive tool (spec 018, Req 14; spec 033 R3). */
 export const talkToTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'talk_to',
     description:
-      'Send a message to another agent in the same room. The message will appear in their next perception tick.',
+      'Send a message to another agent in the same room. The message will appear in their next perception tick, join the ongoing conversation thread between you, and open one if none exists. Optionally tag the message sentiment.',
     parameters: talkToSchema,
   },
 };
@@ -453,5 +459,54 @@ export const ignoreTool: ToolDefinition = {
     name: 'ignore',
     description: 'Choose to ignore another agent in the same room. Signals social disengagement.',
     parameters: ignoreSchema,
+  },
+};
+
+// ─── Identity Self-Model Tool (spec 033, R12) ────────────────────────────────
+
+/** Schema for the update_self_model cognitive tool (spec 033, R12). */
+export const updateSelfModelSchema = {
+  type: 'object',
+  properties: {
+    addTraits: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'New traits to adopt (e.g. "patient"). Slow, long-term self-change only.',
+    },
+    removeTraits: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Traits to shed.',
+    },
+    narrative: {
+      type: 'string',
+      description: 'An updated first-person self-narrative (replaces the current one).',
+    },
+    addGoals: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'New long-term goals / aspirations.',
+    },
+    removeGoals: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Long-term goals to abandon.',
+    },
+    reason: {
+      type: 'string',
+      description: 'Why you are changing (recorded in the identity_change audit trail).',
+    },
+  },
+  additionalProperties: false,
+} as const;
+
+/** Tool definition for the update_self_model cognitive tool (spec 033, R12). */
+export const updateSelfModelTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'update_self_model',
+    description:
+      'Propose slow, bounded edits to your own identity self-model (traits, self-narrative, long-term goals). Use sparingly — this is a guarded, rate-limited, audited tool for genuine self-change, not for reacting to a single message.',
+    parameters: updateSelfModelSchema,
   },
 };

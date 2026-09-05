@@ -53,11 +53,18 @@ import { AutoSaveSystem } from './systems/auto-save.js';
 import { EnginePersistenceImpl } from './persistence/index.js';
 import { SocialManager } from './social/social-manager.js';
 import {
+  ConversationManagerImpl,
+  defaultConversationManagerConfig,
+  type ConversationConsolidationSink,
+} from './social/conversation-manager.js';
+import { SelfModelManager } from './agents/state/self-model-manager.js';
+import {
   SceneMutationServiceImpl,
   SceneMutationSystem,
   DormantAgentStore,
   YaamEventLog,
 } from './world/mutations/index.js';
+import { ConversationLifecycleSystem } from './systems/conversation-lifecycle.js';
 import type { GameLoop, EnginePersistence } from './index.js';
 
 /** A no-op MemoryStore used when no real memory subsystem is wired. */
@@ -120,6 +127,10 @@ export interface EngineCore {
   autoSaveConfig?: AutoSaveConfig;
   /** Social manager — always created (spec 019, Req 3). */
   socialManager: SocialManager;
+  /** Conversation lifecycle engine (spec 033, R1/R2). Always created. */
+  conversationManager: ConversationManagerImpl;
+  /** Guarded identity self-model store (spec 033, R11–R13). Always created. */
+  selfModelManager: SelfModelManager;
   /**
    * Optional per-scene PPER scheduler config override (spec 022, Req 1, AC-1).
    * Populated by {@link loadScene} from `SceneDefinition.maxConcurrentCycles`
@@ -172,6 +183,36 @@ export function createEngineCore(
   // SocialManager (spec 019, Req 1) — always created; depends only on AgentManager.
   const socialManager = new SocialManager(agentManager);
 
+  // Conversation lifecycle engine (spec 033, R1/R2) + guarded identity
+  // self-model store (R11–R13). The close-time consolidation sink (R5) is
+  // wired to the memory store when one exists — interaction memories land in
+  // the same store the Reflect phase writes to.
+  const selfModelManager = new SelfModelManager();
+  const consolidationSink: ConversationConsolidationSink = {
+    storeInteraction(agentId, entry) {
+      // Deterministic write into the engine's memory store (no LLM — AC-14).
+      void memoryStore.store(agentId, entry, clock.get()).catch(() => {
+        // A consolidation write failure must never break the game loop.
+      });
+    },
+  };
+  const conversationManager = new ConversationManagerImpl({
+    agentManager,
+    registry: smartObjectRegistry,
+    sceneManager,
+    config: defaultConversationManagerConfig(),
+    consolidationSink,
+  });
+  socialManager.setConversationManager(conversationManager);
+
+  // Conversation affordance handlers (spec 033, R3): the four affordances
+  // execute through the conversation manager — deterministic, no LLM (AC-14).
+  registerConversationAffordanceHandlers(
+    conversationManager,
+    affordanceRegistry,
+    () => gameLoop.currentTick().tickNumber,
+  );
+
   // Dynamic world (spec 030, Req 1): the single mutation funnel + dormancy.
   const dormantStore = new DormantAgentStore();
   const yaamEventLog = new YaamEventLog();
@@ -181,6 +222,8 @@ export function createEngineCore(
     agentManager,
     dormantStore,
     yaamLog: yaamEventLog,
+    selfModelManager,
+    conversationManager,
   });
 
   const bridges = {
@@ -212,6 +255,10 @@ export function createEngineCore(
   // Wire the SocialManager into the perception provider (spec 019, Req 2) so
   // getAgentsInRoom / dequeueSocialMessages / getRelationships delegate to it.
   bridges.perception.setSocialManager(socialManager);
+  // Spec 033: conversation-affordance eligibility filtering (R3/R8) and the
+  // evolved self-model prompt source (R11/AC-13).
+  bridges.perception.setConversationManager(conversationManager);
+  bridges.perception.setSelfModelManager(selfModelManager);
 
   const gameLoop = new GameLoopImpl(config);
   clock.bind(gameLoop);
@@ -226,6 +273,8 @@ export function createEngineCore(
           sceneManager,
           vectorStore,
           mutationService,
+          conversationManager,
+          selfModelManager,
         })
       : undefined;
 
@@ -244,6 +293,8 @@ export function createEngineCore(
     clock: clock,
     ...(persistence !== undefined ? { persistence } : {}),
     socialManager,
+    conversationManager,
+    selfModelManager,
     mutationService,
     dormantStore,
     yaamEventLog,
@@ -278,6 +329,7 @@ export function assembleGameLoop(
   core.gameLoop.registerSystem(core.spatial); // (1) SpatialSystem
   core.gameLoop.registerSystem(new DriveDecaySystem(core.agentManager, core.driveSystem)); // (2) DriveDecaySystem
   core.gameLoop.registerSystem(new ObjectStateSystem(core.smartObjectRegistry)); // (3) ObjectStateSystem (spec 018)
+  core.gameLoop.registerSystem(new ConversationLifecycleSystem(core.conversationManager)); // (3.5) ConversationLifecycleSystem (spec 033)
   const scheduler = new PPERScheduler(core.agentManager, orchestrator, resolvedSchedulerConfig); // (4) PPERScheduler
   core.scheduler = scheduler;
   core.gameLoop.registerSystem(scheduler);
@@ -324,6 +376,10 @@ export interface AssembledEngine {
   persistence?: EnginePersistence;
   /** Social manager (spec 019, Req 5). */
   socialManager: SocialManager;
+  /** Conversation lifecycle engine (spec 033). */
+  conversationManager: ConversationManagerImpl;
+  /** Guarded identity self-model store (spec 033). */
+  selfModelManager: SelfModelManager;
   /** Runtime scene mutation funnel (spec 030, Req 1). */
   mutationService: SceneMutationServiceImpl;
   /** Dormant-agent store (spec 030, Req 7/8). */
@@ -358,11 +414,68 @@ export function createEngine(
     bridges: core.bridges,
     ...(core.persistence !== undefined ? { persistence: core.persistence } : {}),
     socialManager: core.socialManager,
+    conversationManager: core.conversationManager,
+    selfModelManager: core.selfModelManager,
     ...(core.scheduler !== undefined ? { scheduler: core.scheduler } : {}),
     mutationService: core.mutationService,
     dormantStore: core.dormantStore,
     yaamEventLog: core.yaamEventLog,
   };
+}
+
+/**
+ * Register the deterministic engine-effect handlers for the four conversation
+ * affordances (spec 033, R3). Execution is fully deterministic — no LLM (AC-14).
+ * `contribute` executed directly (args-free) returns structured guidance
+ * directing the agent through `talk_to` (open-or-contribute), which is the
+ * message-carrying write path.
+ */
+function registerConversationAffordanceHandlers(
+  conversationManager: ConversationManagerImpl,
+  affordanceRegistry: AffordanceRegistryImpl,
+  tick: () => number,
+): void {
+  const toResult = (
+    result: import('@evol-hive/shared').ConversationActionResult,
+    socialBoost: number,
+  ): import('@evol-hive/shared').AffordanceResult => {
+    if (result.success) {
+      return {
+        success: true,
+        ...(socialBoost !== 0 ? { driveChanges: { social: socialBoost } } : {}),
+      };
+    }
+    return { success: false, failureReason: result.message };
+  };
+
+  affordanceRegistry.registerHandler('conversation_join', async (objectId, agentId) => {
+    const result = conversationManager.join(agentId, objectId, tick());
+    return toResult(result, 5);
+  });
+  affordanceRegistry.registerHandler('conversation_leave', async (objectId, agentId) => {
+    const result = conversationManager.leave(agentId, objectId, tick());
+    return toResult(result, 0);
+  });
+  affordanceRegistry.registerHandler('conversation_observe', async (objectId, agentId) => {
+    const observed = conversationManager.observe(agentId, objectId);
+    if (!observed.success) {
+      return { success: false, failureReason: observed.message };
+    }
+    return { success: true };
+  });
+  affordanceRegistry.registerHandler('conversation_contribute', async (objectId, agentId) => {
+    void agentId;
+    // Args-free direct execution: structured guidance — the message-carrying
+    // write path is talk_to (open-or-contribute, spec 033, R3).
+    const conversation = conversationManager.getConversation(objectId);
+    if (conversation === null) {
+      return { success: false, failureReason: 'Conversation not found.' };
+    }
+    return {
+      success: false,
+      failureReason: `Use talk_to with an agent in this conversation to contribute to '${conversation.topic}'.`,
+    };
+  });
 }
 
 /** Load a SceneDefinition into an engine core (rooms, objects, agents). */
@@ -414,6 +527,10 @@ export function loadScene(core: EngineCore, scene: SceneDefinition): void {
       location: startRoom,
       lastPerceptionTick: 0,
     });
+    // Seed the identity self-model from the immutable spawn profile (spec 033,
+    // R11) — the profile stays the fallback seed; the self-model evolves from
+    // here via the guarded path.
+    core.selfModelManager.seedFromProfile(profile, 0);
   }
 }
 

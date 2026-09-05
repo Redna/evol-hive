@@ -23,7 +23,12 @@ import type {
   SceneMutationProposal,
   SceneMutationType,
   ModifySceneToolResult,
+  ConversationBridge,
+  ConversationSentiment,
+  SelfModelBridge,
+  UpdateSelfModelToolResult,
 } from '@evol-hive/shared';
+import { conversationRelationshipDelta, participantSentimentCounts } from '@evol-hive/shared';
 import type { MemoryInjector } from '@evol-hive/memory';
 
 /** Constructor options for {@link CognitiveToolExecutorImpl}. */
@@ -42,6 +47,18 @@ export interface CognitiveToolExecutorOptions {
    * tool layer only *proposes* — validation happens engine-side.
    */
   mutationPort?: SceneMutationPort;
+  /**
+   * Optional conversation bridge for talk_to open-or-contribute + sentiment-
+   * gated relationship deltas (spec 033, R1/R3/R6). Implemented by the engine
+   * (`SocialManager` delegating to `ConversationManagerImpl`).
+   */
+  conversationBridge?: ConversationBridge;
+  /**
+   * Optional guarded self-model bridge for update_self_model (spec 033, R12).
+   * Implemented by the engine (`SelfModelManager`); the LLM only proposes —
+   * validation/bounding/rate-limiting/auditing happen engine-side (R13).
+   */
+  selfModelBridge?: SelfModelBridge;
   /**
    * Max modify_scene proposals per agent per PPER cycle (spec 030, Req 14a).
    * Default 1. Wired from `GuardrailConfig.maxSceneMutationsPerCycle`.
@@ -62,6 +79,8 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
   private readonly memoryInjector: MemoryInjector | undefined;
   private readonly stateDataProvider: CognitiveToolDataProvider | undefined;
   private readonly socialBridge: SocialActionBridge | undefined;
+  private readonly conversationBridge: ConversationBridge | undefined;
+  private readonly selfModelBridge: SelfModelBridge | undefined;
   private readonly currentTick: number;
   private readonly mutationPort: SceneMutationPort | undefined;
   private readonly maxSceneMutationsPerCycle: number;
@@ -72,6 +91,8 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
     this.memoryInjector = options.memoryInjector;
     this.stateDataProvider = options.stateDataProvider;
     this.socialBridge = options.socialBridge;
+    this.conversationBridge = options.conversationBridge;
+    this.selfModelBridge = options.selfModelBridge;
     this.currentTick = options.currentTick ?? Date.now();
     this.mutationPort = options.mutationPort;
     this.maxSceneMutationsPerCycle = options.maxSceneMutationsPerCycle ?? 1;
@@ -164,12 +185,13 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
     };
   }
 
-  // ── Social cognitive tool methods (spec 018, Req 25–28) ─────────────────────
+  // ── Social cognitive tool methods (spec 018, Req 25–28; spec 033, R1/R3/R6) ──
 
   async executeTalkTo(
     agentId: string,
     targetAgentId: string,
     message: string,
+    sentiment?: ConversationSentiment,
   ): Promise<SocialToolResult> {
     if (this.socialBridge === undefined) {
       return {
@@ -178,16 +200,40 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         relationshipUpdated: false,
       };
     }
+    const taggedSentiment: ConversationSentiment = sentiment ?? 'neutral';
     try {
+      // Spec 033 (R1/R3): talk_to maps to open-or-contribute — the exchange
+      // joins the ongoing conversation thread (or opens one).
+      let conversationDelta: { familiarity: number; trust: number } | null = null;
+      if (this.conversationBridge !== undefined) {
+        const result = this.conversationBridge.openOrContribute(
+          agentId,
+          targetAgentId,
+          message,
+          taggedSentiment,
+          this.currentTick,
+        );
+        if (result.success && result.conversation !== undefined) {
+          // Spec 033 (R6/AC-7): the relationship delta is a pure deterministic
+          // function of the conversation's aggregate sentiment — a
+          // predominantly negative exchange produces NO trust gain.
+          const counts = participantSentimentCounts(result.conversation, agentId);
+          conversationDelta = conversationRelationshipDelta(counts);
+        }
+      }
+
       this.socialBridge.queueMessage(agentId, targetAgentId, message);
+      // Spec 033 (R6): sentiment-gated deltas when a conversation is wired;
+      // legacy blind +5/+2 deltas otherwise (backward compat, AC-14).
+      const delta = conversationDelta ?? { familiarity: 5, trust: 2 };
       this.socialBridge.updateRelationship(agentId, targetAgentId, {
-        familiarity: 5,
-        trust: 2,
+        familiarity: delta.familiarity,
+        trust: delta.trust,
         lastInteraction: this.currentTick,
       });
       this.socialBridge.updateRelationship(targetAgentId, agentId, {
-        familiarity: 5,
-        trust: 2,
+        familiarity: delta.familiarity,
+        trust: delta.trust,
         lastInteraction: this.currentTick,
       });
       if (this.stateDataProvider !== undefined) {
@@ -198,6 +244,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         success: true,
         message: `Message sent to ${targetName}.`,
         relationshipUpdated: true,
+        conversationUpdated: this.conversationBridge !== undefined && conversationDelta !== null,
       };
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -207,6 +254,56 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         relationshipUpdated: false,
       };
     }
+  }
+
+  /**
+   * Execute update_self_model: propose bounded edits to the identity
+   * self-model (spec 033, R12/AC-8). The LLM only proposes — the engine-side
+   * {@link SelfModelBridge} validates, bounds, rate-limits, applies, and
+   * audits every delta (R13). Message text from talk_to NEVER reaches this
+   * path — prompt injection cannot rewrite identity.
+   */
+  async executeUpdateSelfModel(
+    agentId: string,
+    args: Record<string, unknown>,
+  ): Promise<UpdateSelfModelToolResult> {
+    if (this.selfModelBridge === undefined) {
+      return {
+        success: false,
+        applied: 0,
+        rejected: 0,
+        message: 'Identity self-model updates are not available in this environment.',
+      };
+    }
+
+    // Map flat tool args to typed deltas (deterministic mapping — no LLM).
+    const deltas = buildSelfModelDeltas(args);
+    if (deltas.length === 0) {
+      return {
+        success: false,
+        applied: 0,
+        rejected: 0,
+        message:
+          'No valid identity changes proposed. Provide addTraits / removeTraits / narrative / addGoals / removeGoals.',
+      };
+    }
+
+    const result = this.selfModelBridge.applySelfModelDeltas(agentId, deltas);
+    if (!result.success) {
+      return { success: false, applied: 0, rejected: result.rejected, message: result.message };
+    }
+    return {
+      success: true,
+      applied: result.applied,
+      rejected: result.rejected,
+      ...(result.audit !== undefined ? { revision: result.audit.revision } : {}),
+      message: result.message,
+    };
+  }
+
+  /** The name of the only cognitive tool that can write identity (R13 audit aid). */
+  getSelfModelToolName(): string {
+    return 'update_self_model';
   }
 
   async executeObserveAgent(agentId: string, targetAgentId: string): Promise<SocialToolResult> {
@@ -437,6 +534,49 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         return null;
     }
   }
+}
+
+/**
+ * Map flat `update_self_model` tool args to typed identity deltas
+ * (spec 033, R12). Deterministic mapping — no LLM on this path.
+ */
+function buildSelfModelDeltas(
+  args: Record<string, unknown>,
+): import('@evol-hive/shared').IdentityChangeDelta[] {
+  const deltas: import('@evol-hive/shared').IdentityChangeDelta[] = [];
+  const reason = typeof args['reason'] === 'string' ? (args['reason'] as string) : undefined;
+
+  const strings = (key: string): string[] => {
+    const value = args[key];
+    if (!Array.isArray(value)) return [];
+    return value.filter((v): v is string => typeof v === 'string' && v.length > 0);
+  };
+
+  for (const trait of strings('addTraits')) {
+    deltas.push({ type: 'trait_add', value: trait, ...(reason !== undefined ? { reason } : {}) });
+  }
+  for (const trait of strings('removeTraits')) {
+    deltas.push({
+      type: 'trait_remove',
+      value: trait,
+      ...(reason !== undefined ? { reason } : {}),
+    });
+  }
+  for (const goal of strings('addGoals')) {
+    deltas.push({ type: 'goal_add', value: goal, ...(reason !== undefined ? { reason } : {}) });
+  }
+  for (const goal of strings('removeGoals')) {
+    deltas.push({ type: 'goal_remove', value: goal, ...(reason !== undefined ? { reason } : {}) });
+  }
+  const narrative = args['narrative'];
+  if (typeof narrative === 'string' && narrative.length > 0) {
+    deltas.push({
+      type: 'narrative_edit',
+      value: narrative,
+      ...(reason !== undefined ? { reason } : {}),
+    });
+  }
+  return deltas;
 }
 
 export {};

@@ -124,8 +124,8 @@ describe('AC-4: WorldSnapshot interface', () => {
 });
 
 describe('AC-5: SAVE_FORMAT_VERSION constant', () => {
-  it('is defined with the current format version (bumped to 2 by spec 030)', () => {
-    expect(SAVE_FORMAT_VERSION).toBe(2);
+  it('is defined with the current format version (bumped to 3 by spec 033)', () => {
+    expect(SAVE_FORMAT_VERSION).toBe(3);
   });
 });
 

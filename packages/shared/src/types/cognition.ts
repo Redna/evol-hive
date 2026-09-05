@@ -18,6 +18,8 @@ import type {
   CompoundAction,
   ObjectDependency,
 } from './affordance.js';
+import type { ConversationSentiment } from './conversation.js';
+import type { SelfModel, IdentityChangeDelta, IdentityChangeAudit } from './identity.js';
 import type { ModifySceneToolResult, AffordanceGuard } from './mutations.js';
 import type {
   AgentInternalState,
@@ -90,6 +92,13 @@ export interface PerceptionResult {
    * no relationships.
    */
   relationships?: Record<string, Relationship>;
+  /**
+   * The evolved identity self-model (spec 033, R11/AC-13). Populated by the
+   * perception service via `provider.getSelfModel` when the provider implements
+   * it and a self-model exists. `undefined` → prompt falls back to the spawn
+   * persona (backward compat).
+   */
+  selfModel?: SelfModel;
 }
 
 /** Active observation result (Section 6.2) — deep JSON state of a target object. */
@@ -152,6 +161,7 @@ export type CognitiveToolName =
   | 'formulate_plan'
   | 'query_memory'
   | 'update_internal_state'
+  | 'update_self_model'
   | 'talk_to'
   | 'observe_agent'
   | 'help'
@@ -220,6 +230,12 @@ export interface SocialToolResult {
   success: boolean;
   message: string;
   relationshipUpdated: boolean;
+  /**
+   * `true` when the exchange was recorded on a conversation object via the
+   * open-or-contribute mapping (spec 033, R1/R3). Absent when no conversation
+   * bridge is wired (legacy behavior).
+   */
+  conversationUpdated?: boolean;
   /** Present only for observe_agent: the observed agent's details. */
   observedAgent?: {
     name: string;
@@ -243,6 +259,39 @@ export interface SocialActionBridge {
   getAgentSummary(agentId: string): AgentSummary | null;
   /** Get an agent's drives as a flat record. Returns `{}` if not found. */
   getAgentDrives(agentId: string): Record<string, number>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Identity Self-Model Bridge (spec 033, R12/R13)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Result of applying guarded identity deltas through the {@link SelfModelBridge}. */
+export interface SelfModelApplyResult {
+  success: boolean;
+  /** How many deltas were applied. */
+  applied: number;
+  /** How many proposals were dropped by the bound / validation. */
+  rejected: number;
+  /** Actionable feedback for the LLM. */
+  message: string;
+  /** The `identity_change` audit event when deltas were applied (R13). */
+  audit?: IdentityChangeAudit;
+}
+
+/**
+ * Bridge interface (defined in `shared` per ADR-0001) for the guarded identity
+ * self-model. The engine implements it (`SelfModelManager` — bounded,
+ * rate-limited, audited); cognition consumes it from the `update_self_model`
+ * tool and the session-end identity consolidation pass. The LLM can only
+ * *propose* deltas — application is deterministic engine code (R13).
+ */
+export interface SelfModelBridge {
+  /** The agent's current self-model, or `null` when none exists (persona fallback). */
+  getSelfModel(agentId: string): SelfModel | null;
+  /** Validate, bound, apply, and audit identity deltas (all guards engine-side). */
+  applySelfModelDeltas(agentId: string, deltas: IdentityChangeDelta[]): SelfModelApplyResult;
+  /** The agent's `identity_change` audit trail (R13). */
+  getIdentityAuditLog(agentId: string): IdentityChangeAudit[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -276,6 +325,23 @@ export interface UpdateStateToolResult {
 }
 
 /**
+ * The confirmation result of executing `update_self_model` mid-loop
+ * (spec 033, R12). Sent back to the LLM as the tool result content.
+ */
+export interface UpdateSelfModelToolResult {
+  /** `true` when at least one delta was applied (or the proposal was valid but rate-limited → `false`). */
+  success: boolean;
+  /** Number of deltas applied (≤ IDENTITY_MAX_DELTAS_PER_UPDATE). */
+  applied: number;
+  /** Number of proposals dropped by the bound / validation. */
+  rejected: number;
+  /** The self-model revision after the update, when applied. */
+  revision?: number;
+  /** Human-readable confirmation / rejection sent back to the LLM. */
+  message: string;
+}
+
+/**
  * Bridge interface (defined in `shared`) for the state update operations needed
  * by `update_internal_state` mid-loop (spec 015, Req 2). A focused subset of
  * `ReflectDataProvider` so `CognitiveToolExecutorImpl` does not need to depend
@@ -305,8 +371,18 @@ export interface CognitiveToolExecutor {
     newGoal?: string,
     driveOverrides?: Partial<Record<string, number>>,
   ): Promise<UpdateStateToolResult>;
-  /** Execute talk_to: queue a message and update relationships (spec 018, Req 11). */
-  executeTalkTo(agentId: string, targetAgentId: string, message: string): Promise<SocialToolResult>;
+  /**
+   * Execute talk_to: queue a message and update relationships (spec 018, Req 11).
+   * Spec 033 (R1/R3): the optional `sentiment` argument (LLM-tagged at write
+   * time) routes the exchange through the conversation bridge — open-or-
+   * contribute — and gates the relationship deltas on the aggregate sentiment.
+   */
+  executeTalkTo(
+    agentId: string,
+    targetAgentId: string,
+    message: string,
+    sentiment?: ConversationSentiment,
+  ): Promise<SocialToolResult>;
   /** Execute observe_agent: return the target agent's state (spec 018, Req 11). */
   executeObserveAgent(agentId: string, targetAgentId: string): Promise<SocialToolResult>;
   /** Execute help: boost the target's primary drive and the helper's social drive (spec 018, Req 11). */
@@ -322,6 +398,16 @@ export interface CognitiveToolExecutor {
     agentId: string,
     args: Record<string, unknown>,
   ): Promise<ModifySceneToolResult>;
+  /**
+   * Execute update_self_model: propose bounded edits to the identity self-model
+   * (spec 033, R12). Optional so existing implementations compile unchanged.
+   * The LLM only proposes — validation, bounding, rate-limiting, and auditing
+   * happen engine-side via the {@link SelfModelBridge} (R13).
+   */
+  executeUpdateSelfModel?(
+    agentId: string,
+    args: Record<string, unknown>,
+  ): Promise<UpdateSelfModelToolResult>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -451,6 +537,12 @@ export interface PerceptionDataProvider {
   dequeueSocialMessages?(agentId: string): SocialMessage[];
   /** The agent's structured relationship map (spec 018, Req 9). */
   getRelationships?(agentId: string): Record<string, Relationship>;
+  /**
+   * The agent's evolved identity self-model, or `null` when none exists
+   * (spec 033, R11/AC-13). Optional so existing implementations compile
+   * unchanged — when absent, prompts fall back to the spawn persona.
+   */
+  getSelfModel?(agentId: string): SelfModel | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

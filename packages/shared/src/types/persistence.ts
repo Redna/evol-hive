@@ -14,6 +14,7 @@ import type { SmartObject } from './affordance.js';
 import type { MemoryNode } from './memory.js';
 import type { Room } from './world.js';
 import type { DynamicWorldSnapshot } from './mutations.js';
+import type { SelfModel } from './identity.js';
 
 /** A snapshot of the deterministic game loop state (spec 017, Req 2). */
 export interface GameLoopSnapshot {
@@ -28,6 +29,11 @@ export interface AgentSnapshot {
   profile: AgentProfile;
   /** The agent's mutable internal state (drives, goal, plan, location, etc.). */
   state: AgentInternalState;
+  /**
+   * The evolved identity self-model (spec 033, R10/R11). Optional — absent
+   * when the agent never evolved (backward compat with v1/v2 saves).
+   */
+  selfModel?: SelfModel;
 }
 
 /** The full world state: rooms and smart objects (spec 017, Req 4). */
@@ -69,8 +75,14 @@ export interface SaveState {
  * Spec 030 bumps 1 → 2: the optional `dynamic` field was added to
  * `SaveState`. Old (v1) saves still load — absence of dynamic data is
  * equivalent to zero mutations replayed (spec 030, Req 11).
+ *
+ * Spec 033 bumps 2 → 3: conversations ride in `DynamicWorldSnapshot.conversations`
+ * and the evolved identity self-model rides in `AgentSnapshot.selfModel` /
+ * `DormantAgentSnapshot.selfModel`. All new fields are optional, and
+ * `MIN_SUPPORTED_SAVE_FORMAT_VERSION` stays at 1 so v1/v2 saves still load
+ * (spec 033, R10/R16).
  */
-export const SAVE_FORMAT_VERSION = 2;
+export const SAVE_FORMAT_VERSION = 3;
 
 /** The last save format version that `load()` still accepts (spec 030, Req 11). */
 export const MIN_SUPPORTED_SAVE_FORMAT_VERSION = 1;

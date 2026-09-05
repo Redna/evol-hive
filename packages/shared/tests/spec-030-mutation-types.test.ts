@@ -108,8 +108,8 @@ describe('SceneMutationPort bridge (spec 030, Req 13)', () => {
 });
 
 describe('SaveState dynamic extension (spec 030, Req 11)', () => {
-  it('bumps SAVE_FORMAT_VERSION to 2', () => {
-    expect(SAVE_FORMAT_VERSION).toBe(2);
+  it('bumps SAVE_FORMAT_VERSION to 2 (spec 033 later bumps it to 3)', () => {
+    expect(SAVE_FORMAT_VERSION).toBeGreaterThanOrEqual(2);
   });
 
   it('SaveState.dynamic is optional (static scenes unchanged)', () => {
