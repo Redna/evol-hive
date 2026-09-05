@@ -16,6 +16,8 @@
 import type { AgentInternalState, AgentProfile } from './agent.js';
 import type { MemoryNode } from './memory.js';
 import type { SmartObject } from './affordance.js';
+import type { ConversationObject } from './conversation.js';
+import type { SelfModel } from './identity.js';
 
 // ── Mutation operations ──────────────────────────────────────────────────────
 
@@ -160,6 +162,12 @@ export interface DormantAgentSnapshot {
   profile: AgentProfile;
   state: AgentInternalState;
   memories: MemoryNode[];
+  /**
+   * The evolved identity self-model (spec 033, R14) — respawned dormant
+   * agents come back changed by their last session. Optional for backward
+   * compat with pre-033 dormant snapshots.
+   */
+  selfModel?: SelfModel;
 }
 
 /**
@@ -171,6 +179,12 @@ export interface DormantAgentSnapshot {
 export interface DynamicWorldSnapshot {
   mutationLog: SceneMutationEvent[];
   dormantAgents: DormantAgentSnapshot[];
+  /**
+   * Live conversation objects (spec 033, R10) — open, active, and closed
+   * (closed conversations are resumable next session). Optional for backward
+   * compat with v2 saves and static scenes.
+   */
+  conversations?: ConversationObject[];
 }
 
 // ── Topology guard (Req 10) ──────────────────────────────────────────────────

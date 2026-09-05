@@ -53,6 +53,12 @@ export interface VisualizerObject {
   state: Record<string, unknown>;
   affordances: { id: string; label: string }[];
   compoundActions?: { id: string; label: string; stepCount: number }[];
+  /**
+   * Live conversation projection (spec 033, R9/AC-10) — present only on
+   * conversation smart objects. Carries the topic, participants, and a
+   * sentiment-derived tint for rendering.
+   */
+  conversation?: { topic: string; participants: string[]; sentimentTint: string };
 }
 
 /**

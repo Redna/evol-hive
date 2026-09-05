@@ -14,6 +14,8 @@ export * from './types/persistence.js';
 export * from './types/mutations.js';
 export * from './types/visualizer.js';
 export * from './types/performance.js';
+export * from './types/conversation.js';
+export * from './types/identity.js';
 
 // Schemas
 export * from './schemas/llm-schemas.js';
