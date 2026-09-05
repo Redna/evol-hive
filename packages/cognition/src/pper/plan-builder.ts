@@ -24,6 +24,7 @@ import {
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PlanBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
+import { matchDrivesToAffordances, formatPlanDriveHint } from './drive-affordance-matcher.js';
 
 /** Options for contextual forcing in the Plan builder (spec 016, Req 9). */
 export interface PlanBuilderGuardrailOptions {
@@ -135,6 +136,16 @@ export class PlanBuilderImpl implements PlanBuilder {
       dynamicLines.push(
         'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them. Do not use formulate_plan for social actions.',
       );
+    }
+
+    // Drive→affordance matching hints, imperative form (spec 034, Req 2): the
+    // same match as the perception builder (same threshold, same data source —
+    // the plan tool list), phrased as an imperative per the spec-024 pattern.
+    // Supplements (never replaces) the social directive logic above; social is
+    // excluded from matching (spec 018/024 own it). Dynamic section only
+    // (KV-cache safety, spec 021); no matching affordance → no hint (Req 4).
+    for (const match of matchDrivesToAffordances(passive.drives, prunedAffordances)) {
+      dynamicLines.push(formatPlanDriveHint(match));
     }
 
     // Append system feedback (prior action failures) per §9.2.
