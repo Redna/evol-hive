@@ -264,11 +264,10 @@ describe('PerceptionBuilder — drive→affordance hint (spec 034 Req 1)', () =>
 
   it('unattributed affordances render without the object prefix', () => {
     const payload = builder.build(
-      makePerceptionResult(
-        {},
-        {},
-        [plainWork(), { ...sitOutside(), objectId: undefined, objectName: undefined } as Affordance],
-      ),
+      makePerceptionResult({}, {}, [
+        plainWork(),
+        { ...sitOutside(), objectId: undefined, objectName: undefined } as Affordance,
+      ]),
     );
     expect(payload.perceptionContext).toContain(
       'Your energy is low (23). Here, you can restore it: "sit_outside" (restores energy).',
@@ -306,9 +305,7 @@ describe('PerceptionBuilder — drive→affordance hint (spec 034 Req 1)', () =>
 
   it('uses the masked affordances as the data source when a guardrail masked them', () => {
     // masked list drops the bench — no hint may fire even though prunedAffordances has it.
-    const payload = builder.build(
-      makePerceptionResult({ maskedAffordances: [plainWork()] }),
-    );
+    const payload = builder.build(makePerceptionResult({ maskedAffordances: [plainWork()] }));
     expect(payload.perceptionContext).not.toContain('Here, you can restore it');
   });
 });
@@ -372,11 +369,9 @@ describe('PlanBuilder — imperative drive→affordance hint (spec 034 Req 2)', 
 
   it('unattributed affordances render the affordance ID only', () => {
     const payload = builder.build(
-      makePerceptionResult(
-        {},
-        {},
-        [{ ...sitOutside(), objectId: undefined, objectName: undefined } as Affordance],
-      ),
+      makePerceptionResult({}, {}, [
+        { ...sitOutside(), objectId: undefined, objectName: undefined } as Affordance,
+      ]),
     );
     expect(payload.perceptionContext).toContain(
       'Your energy is low (23). The affordances in your tool list restore it directly (e.g., sit_outside). Call such an affordance NOW — do not formulate a search plan.',

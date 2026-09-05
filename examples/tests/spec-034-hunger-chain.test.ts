@@ -234,7 +234,9 @@ describe('AC-3d: harvest → eat chain through the sim cognition stack restores 
 describe('AC-5: logState prints all five drives (h= and co= added)', () => {
   it('every agent sample line includes e=, h=, s=, co=, and cu= fields', () => {
     const lines: string[] = [];
-    const log = (msg: string): void => lines.push(msg);
+    const log = (msg: string): void => {
+      lines.push(msg);
+    };
 
     const core = {
       agentManager: {
@@ -264,7 +266,9 @@ describe('AC-5: logState prints all five drives (h= and co= added)', () => {
 
   it('samples multiple agents, printing five drives for each', () => {
     const lines: string[] = [];
-    const log = (msg: string): void => lines.push(msg);
+    const log = (msg: string): void => {
+      lines.push(msg);
+    };
 
     const core = {
       agentManager: {

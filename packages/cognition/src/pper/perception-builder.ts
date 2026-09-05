@@ -26,10 +26,7 @@ import {
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
-import {
-  matchDrivesToAffordances,
-  formatPerceptionDriveHint,
-} from './drive-affordance-matcher.js';
+import { matchDrivesToAffordances, formatPerceptionDriveHint } from './drive-affordance-matcher.js';
 
 const GENERIC_SYSTEM_PROMPT = [
   'You are an autonomous NPC in a deterministic simulation.',
