@@ -149,9 +149,7 @@ export class IdentityConsolidationServiceImpl {
     const remaining = this.config.maxDeltasPerSession - used;
     const override = options?.maxDeltasOverride;
     const effectiveRemaining =
-      override !== undefined
-        ? Math.min(remaining, Math.max(0, Math.floor(override)))
-        : remaining;
+      override !== undefined ? Math.min(remaining, Math.max(0, Math.floor(override))) : remaining;
     if (effectiveRemaining <= 0) {
       this.sessionPassesUsed.set(agentId, passesUsed + 1);
       return {

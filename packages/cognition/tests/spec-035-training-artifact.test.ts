@@ -18,10 +18,7 @@ import {
 } from '@evol-hive/shared';
 import { evaluateLinearProbe, sigmoid } from '../src/system1/index.js';
 
-const ARTIFACT_PATH = join(
-  __dirname,
-  '../../../training/artifacts/react-gate-fixture-v1.json',
-);
+const ARTIFACT_PATH = join(__dirname, '../../../training/artifacts/react-gate-fixture-v1.json');
 const ONNX_PATH = join(__dirname, '../../../training/artifacts/react-gate-fixture-v1.onnx');
 const FIXTURE_PATH = join(__dirname, '../../../training/fixtures/react-gate-fixture.jsonl');
 

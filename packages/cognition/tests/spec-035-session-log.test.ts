@@ -8,7 +8,11 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FEATURE_SCHEMA_VERSION, SCALAR_FEATURE_FIELDS, type CycleOutcomeSample } from '@evol-hive/shared';
+import {
+  FEATURE_SCHEMA_VERSION,
+  SCALAR_FEATURE_FIELDS,
+  type CycleOutcomeSample,
+} from '@evol-hive/shared';
 import {
   JsonlSessionSampleLog,
   InMemorySampleLogWriter,
@@ -50,9 +54,18 @@ describe('Spec 035 — JSONL session log (Req 9 / AC-4)', () => {
     const writer = new InMemorySampleLogWriter();
     const log = new JsonlSessionSampleLog(writer);
     log.record(reactSample());
-    log.record(reactSample({ label: 'ignore', tickNumber: 43, outcome: {
-      planChanged: false, drivesChanged: false, memoryWritten: false, conversationContinued: false,
-    } }));
+    log.record(
+      reactSample({
+        label: 'ignore',
+        tickNumber: 43,
+        outcome: {
+          planChanged: false,
+          drivesChanged: false,
+          memoryWritten: false,
+          conversationContinued: false,
+        },
+      }),
+    );
 
     const lines = writer.toString().trim().split('\n');
     expect(lines).toHaveLength(2);
@@ -85,7 +98,9 @@ describe('Spec 035 — JSONL session log (Req 9 / AC-4)', () => {
       'embedding',
     ]);
     // Scalar keys are also in the documented fixed order.
-    const scalarKeys = Object.keys((JSON.parse(line) as { scalar: Record<string, unknown> }).scalar);
+    const scalarKeys = Object.keys(
+      (JSON.parse(line) as { scalar: Record<string, unknown> }).scalar,
+    );
     expect(scalarKeys).toEqual([...SCALAR_FEATURE_FIELDS]);
   });
 

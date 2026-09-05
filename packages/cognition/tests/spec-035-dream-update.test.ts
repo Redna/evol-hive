@@ -81,7 +81,13 @@ describe('Spec 035 — dream update mechanics (Req 11)', () => {
     }
     const prev = artifact(0, 0); // untrained: p = 0.5 everywhere
     const lossBeforeAll = binaryCrossEntropy(
-      samples.map((s) => evaluateLinearProbe(prev, { schemaVersion: FEATURE_SCHEMA_VERSION, embedding: [], scalar: s.scalar })),
+      samples.map((s) =>
+        evaluateLinearProbe(prev, {
+          schemaVersion: FEATURE_SCHEMA_VERSION,
+          embedding: [],
+          scalar: s.scalar,
+        }),
+      ),
       samples.map((s) => (s.label === 'react' ? 1 : 0)),
     );
 
@@ -201,7 +207,11 @@ describe('Spec 035 — holdout revert guardrail (Req 12 / AC-6)', () => {
     );
     const lossBefore = binaryCrossEntropy(
       holdoutX.map((s) =>
-        evaluateLinearProbe(prev, { schemaVersion: FEATURE_SCHEMA_VERSION, embedding: [], scalar: s.scalar }),
+        evaluateLinearProbe(prev, {
+          schemaVersion: FEATURE_SCHEMA_VERSION,
+          embedding: [],
+          scalar: s.scalar,
+        }),
       ),
       holdoutX.map((s) => (s.label === 'react' ? 1 : 0)),
     );
@@ -242,10 +252,7 @@ describe('Spec 035 — holdout revert guardrail (Req 12 / AC-6)', () => {
 
 describe('Spec 035 — shared head first (Req 13)', () => {
   it('one dream applies updates over samples from multiple agents (shared head)', () => {
-    const samples = [
-      sample(0.9, 'react', 0),
-      sample(0.1, 'ignore', 1),
-    ];
+    const samples = [sample(0.9, 'react', 0), sample(0.1, 'ignore', 1)];
     samples[0]!.agentId = 'a1';
     samples[1]!.agentId = 'a2';
     const result = applyDreamUpdate(artifact(0, 0), samples, {

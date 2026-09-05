@@ -22,7 +22,12 @@ const fakeEmbeddingProvider: EmbeddingProvider = {
   },
 };
 
-function makeStore(composer?: (entry: MemoryEntryInput, ctx: { agentId: string; timestamp: number; content: string }) => number): {
+function makeStore(
+  composer?: (
+    entry: MemoryEntryInput,
+    ctx: { agentId: string; timestamp: number; content: string },
+  ) => number,
+): {
   store: MemoryStoreImpl;
   nodes: MemoryNode[];
 } {
@@ -45,7 +50,14 @@ function makeStore(composer?: (entry: MemoryEntryInput, ctx: { agentId: string; 
       return nodes.length;
     },
   };
-  return { store: new MemoryStoreImpl({ vectorStore, embeddingProvider: fakeEmbeddingProvider, ...(composer ? { importanceComposer: composer } : {}) }), nodes };
+  return {
+    store: new MemoryStoreImpl({
+      vectorStore,
+      embeddingProvider: fakeEmbeddingProvider,
+      ...(composer ? { importanceComposer: composer } : {}),
+    }),
+    nodes,
+  };
 }
 
 function entry(importance = 5): MemoryEntryInput {
@@ -72,7 +84,11 @@ describe('Spec 035 — composite importance at memory-write time (Req 14 / AC-7)
       return 5;
     });
     await store.store('a1', entry(3), 250);
-    expect(seen).toEqual({ agentId: 'a1', timestamp: 250, content: 'brewed coffee at the machine' });
+    expect(seen).toEqual({
+      agentId: 'a1',
+      timestamp: 250,
+      content: 'brewed coffee at the machine',
+    });
   });
 
   it('the composed importance is clamped to the 1..10 storage contract', async () => {

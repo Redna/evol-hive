@@ -36,10 +36,7 @@ export {
   type ArtifactLoader,
 } from './react-gate.js';
 
-export {
-  System1GateServiceImpl,
-  type System1GateServiceOptions,
-} from './gate-service.js';
+export { System1GateServiceImpl, type System1GateServiceOptions } from './gate-service.js';
 
 export {
   LinearImportanceHead,
@@ -79,7 +76,4 @@ export {
   type SalienceIdentityServiceOptions,
 } from './identity-salience.js';
 
-export {
-  System1FeatureServiceImpl,
-  type System1FeatureServiceOptions,
-} from './feature-service.js';
+export { System1FeatureServiceImpl, type System1FeatureServiceOptions } from './feature-service.js';

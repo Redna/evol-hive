@@ -53,7 +53,10 @@ export function dotProduct(a: number[], b: number[]): number {
  * Missing/`null` embedding weights contribute 0. Malformed weight shapes are
  * swallowed by the caller (the head wraps this in fail-open).
  */
-export function evaluateLinearProbe(artifact: GateWeightArtifact, vector: System1FeatureVector): number {
+export function evaluateLinearProbe(
+  artifact: GateWeightArtifact,
+  vector: System1FeatureVector,
+): number {
   let z = artifact.bias;
   for (const field of SCALAR_FEATURE_FIELDS) {
     const w = artifact.scalarWeights[field];
@@ -152,7 +155,7 @@ export class ReactGateHead {
     try {
       artifact = await this.loader();
     } catch {
-      artifact = null; // load failure → fail-open below
+      // load failure → fail-open below (artifact stays null)
     }
     this.setArtifactValidated(artifact);
   }

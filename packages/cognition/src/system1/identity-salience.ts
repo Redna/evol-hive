@@ -151,7 +151,11 @@ export class SalienceWeightedIdentityService {
     sessionMemories: MemorySnippet[],
     conversationThreads: ConversationThreadSummary[] = [],
   ): Promise<IdentityConsolidationResult> {
-    const result = await this.consolidateWithSalience(agentId, sessionMemories, conversationThreads);
+    const result = await this.consolidateWithSalience(
+      agentId,
+      sessionMemories,
+      conversationThreads,
+    );
     this.consumeMidSessionTrigger(agentId);
     return result;
   }

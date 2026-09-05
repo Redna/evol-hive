@@ -26,8 +26,11 @@ import type {
   DreamUpdateEvent,
   GateWeightArtifact,
 } from '@evol-hive/shared';
-import { FEATURE_SCHEMA_VERSION, SCALAR_FEATURE_FIELDS, defaultDreamUpdateConfig } from '@evol-hive/shared';
-
+import {
+  FEATURE_SCHEMA_VERSION,
+  SCALAR_FEATURE_FIELDS,
+  defaultDreamUpdateConfig,
+} from '@evol-hive/shared';
 
 /** Enforces the guardrail caps on a config (never trusts a wider config). */
 function clampConfig(config: DreamUpdateConfig): DreamUpdateConfig {
@@ -168,9 +171,7 @@ export function applyDreamUpdate(
 
   // Holdout = most recent fraction; train = the rest (bounded).
   const holdoutCount =
-    cfg.holdoutFraction > 0
-      ? Math.max(1, Math.floor(compatible.length * cfg.holdoutFraction))
-      : 0;
+    cfg.holdoutFraction > 0 ? Math.max(1, Math.floor(compatible.length * cfg.holdoutFraction)) : 0;
   const holdoutStart = compatible.length - holdoutCount;
   const trainSamples = compatible.slice(0, holdoutStart).slice(-cfg.maxSteps);
   const holdoutSamples = compatible.slice(holdoutStart);

@@ -55,7 +55,11 @@ export class MemoryStoreImpl implements MemoryStore {
     // `MemoryNode.importance` holds the composite when a composer is wired.
     let importance = entry.importance;
     if (this.importanceComposer !== undefined) {
-      const composed = this.importanceComposer(entry, { agentId, timestamp, content: entry.content });
+      const composed = this.importanceComposer(entry, {
+        agentId,
+        timestamp,
+        content: entry.content,
+      });
       importance = Math.min(10, Math.max(1, composed));
     }
 

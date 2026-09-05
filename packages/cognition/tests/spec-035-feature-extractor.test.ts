@@ -25,7 +25,13 @@ import {
   cosine,
 } from '../src/system1/index.js';
 
-function drives(energy: number, hunger: number, social: number, comfort: number, curiosity: number): AgentDrives {
+function drives(
+  energy: number,
+  hunger: number,
+  social: number,
+  comfort: number,
+  curiosity: number,
+): AgentDrives {
   return { energy, hunger, social, comfort, curiosity };
 }
 
@@ -81,11 +87,14 @@ describe('Spec 035 — drive deltas (AC-1, hand-computed scripted sequence)', ()
 
 describe('Spec 035 — novelty (AC-1)', () => {
   it('decreases as the snapshot embedding approaches a recent-memory embedding', () => {
-    const recent = [[1, 0, 0], [0, 1, 0]];
+    const recent = [
+      [1, 0, 0],
+      [0, 1, 0],
+    ];
     const far = computeNovelty([0, 0, 1], recent); // orthogonal to both
     const near = computeNovelty([0.99, 0.1, 0], recent); // close to the first
     expect(near).toBeLessThan(far);
- expect(far).toBeLessThanOrEqual(1);
+    expect(far).toBeLessThanOrEqual(1);
     expect(near).toBeGreaterThanOrEqual(0);
   });
 
@@ -118,20 +127,28 @@ describe('Spec 035 — novelty (AC-1)', () => {
 describe('Spec 035 — threshold crossing detection (AC-1)', () => {
   it('detects a downward crossing of the low threshold', () => {
     // hunger 25 → 18 crosses the low threshold (20).
-    expect(detectThresholdCrossings(drives(50, 25, 50, 50, 50), drives(50, 18, 50, 50, 50))).toBe(true);
+    expect(detectThresholdCrossings(drives(50, 25, 50, 50, 50), drives(50, 18, 50, 50, 50))).toBe(
+      true,
+    );
   });
 
   it('detects an upward crossing of the high threshold', () => {
     // comfort 78 → 84 crosses the high threshold (80).
-    expect(detectThresholdCrossings(drives(50, 50, 50, 78, 50), drives(50, 50, 50, 84, 50))).toBe(true);
+    expect(detectThresholdCrossings(drives(50, 50, 50, 78, 50), drives(50, 50, 50, 84, 50))).toBe(
+      true,
+    );
   });
 
   it('does not fire when a drive moves within its band', () => {
-    expect(detectThresholdCrossings(drives(50, 30, 50, 50, 50), drives(50, 22, 50, 50, 50))).toBe(false);
+    expect(detectThresholdCrossings(drives(50, 30, 50, 50, 50), drives(50, 22, 50, 50, 50))).toBe(
+      false,
+    );
   });
 
   it('does not fire when nothing changed', () => {
-    expect(detectThresholdCrossings(drives(50, 19, 50, 50, 50), drives(50, 19, 50, 50, 50))).toBe(false);
+    expect(detectThresholdCrossings(drives(50, 19, 50, 50, 50), drives(50, 19, 50, 50, 50))).toBe(
+      false,
+    );
   });
 });
 
@@ -164,14 +181,18 @@ describe('Spec 035 — extractScalarFeatures (AC-1: flags toggle from engine sta
   });
 
   it('toggles conversationOpen and normalizes conversationTurns', () => {
-    const closed = extractScalarFeatures(snapshot({ conversationOpen: false, conversationTurns: 0 }));
+    const closed = extractScalarFeatures(
+      snapshot({ conversationOpen: false, conversationTurns: 0 }),
+    );
     const open = extractScalarFeatures(snapshot({ conversationOpen: true, conversationTurns: 10 }));
     expect(closed.scalar.conversationOpen).toBe(0);
     expect(open.scalar.conversationOpen).toBe(1);
     // 10 turns / 20-turn normalization = 0.5.
     expect(open.scalar.conversationTurns).toBeCloseTo(0.5, 12);
     // Saturates at 1.
-    const saturated = extractScalarFeatures(snapshot({ conversationOpen: true, conversationTurns: 999 }));
+    const saturated = extractScalarFeatures(
+      snapshot({ conversationOpen: true, conversationTurns: 999 }),
+    );
     expect(saturated.scalar.conversationTurns).toBe(1);
   });
 
@@ -194,9 +215,7 @@ describe('Spec 035 — extractScalarFeatures (AC-1: flags toggle from engine sta
     const noCross = extractScalarFeatures(snapshot(base));
     expect(noCross.scalar.driveThresholdCrossing).toBe(0);
     // Hunger 25 → 18 crosses the low threshold (20).
-    const cross = extractScalarFeatures(
-      snapshot({ ...base, drives: drives(50, 18, 50, 50, 50) }),
-    );
+    const cross = extractScalarFeatures(snapshot({ ...base, drives: drives(50, 18, 50, 50, 50) }));
     expect(cross.scalar.driveThresholdCrossing).toBe(1);
   });
 

@@ -48,7 +48,9 @@ interface CacheEntry {
   scalar: System1FeatureVector['scalar'] | null;
 }
 
-export class System1FeatureServiceImpl implements System1FeatureSourcePort, System1FeatureRefresherPort {
+export class System1FeatureServiceImpl
+  implements System1FeatureSourcePort, System1FeatureRefresherPort
+{
   private readonly embeddingProvider: UnifiedEmbeddingProvider;
   private readonly recentMemories: System1RecentMemoriesPort;
   private readonly noveltyMemoryK: number;

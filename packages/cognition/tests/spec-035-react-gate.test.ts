@@ -90,7 +90,10 @@ describe('Spec 035 — linear probe math (Req 3)', () => {
 
   it('is deterministic for repeated evaluation', () => {
     const artifact = fixedArtifact();
-    const vector = featureVector([0.5, -0.5, 1], SCALAR_FEATURE_FIELDS.map(() => 0.3));
+    const vector = featureVector(
+      [0.5, -0.5, 1],
+      SCALAR_FEATURE_FIELDS.map(() => 0.3),
+    );
     expect(evaluateLinearProbe(artifact, vector)).toBe(evaluateLinearProbe(artifact, vector));
   });
 });
@@ -118,14 +121,23 @@ describe('Spec 035 — ReactGateHead deterministic inference (AC-2)', () => {
   });
 
   it('reacts when p(react) >= threshold', async () => {
-    const head = new ReactGateHead({ loader: makeFeatureArtifactLoader(async () => fixedArtifact()), threshold: 0.4 });
-    await head.ensureLoaded();
-    const decision = head.decide(featureVector([1, 1, 1], SCALAR_FEATURE_FIELDS.map(() => 1)), {
-      messagePending: false,
-      conversationInvite: false,
-      nearbyObjectMutation: false,
-      driveThresholdCrossing: false,
+    const head = new ReactGateHead({
+      loader: makeFeatureArtifactLoader(async () => fixedArtifact()),
+      threshold: 0.4,
     });
+    await head.ensureLoaded();
+    const decision = head.decide(
+      featureVector(
+        [1, 1, 1],
+        SCALAR_FEATURE_FIELDS.map(() => 1),
+      ),
+      {
+        messagePending: false,
+        conversationInvite: false,
+        nearbyObjectMutation: false,
+        driveThresholdCrossing: false,
+      },
+    );
     // z = -0.35 + Σ(i+1)·1 + (0.1-0.2+0.3) = -0.35 + 171 + 0.2 → p ≈ 1
     expect(decision.pReact).toBeGreaterThan(0.4);
     expect(decision.react).toBe(true);
@@ -144,13 +156,32 @@ describe('Spec 035 — ReactGateHead deterministic inference (AC-2)', () => {
       nearbyObjectMutation: false,
       driveThresholdCrossing: false,
     };
-    expect(head.decide(featureVector([1, 0, 0], SCALAR_FEATURE_FIELDS.map(() => 0)), noTriggers).react).toBe(false);
+    expect(
+      head.decide(
+        featureVector(
+          [1, 0, 0],
+          SCALAR_FEATURE_FIELDS.map(() => 0),
+        ),
+        noTriggers,
+      ).react,
+    ).toBe(false);
 
-    for (const trigger of ['messagePending', 'conversationInvite', 'nearbyObjectMutation', 'driveThresholdCrossing'] as const) {
-      const decision = head.decide(featureVector([1, 0, 0], SCALAR_FEATURE_FIELDS.map(() => 0)), {
-        ...noTriggers,
-        [trigger]: true,
-      });
+    for (const trigger of [
+      'messagePending',
+      'conversationInvite',
+      'nearbyObjectMutation',
+      'driveThresholdCrossing',
+    ] as const) {
+      const decision = head.decide(
+        featureVector(
+          [1, 0, 0],
+          SCALAR_FEATURE_FIELDS.map(() => 0),
+        ),
+        {
+          ...noTriggers,
+          [trigger]: true,
+        },
+      );
       expect(decision.react).toBe(true);
       expect(decision.hardTrigger).toBe(true);
       expect(decision.pReact).toBeLessThan(0.001);
@@ -169,7 +200,10 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
     });
     await head.ensureLoaded();
 
-    const vector = featureVector([1, 0, 0], SCALAR_FEATURE_FIELDS.map(() => 0));
+    const vector = featureVector(
+      [1, 0, 0],
+      SCALAR_FEATURE_FIELDS.map(() => 0),
+    );
     const decision = head.decide(vector, {
       messagePending: false,
       conversationInvite: false,
@@ -189,12 +223,18 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
     });
     const head = new ReactGateHead({ loader, threshold: 0.5 });
     await head.ensureLoaded();
-    const decision = head.decide(featureVector([1, 0, 0], SCALAR_FEATURE_FIELDS.map(() => 0)), {
-      messagePending: false,
-      conversationInvite: false,
-      nearbyObjectMutation: false,
-      driveThresholdCrossing: false,
-    });
+    const decision = head.decide(
+      featureVector(
+        [1, 0, 0],
+        SCALAR_FEATURE_FIELDS.map(() => 0),
+      ),
+      {
+        messagePending: false,
+        conversationInvite: false,
+        nearbyObjectMutation: false,
+        driveThresholdCrossing: false,
+      },
+    );
     expect(decision.react).toBe(true);
     expect(decision.failOpen).toBe(true);
     expect(warn).toHaveBeenCalledTimes(1); // warn once, not per decision
@@ -210,12 +250,18 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
     });
     await head.ensureLoaded();
     for (let i = 0; i < 25; i++) {
-      const decision = head.decide(featureVector([0.1, 0, 0], SCALAR_FEATURE_FIELDS.map(() => 0.1)), {
-        messagePending: false,
-        conversationInvite: false,
-        nearbyObjectMutation: false,
-        driveThresholdCrossing: false,
-      });
+      const decision = head.decide(
+        featureVector(
+          [0.1, 0, 0],
+          SCALAR_FEATURE_FIELDS.map(() => 0.1),
+        ),
+        {
+          messagePending: false,
+          conversationInvite: false,
+          nearbyObjectMutation: false,
+          driveThresholdCrossing: false,
+        },
+      );
       expect(decision.react).toBe(true);
       expect(decision.failOpen).toBe(true);
     }
@@ -229,12 +275,18 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
       threshold: 0.5,
     });
     await head.ensureLoaded();
-    const decision = head.decide(featureVector([1, 0, 0], SCALAR_FEATURE_FIELDS.map(() => 0)), {
-      messagePending: false,
-      conversationInvite: false,
-      nearbyObjectMutation: false,
-      driveThresholdCrossing: false,
-    });
+    const decision = head.decide(
+      featureVector(
+        [1, 0, 0],
+        SCALAR_FEATURE_FIELDS.map(() => 0),
+      ),
+      {
+        messagePending: false,
+        conversationInvite: false,
+        nearbyObjectMutation: false,
+        driveThresholdCrossing: false,
+      },
+    );
     expect(decision.react).toBe(true);
     expect(decision.failOpen).toBe(true);
     expect(warn).toHaveBeenCalledTimes(1);
@@ -244,18 +296,26 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const head = new ReactGateHead({
       loader: makeFeatureArtifactLoader(async () =>
-        fixedArtifact({ scalarWeights: 'garbage' as unknown as GateWeightArtifact['scalarWeights'] }),
+        fixedArtifact({
+          scalarWeights: 'garbage' as unknown as GateWeightArtifact['scalarWeights'],
+        }),
       ),
       threshold: 0.5,
     });
     await head.ensureLoaded();
     expect(() =>
-      head.decide(featureVector([1, 0, 0], SCALAR_FEATURE_FIELDS.map(() => 0)), {
-        messagePending: false,
-        conversationInvite: false,
-        nearbyObjectMutation: false,
-        driveThresholdCrossing: false,
-      }),
+      head.decide(
+        featureVector(
+          [1, 0, 0],
+          SCALAR_FEATURE_FIELDS.map(() => 0),
+        ),
+        {
+          messagePending: false,
+          conversationInvite: false,
+          nearbyObjectMutation: false,
+          driveThresholdCrossing: false,
+        },
+      ),
     ).not.toThrow();
     expect(warn).toHaveBeenCalledTimes(1);
   });
@@ -267,12 +327,18 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
       threshold: 0.5,
     });
     await head.ensureLoaded();
-    head.decide(featureVector([1, 0, 0], SCALAR_FEATURE_FIELDS.map(() => 0)), {
-      messagePending: false,
-      conversationInvite: false,
-      nearbyObjectMutation: false,
-      driveThresholdCrossing: false,
-    });
+    head.decide(
+      featureVector(
+        [1, 0, 0],
+        SCALAR_FEATURE_FIELDS.map(() => 0),
+      ),
+      {
+        messagePending: false,
+        conversationInvite: false,
+        nearbyObjectMutation: false,
+        driveThresholdCrossing: false,
+      },
+    );
     expect(warn).not.toHaveBeenCalled();
   });
 });
@@ -284,7 +350,10 @@ describe('Spec 035 — hot-swap (Req 12: new weights hot-swap, no restart)', () 
       threshold: 0.5,
     });
     await head.ensureLoaded();
-    const vector = featureVector([1, 0, 0], SCALAR_FEATURE_FIELDS.map(() => 0));
+    const vector = featureVector(
+      [1, 0, 0],
+      SCALAR_FEATURE_FIELDS.map(() => 0),
+    );
     const triggers = {
       messagePending: false,
       conversationInvite: false,
@@ -306,15 +375,20 @@ describe('Spec 035 — hot-swap (Req 12: new weights hot-swap, no restart)', () 
       threshold: 0.5,
     });
     await head.ensureLoaded();
-    const vector = featureVector([1, 0, 0], SCALAR_FEATURE_FIELDS.map(() => 0));
+    const vector = featureVector(
+      [1, 0, 0],
+      SCALAR_FEATURE_FIELDS.map(() => 0),
+    );
     head.hotSwap(fixedArtifact({ featureSchemaVersion: 999 }));
     // Still the old (healthy) artifact — a bad swap must not brick the gate.
-    expect(head.decide(vector, {
-      messagePending: false,
-      conversationInvite: false,
-      nearbyObjectMutation: false,
-      driveThresholdCrossing: false,
-    }).failOpen).toBe(false);
+    expect(
+      head.decide(vector, {
+        messagePending: false,
+        conversationInvite: false,
+        nearbyObjectMutation: false,
+        driveThresholdCrossing: false,
+      }).failOpen,
+    ).toBe(false);
   });
 });
 

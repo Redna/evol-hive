@@ -131,7 +131,8 @@ export class DownstreamUtilityTracker {
   getUtility(memoryId: string): number {
     const stats = this.getStats(memoryId);
     return clamp01(
-      stats.retrievals * UTILITY_RETRIEVAL_WEIGHT + stats.planSuccesses * UTILITY_PLAN_SUCCESS_WEIGHT,
+      stats.retrievals * UTILITY_RETRIEVAL_WEIGHT +
+        stats.planSuccesses * UTILITY_PLAN_SUCCESS_WEIGHT,
     );
   }
 }

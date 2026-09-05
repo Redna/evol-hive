@@ -176,3 +176,7 @@ export * from './classifier/index.js';
 // System 1 Trainable Heads (spec 035) — React/Ignore gate, importance head,
 // session logging, dream updates, salience-weighted identity hook
 export * from './system1/index.js';
+
+// Identity consolidation service (spec 033) — consumed by the System 1
+// salience-weighted identity hook (spec 035, Req 16/17)
+export * from './identity/identity-consolidation.js';

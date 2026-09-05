@@ -12,10 +12,7 @@
  * never blocks a write.
  */
 
-import type {
-  GateWeightArtifact,
-  System1FeatureVector,
-} from '@evol-hive/shared';
+import type { GateWeightArtifact, System1FeatureVector } from '@evol-hive/shared';
 import { FEATURE_SCHEMA_VERSION } from '@evol-hive/shared';
 import type { ArtifactLoader } from './react-gate.js';
 import { evaluateLinearProbe, makeFeatureArtifactLoader } from './react-gate.js';
@@ -51,7 +48,7 @@ export class LinearImportanceHead {
     try {
       artifact = await this.loader();
     } catch {
-      artifact = null;
+      // load failure → fail-open below (artifact stays null)
     }
     this.setArtifactValidated(artifact);
   }

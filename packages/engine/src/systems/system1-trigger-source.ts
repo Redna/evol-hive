@@ -27,7 +27,11 @@ import type {
   SpawnAgentPayload,
   System1TriggerSourcePort,
 } from '@evol-hive/shared';
-import { NO_HARD_TRIGGERS, detectThresholdCrossings, DEFAULT_DRIVE_THRESHOLDS } from '@evol-hive/shared';
+import {
+  NO_HARD_TRIGGERS,
+  detectThresholdCrossings,
+  DEFAULT_DRIVE_THRESHOLDS,
+} from '@evol-hive/shared';
 import type { DriveThresholds } from '@evol-hive/shared';
 import type { AgentManager } from '../agents/index.js';
 import type { SocialManager } from '../social/social-manager.js';

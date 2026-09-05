@@ -22,10 +22,7 @@ import type {
 import { FEATURE_SCHEMA_VERSION } from '@evol-hive/shared';
 import { AgentManagerImpl, PlanManagerImpl } from '../src/agents/index.js';
 import { PPERScheduler } from '../src/systems/pper-scheduler.js';
-import {
-  System1OutcomeRecorderImpl,
-  System1AgentTracker,
-} from '../src/systems/index.js';
+import { System1OutcomeRecorderImpl, System1AgentTracker } from '../src/systems/index.js';
 const TICK: GameTick = { tickNumber: 1, simulationTime: 0.0167, deltaSeconds: 0.0167 };
 
 function makeAgent(id = 'a1', energy = 50) {
@@ -99,13 +96,15 @@ class RecordingSink {
 class ScriptedProbe implements System1OutcomeProbePort {
   snapshots: OutcomeSnapshot[] = [];
   async snapshot(_agentId: string): Promise<OutcomeSnapshot> {
-    return this.snapshots.shift() ?? {
-      planId: null,
-      planStepIndex: 0,
-      drives: { energy: 50, hunger: 50, social: 50, comfort: 50, curiosity: 50 },
-      memoryCount: 0,
-      conversationTurns: 0,
-    };
+    return (
+      this.snapshots.shift() ?? {
+        planId: null,
+        planStepIndex: 0,
+        drives: { energy: 50, hunger: 50, social: 50, comfort: 50, curiosity: 50 },
+        memoryCount: 0,
+        conversationTurns: 0,
+      }
+    );
   }
 }
 
@@ -141,9 +140,14 @@ describe('Spec 035 — gate before cycle (Req 7 / AC-3)', () => {
     const orch = new FakeOrchestrator();
     const gate = new ScriptedGate();
     gate.decisions = [decision(0.2, false)];
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+      },
+    );
 
     scheduler.update(TICK);
     expect(orch.runCycleCalls).toHaveLength(0);
@@ -157,9 +161,14 @@ describe('Spec 035 — gate before cycle (Req 7 / AC-3)', () => {
     const orch = new FakeOrchestrator();
     const gate = new ScriptedGate();
     gate.decisions = [decision(0.9, true)];
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+      },
+    );
 
     scheduler.update(TICK);
     expect(orch.runCycleCalls).toEqual(['a1']);
@@ -197,10 +206,15 @@ describe('Spec 035 — gate before cycle (Req 7 / AC-3)', () => {
     agents.spawn(makeAgent('a1'));
     const orch = new FakeOrchestrator();
     const gate = new ScriptedGate();
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-      triggerSource: { getHardTriggers: () => oneTrigger('messagePending') },
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        triggerSource: { getHardTriggers: () => oneTrigger('messagePending') },
+      },
+    );
 
     scheduler.update(TICK);
     expect(gate.calls[0]!.hardTriggers).toEqual(oneTrigger('messagePending'));
@@ -212,9 +226,14 @@ describe('Spec 035 — gate before cycle (Req 7 / AC-3)', () => {
     const orch = new FakeOrchestrator();
     const gate = new ScriptedGate();
     gate.decisions = [decision(0.1, false), decision(0.8, true)];
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+      },
+    );
 
     scheduler.update(TICK);
     expect(orch.runCycleCalls).toHaveLength(0);
@@ -240,9 +259,14 @@ describe('Spec 035 — associative injection gating (Req 8 / AC-3)', () => {
     const orch = new FakeOrchestrator();
     const gate = new ScriptedGate();
     gate.decisions = [decision(0.1, false)];
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+      },
+    );
 
     scheduler.update(TICK);
     // The orchestrator (and therefore the Perceive phase and its associative
@@ -259,9 +283,14 @@ describe('Spec 035 — gating adds zero LLM calls (AC-3)', () => {
     const orch = new FakeOrchestrator();
     const gate = new ScriptedGate();
     // Gate idles everything for 50 ticks.
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+      },
+    );
 
     const before = orch.llmCallCount;
     for (let i = 0; i < 50; i++) {
@@ -281,10 +310,15 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     gate.decisions = [decision(0.9, true)];
     const { sink, probe, recorder } = makeRecorder();
 
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-      outcomeRecorder: recorder,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        outcomeRecorder: recorder,
+      },
+    );
 
     // Before: plan X. After: plan Y (the cycle changed the plan).
     probe.snapshots = [baseSnapshot('plan_X'), baseSnapshot('plan_Y')];
@@ -302,10 +336,15 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     gate.decisions = [decision(0.9, true)];
     const { sink, probe, recorder } = makeRecorder();
 
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-      outcomeRecorder: recorder,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        outcomeRecorder: recorder,
+      },
+    );
 
     // Nothing changed before → after.
     probe.snapshots = [baseSnapshot(null), baseSnapshot(null)];
@@ -322,10 +361,15 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     gate.decisions = [decision(0.9, true)];
     const { sink, probe, recorder } = makeRecorder();
 
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-      outcomeRecorder: recorder,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        outcomeRecorder: recorder,
+      },
+    );
 
     const before = baseSnapshot(null);
     const afterDrives = baseSnapshot(null);
@@ -368,13 +412,20 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     agents.spawn(makeAgent('a1'));
     const orch = new FakeOrchestrator();
     const gate = new ScriptedGate();
-    gate.decisions = [{ pReact: 0.77, react: true, hardTrigger: false, headVersion: 11, failOpen: false }];
+    gate.decisions = [
+      { pReact: 0.77, react: true, hardTrigger: false, headVersion: 11, failOpen: false },
+    ];
     const { sink, probe, recorder } = makeRecorder();
 
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-      outcomeRecorder: recorder,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        outcomeRecorder: recorder,
+      },
+    );
 
     probe.snapshots = [baseSnapshot('plan_X'), baseSnapshot('plan_Y')];
     scheduler.update(TICK);
@@ -384,7 +435,7 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     expect(sample.headVersion).toBe(11);
     expect(sample.pReact).toBeCloseTo(0.77, 12);
     expect(sample.agentId).toBe('a1');
-   expect(sample.tickNumber).toBe(TICK.tickNumber);
+    expect(sample.tickNumber).toBe(TICK.tickNumber);
   });
 
   it('idled ticks write no samples (only completed cycles are labeled)', async () => {
@@ -395,10 +446,15 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     gate.decisions = [decision(0.1, false)];
     const { sink, recorder } = makeRecorder();
 
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-      outcomeRecorder: recorder,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        outcomeRecorder: recorder,
+      },
+    );
 
     scheduler.update(TICK);
     await new Promise((r) => setTimeout(r, 5));
@@ -413,10 +469,15 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     gate.decisions = [decision(0.9, true)];
     const { probe, tracker, recorder } = makeRecorder();
 
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-      outcomeRecorder: recorder,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        outcomeRecorder: recorder,
+      },
+    );
 
     probe.snapshots = [baseSnapshot(null), baseSnapshot(null)];
     scheduler.update(TICK);
@@ -425,7 +486,11 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     scheduler.update({ ...TICK, tickNumber: 2 });
     expect(tracker.getTicksSinceLastCycle('a1')).toBe(1);
     expect(tracker.getDrivesAtLastCycle('a1')).toEqual({
-      energy: 50, hunger: 50, social: 50, comfort: 50, curiosity: 50,
+      energy: 50,
+      hunger: 50,
+      social: 50,
+      comfort: 50,
+      curiosity: 50,
     });
   });
 });
@@ -443,10 +508,23 @@ describe('Spec 035 — recorder carries features when a feature source is wired 
       schemaVersion: FEATURE_SCHEMA_VERSION,
       embedding: [0.1, 0.2, 0.3],
       scalar: {
-        driveEnergy: 0.5, driveHunger: 0.5, driveSocial: 0.5, driveComfort: 0.5, driveCuriosity: 0.5,
-        deltaEnergy: 0, deltaHunger: 0, deltaSocial: 0, deltaComfort: 0, deltaCuriosity: 0,
-        novelty: 0.9, messagePending: 0, conversationOpen: 0, conversationTurns: 0,
-        nearbyObjectStateChange: 0, worldMutation: 0, driveThresholdCrossing: 0,
+        driveEnergy: 0.5,
+        driveHunger: 0.5,
+        driveSocial: 0.5,
+        driveComfort: 0.5,
+        driveCuriosity: 0.5,
+        deltaEnergy: 0,
+        deltaHunger: 0,
+        deltaSocial: 0,
+        deltaComfort: 0,
+        deltaCuriosity: 0,
+        novelty: 0.9,
+        messagePending: 0,
+        conversationOpen: 0,
+        conversationTurns: 0,
+        nearbyObjectStateChange: 0,
+        worldMutation: 0,
+        driveThresholdCrossing: 0,
         ticksSinceLastCycle: 0.5,
       },
     };
@@ -459,10 +537,15 @@ describe('Spec 035 — recorder carries features when a feature source is wired 
       featureSource: { getFeatures: () => features },
     });
 
-    const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-      gate,
-      outcomeRecorder: recorder,
-    });
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        outcomeRecorder: recorder,
+      },
+    );
 
     probe.snapshots = [baseSnapshot('plan_X'), baseSnapshot('plan_Y')];
     scheduler.update(TICK);

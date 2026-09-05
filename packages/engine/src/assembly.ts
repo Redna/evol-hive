@@ -399,7 +399,12 @@ export function assembleGameLoop(
   // (4.5) System 1 feature plumbing (spec 035, Req 1/7): per-tick scalar
   // refresh + throttled async embedding refresh. Registered BEFORE the
   // scheduler so the gate reads this tick's scalars.
-  if (system1 !== undefined && system1.featureRefresher !== undefined && system1Tracker !== undefined && system1TriggerSource !== undefined) {
+  if (
+    system1 !== undefined &&
+    system1.featureRefresher !== undefined &&
+    system1Tracker !== undefined &&
+    system1TriggerSource !== undefined
+  ) {
     core.gameLoop.registerSystem(
       new System1FeatureSystem({
         agentManager: core.agentManager,

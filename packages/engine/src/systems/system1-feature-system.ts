@@ -91,13 +91,9 @@ export class System1FeatureSystem {
       }
     }
   }
-
 }
 
 /** Deterministic snapshot text from engine state (embedded on the async path). */
-function buildSnapshotText(agent: {
-  location: string;
-  currentGoal: string;
-}): string {
+function buildSnapshotText(agent: { location: string; currentGoal: string }): string {
   return `room:${agent.location}|goal:${agent.currentGoal}`;
 }
