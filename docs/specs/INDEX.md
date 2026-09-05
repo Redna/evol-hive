@@ -45,12 +45,12 @@ Living index of all feature specifications. Updated by the Architect when creati
 |---------|-------|---------|--------|
 | [§1](../architecture/01-vision.md) | Vision & Philosophy | — | ✅ Documented |
 | [§2](../architecture/02-system-overview.md) | System Overview | 008, 013, 017, 022 | ✅ Documented |
-| [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002, 008, 012, 017, 022 | ✅ Implemented |
-| [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001, 003, 008, 013, 018, 019, 022, 031 | ✅ Implemented |
+| [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002, 008, 012, 017, 022, 032 | ✅ Implemented |
+| [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001, 003, 008, 013, 018, 019, 022, 031, 032 | ✅ Implemented |
 | [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) | 001, 006, 007, 018 | ✅ Implemented |
-| [§6](../architecture/06-pper-loop.md) | PPER Loop | 001-004, 006, 008, 012, 017, 025, 026, 031 | ✅ Implemented |
+| [§6](../architecture/06-pper-loop.md) | PPER Loop | 001-004, 006, 008, 012, 017, 025, 026, 031, 032 | ✅ Implemented |
 | [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 011 (tool calling), 019 (affordance-as-tools), 025, 026 | ✅ Implemented |
-| [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002, 011, 015, 025, 026 | ✅ Implemented |
+| [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002, 011, 015, 025, 026, 032 | ✅ Implemented |
 | [§9](../architecture/09-engine-routing.md) | Engine Routing | 002, 003, 004, 006, 008, 009 | ✅ Implemented |
 | [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | 016, 019, 030, 031 | ✅ Implemented |
 | [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 004, 007, 014, 017, 025, 026 | ✅ Implemented |
@@ -58,11 +58,11 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      27
+Total specs:      28
 ✅ Done:          17
 🔨 In Development: 0
 🔍 In Review:      4
-📝 Drafted:        5
+📝 Drafted:        6
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -83,3 +83,4 @@ Architecture sections fully implemented: 11/11
 | [029](029-visualizer-state-text-overflow.md) | Visualizer Object State Text — Round Decimals & Truncate Overflow | §2, §4 | 📝 Drafted | [#105](https://github.com/Redna/evol-hive/issues/105) | — | visualizer |
 | [030](030-dynamic-scenes-living-worlds.md) | Dynamic Scenes — Living Worlds (Runtime Scene Mutation) | §2, §3, §4, §6, §8, §10, §11 | 🔍 In Review | [#117](https://github.com/Redna/evol-hive/issues/117) | — | shared, engine, cognition, visualizer, examples |
 | [031](031-execute-colocation-guard.md) | Execute-Time Co-Location Guard & Stale Plan Re-Validation | §4, §6, §10 | 🔍 In Review | [#121](https://github.com/Redna/evol-hive/issues/121) | — | shared, engine, cognition |
+| [032](032-dynamic-world-drive-restoration.md) | Dynamic-World Demo — Drive Restoration Affordances & Long-Run Equilibrium | §3, §4, §6, §8 | 📝 Drafted | [#125](https://github.com/Redna/evol-hive/issues/125) | — | examples |
