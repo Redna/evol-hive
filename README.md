@@ -64,6 +64,15 @@ USE_REAL_LLM=true npx tsx examples/dynamic-world-sim.ts
 
 > Note: the demo runs a no-op mock orchestrator (rendering demo only). Agents do not perform PPER cycles — see issue [#106](https://github.com/Redna/evol-hive/issues/106) for wiring real LLM cognition into the demo.
 
+#### Drive economy (spec 032)
+
+All five drives decay at 0.1/s (spec 019); restoration affordances close the loops so long runs reach equilibrium instead of sliding to zero (issue [#125](https://github.com/Redna/evol-hive/issues/125)):
+
+- **Energy** — `garden-bench-1` in the garden (`sit_outside` +3, `relax` +5) and `stool-1` in the workshop (`relax` +5): every room restores energy, offsetting the workshop's energy-negative `work` (−4).
+- **Comfort** — bench/stool `relax` (+20) and `sit_outside` (+15), plus the gardening and work loops.
+- **Curiosity** — plant_seeds (+12), water_plants (+10), take_tool (+8), work (+6), build_planter (+20), bench `sit_outside` (+5).
+- **Social** — restored only through agent-to-agent tools: `talk_to` (+10 own social) and `help` (target's primary drive + own social). The Gardener is solo only until the Apprentice spawns at t+60s — at most 6 points of social decay from the default 100 in that window.
+
 ## Project Structure
 
 See [ADR-0001](docs/adr/0001-lean-monorepo-structure.md) for the rationale behind this structure.

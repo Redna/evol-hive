@@ -1,5 +1,6 @@
 /**
- * dynamic-world.ts — Dynamic Scenes / Living Worlds demo (spec 030, issue #117)
+ * dynamic-world.ts — Dynamic Scenes / Living Worlds demo (spec 030, issue #117;
+ * drive restoration per spec 032, issue #125)
  * ──────────────────────────────────────────────────────────────────────────────
  * A small scene plus helper factories for runtime scene mutation:
  *  - `portableObject` — an object with a `carry` affordance; the effect
@@ -12,6 +13,19 @@
  *
  * The scene itself is a plain spec-022 `SceneDefinition` — dynamic changes
  * are runtime deltas only; the authoring format is unchanged (Req 16).
+ *
+ * Drive economy (spec 032 — closed loops; decay 0.1/s per drive, spec 019):
+ *  - garden:  plant_seeds/water_plants (+curiosity, +comfort), garden-bench-1
+ *    `sit_outside` (+comfort 15, +curiosity 5, +energy 3) and `relax`
+ *    (+comfort 20, +energy 5) — builtin furniture handlers
+ *  - workshop: work (+curiosity, −energy, −comfort), stool-1 `relax`
+ *    (+comfort 20, +energy 5) — every room restores energy
+ *  - social:  restored only through agent-to-agent cognitive tools —
+ *    `talk_to` (own social +10) and `help` (target primary drive + own
+ *    social), available whenever another agent is co-present (the Apprentice
+ *    from t+60s; see dynamic-world-sim.ts)
+ * Declared `effects` mirror the builtin handler `driveChanges` so the LLM's
+ * affordance tool descriptions surface the real remedies (spec 032, Req 6).
  */
 
 import type { SceneDefinition, SmartObject } from '@evol-hive/shared';
@@ -20,8 +34,19 @@ import type { AffordanceHandler } from '@evol-hive/engine';
 
 // ── Scene ────────────────────────────────────────────────────────────────────
 
-function aff(id: string, label = id) {
-  return { id, label, engineEffect: id, preconditions: [], effects: {} };
+/**
+ * Affordance factory (coffee-shop pattern): `preconditions` and `effects`
+ * are optional — declared `effects` mirror the builtin handler
+ * `driveChanges` so the LLM tool descriptions surface the real drive
+ * impacts (spec 032, Req 6).
+ */
+function aff(
+  id: string,
+  label = id,
+  preconditions: string[] = [],
+  effects: Partial<Record<string, number>> = {},
+) {
+  return { id, label, engineEffect: id, preconditions, effects };
 }
 
 function makeObject(
@@ -39,7 +64,7 @@ const garden: SceneDefinition['rooms'][number] = {
   name: 'Community Garden',
   description: 'A small garden with planters and a gate.',
   connections: ['workshop'],
-  objectIds: ['planter-1', 'gate-1', 'toolbox-1', 'doorway-garden'],
+  objectIds: ['planter-1', 'gate-1', 'toolbox-1', 'garden-bench-1', 'doorway-garden'],
 };
 
 const workshop: SceneDefinition['rooms'][number] = {
@@ -47,7 +72,7 @@ const workshop: SceneDefinition['rooms'][number] = {
   name: 'Workshop',
   description: 'A workshop with a workbench and tool rack.',
   connections: ['garden'],
-  objectIds: ['workbench-1', 'doorway-workshop'],
+  objectIds: ['workbench-1', 'stool-1', 'doorway-workshop'],
 };
 
 /** The demo scene: a garden and a workshop connected by a gated doorway. */
@@ -64,9 +89,23 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
       aff('observe', 'Observe'),
     ]),
     makeObject('gate-1', 'Gate', 'doorway', 'garden', [aff('open_gate', 'Open gate')]),
+    // Garden bench (spec 032, Req 1): builtin furniture `sit_outside` and
+    // `relax` restore energy + comfort — the garden's rest affordance.
+    makeObject('garden-bench-1', 'Garden Bench', 'furniture', 'garden', [
+      aff('sit_outside', 'Sit outside', [], { comfort: 15, curiosity: 5, energy: 3 }),
+      aff('relax', 'Relax on the bench', [], { comfort: 20, energy: 5 }),
+      aff('observe', 'Observe'),
+    ]),
     makeObject('workbench-1', 'Workbench', 'furniture', 'workshop', [
       aff('work', 'Work'),
       aff('build_planter', 'Build a planter'),
+    ]),
+    // Workshop stool (spec 032, Req 2): builtin furniture `relax` restores
+    // energy + comfort so the room with energy-negative `work` also has an
+    // energy-restoring affordance (every room must restore energy).
+    makeObject('stool-1', 'Stool', 'furniture', 'workshop', [
+      aff('relax', 'Relax on the stool', [], { comfort: 20, energy: 5 }),
+      aff('observe', 'Observe'),
     ]),
     makeObject('doorway-garden', 'Doorway', 'doorway', 'garden', [
       aff('go_to_workshop', 'Go to workshop'),
@@ -97,9 +136,21 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
  * the LLM no reason to navigate — a stalemate. These give both rooms a
  * working drive-restoration loop so plans can actually succeed:
  *
- *   garden:  plant_seeds (+curiosity), water_plants (+curiosity, consumes water)
- *   workshop: work, take_tool (enables build_planter), build_planter (+curiosity)
+ *   garden:  plant_seeds (+curiosity, +comfort), water_plants (+curiosity,
+ *            +comfort, consumes water) — plus garden-bench-1 `sit_outside`
+ *            and `relax` (energy + comfort) from the builtin furniture plugin
+ *   workshop: work (+curiosity, −energy, −comfort), take_tool (enables
+ *            build_planter), build_planter (+curiosity, +comfort) — plus
+ *            stool-1 `relax` (energy + comfort) from the furniture plugin
  *   both:    go_to_* via the builtin doorway plugin (movement)
+ *
+ * Drive-economy closed loops (spec 032, Req 4–5): every room restores energy
+ * (bench/stool), curiosity/comfort are restored by the gardening/work loops,
+ * and social is restored only by agent-to-agent cognitive tools (`talk_to` →
+ * own social +10; `help` → target primary drive + own social). Rest affordance
+ * handlers are NOT duplicated here — they are builtin `HandlerPlugin`s
+ * (registered via `autoRegisterHandlers`) and re-registering them would
+ * shadow/conflict with plugin registration semantics.
  */
 export function createDynamicWorldHandlers(): Record<string, AffordanceHandler> {
   return {
