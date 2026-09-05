@@ -1,6 +1,7 @@
 # ADR-002: Trainable Cognitive Heads — Python Trains Offline, TypeScript Serves ONNX
 
 ## Status
+
 Proposed (referenced by issue #132 — System 1 trainable heads)
 
 ## Context
@@ -22,7 +23,7 @@ Since that vision was written, two things changed:
    GitHub Actions runners and already operates one external daemon (YAAM). A second
    always-on Python service (plus possibly a vector DB) duplicates the class of
    operational failure we just spent days eliminating — while the cognition it would
-   host is *microseconds* of MLP inference.
+   host is _microseconds_ of MLP inference.
 
 At the same time, the trainable heads themselves are a confirmed requirement (#132):
 a React/Ignore gate and an importance head over embeddings + engine state features,
@@ -31,8 +32,8 @@ that the heads must be **easily trainable**.
 
 ## Decision
 
-**Split by lifecycle, not by service.** Python is a *build-time training tool*;
-TypeScript is the *only runtime*:
+**Split by lifecycle, not by service.** Python is a _build-time training tool_;
+TypeScript is the _only runtime_:
 
 1. **Training happens in Python, offline, as a batch job** — a `training/` workspace
    (pinned environment) containing the PyTorch head definitions and a training script
@@ -41,7 +42,7 @@ TypeScript is the *only runtime*:
    **not a service**, has no port, and never runs in CI's runtime path.
 
 2. **Trained artifacts are exported to ONNX** and versioned. The ONNX file is the
-   *only* interface between the two worlds — no REST/gRPC bridge exists.
+   _only_ interface between the two worlds — no REST/gRPC bridge exists.
 
 3. **Runtime inference happens in TypeScript** via `onnxruntime-node`, inside the
    perception layer and the PPER scheduler (gating), and the memory subsystem
@@ -50,7 +51,7 @@ TypeScript is the *only runtime*:
 4. **The Golden Rule is amended** from "TS never touches neural networks, embeddings,
    or unstructured text" to:
 
-   > **TS never *trains* models — it only runs exported ONNX inference over
+   > **TS never _trains_ models — it only runs exported ONNX inference over
    > deterministic feature vectors. All gradient updates, dataset construction, and
    > model architecture iteration happen in Python, offline.**
 
@@ -61,6 +62,7 @@ TypeScript is the *only runtime*:
 ## Alternatives Considered
 
 ### A. Full Python cognitive microservice (original vision)
+
 **Rejected.** vLLM/Qdrant/gRPC would reintroduce: a second always-on daemon (the yaam
 daemon class of operational failures — memory saturation, RPC timeouts wedging agent
 sessions), a network hop in front of microseconds of MLP compute, and a heavier CI
@@ -68,11 +70,13 @@ footprint on memory-constrained runners. The LLM itself is already served extern
 (ollama.com) — there is no local LLM inference that would justify a Python service.
 
 ### B. Training in TypeScript directly
+
 **Rejected.** The PyTorch ecosystem (optimizers, schedulers, debugging, export) is the
 industry standard for head training; replicating it in TS (_tfjs_ or hand-rolled
 gradient descent) gives up tooling for no runtime benefit, since training is offline.
 
 ### C. No heads — keep LLM-assigned importance and ungated cycles
+
 **Rejected.** Importance stays LLM-hallucinated, agents re-deliberate every tick
 (5x token variance between equivalent runs), and identity consolidation has no
 salience signal to weight it.
@@ -80,19 +84,24 @@ salience signal to weight it.
 ## Consequences
 
 **Positive:**
+
 - Single runtime process; CI-friendly; no RPC hop on the cognition path
-- Training cadence fully decoupled from runtime (retrain after N sessions; the runtime
-  keeps working with the previous artifact between retrains)
+- Training cadence fully decoupled from runtime for architecture changes; **incremental
+  weight updates happen in-runtime at sleep boundaries** (head is small by design —
+  that is what makes dream-time learning viable)
+- Personalization path: per-agent head fine-tuning becomes possible once per-agent
+  sample volume is sufficient (each agent's salience gate individually calibrated)
 - The heads are "easily trainable" per the original requirement — a standard PyTorch
   script over JSONL session logs
 - Auditability: head version + revision numbers on every gating/identity decision
 
 **Negative / accepted costs:**
-- Model updates require a retrain-export-redeploy cycle (no online learning in the live
-  runtime). Mitigation: scheduled retrain from accumulated session logs; the runtime is
-  never blocked by it.
+
+- The runtime carries a minimal SGD implementation (~100 lines of matmul/backprop for
+  the small head) that must stay mathematically consistent with the Python baseline
+  trainer. Mitigation: a parity test (same batch → same weight delta) runs in CI.
 - A pinned Python environment exists in `training/` (requirements + version lock) —
-  a build-time dependency, not a runtime one.
+  a build-time dependency for architecture work, not a runtime one.
 - Feature schemas (the scalar state features) are a contract between TS feature
   extraction and the Python trainer — changes require coordinating both sides.
   Mitigation: the feature schema lives in `shared` with a version constant.
@@ -103,7 +112,47 @@ salience signal to weight it.
 - No Qdrant/Chroma (the in-memory vector store suffices at current scale; revisit at
   ~1M nodes)
 - No gRPC/REST bridge (ONNX artifacts are the bridge)
-- No online/in-runtime gradient updates
+- No heavyweight training frameworks (PyTorch/tfjs) in the runtime — sleep-time updates
+  use a minimal, audited SGD implementation (see Decision amendment below)
+
+## Decision amendment: sleep-time online updates (user directive, 2026-09-05)
+
+The head is _deliberately minimal_ (~50-100K parameters, 2-3 dense layers) — small
+enough that a gradient update is **milliseconds of arithmetic**, not a training job.
+That makes in-runtime learning viable and biologically apt: **the agent updates its
+System 1 head while it "sleeps" or daydreams.**
+
+**Mechanism:**
+
+1. **Trigger**: the agent enters sleep/daydream — physical inactivity (the idle
+   signal already exists: `ReflectionLoop.shouldReflect(agentId, simTime, isIdle)`,
+   spec 014) with no urgent drives. The runtime has slack exactly then.
+2. **Sample set**: all outcome-labeled event samples accumulated since the last dream
+   (cycle outcomes: plan changed / drive deltas / memory written / conversation
+   continued → REACT; nothing changed → IGNORE).
+3. **Update**: a minimal SGD/Adam step in TypeScript over the head (the forward pass
+   already runs in Node for gating; the backward pass is the same math — this is the
+   same complexity class as the physics code, not "heavyweight ML").
+4. **Guardrails (mirroring the identity-consolidation guardrails, spec 033)**:
+   - bounded steps per dream (e.g. ≤ 200) + learning-rate cap
+   - **validation holdout with revert**: a held-out slice is evaluated before commit;
+     if loss degrades beyond tolerance, the previous weight snapshot is restored
+     (never worse after a dream)
+   - every dream writes a versioned weight snapshot + an audit event (`dream_update`:
+     N samples, loss before/after, head version bump)
+5. **Hot swap**: new weights are immediately active for future gating decisions — no
+   redeploy, no restart.
+
+**Division of labor (unchanged in spirit):** Python remains the offline environment
+for _architecture research, evaluation, and baseline training_ (when the head
+architecture itself changes, or for cross-agent aggregate analysis). The runtime owns
+**incremental weight updates** on the frozen architecture — the same split as humans:
+sleep tunes the weights; waking life occasionally redesigns the theory.
+
+**Per-agent vs shared**: start with a shared head updated at any agent's dream
+(more data per update). Per-agent personalization (each agent's System 1 calibrated
+to its own sensitivities — itself an identity trait) is a follow-up once per-agent
+sample volume is sufficient.
 
 ## Relations
 
