@@ -176,10 +176,10 @@ describe('AC-3c: declarative AffordanceConditions gate visibility (spec 018, Req
     expect(available).toContain('harvest');
     expect(available).not.toContain('eat');
 
-    // A vegetable exists → eat appears too.
+    // A vegetable exists → eat appears; with seeds reset to 0, harvest hides again.
     core.smartObjectRegistry.updateState('planter-1', { seeds_planted: 0, vegetables: 1 });
     available = core.bridges.perception.getAvailableAffordancesInRoom('garden').map((a) => a.id);
-    expect(available).toContain('harvest'); // seeds_planted retained via merge? no — updateState replaces; vegetables >= 1 satisfied
+    expect(available).not.toContain('harvest'); // seeds_planted < 3 again (updateState replaces state)
     expect(available).toContain('eat');
   });
 });
@@ -193,10 +193,11 @@ describe('AC-3d: harvest → eat chain through the sim cognition stack restores 
     // Mature planter: three seeds planted (the plant_seeds loop ran 3×).
     core.smartObjectRegistry.updateState('planter-1', { seeds_planted: 3 });
 
-    // Mid-run hunger decay (the issue #130 failure mode: hunger pins at 0).
+    // Mid-run decayed state (the issue #130 failure mode: hunger pins at 0;
+    // comfort starts at 100 and must be pulled off the clamp to observe +5).
     const state = core.agentManager.getState(GARDENER)!;
     core.agentManager.updateState(GARDENER, {
-      drives: { ...state.drives, hunger: 30 },
+      drives: { ...state.drives, hunger: 30, comfort: 50 },
     });
 
     core.bridges.plan.storePlan(GARDENER, {
@@ -217,7 +218,7 @@ describe('AC-3d: harvest → eat chain through the sim cognition stack restores 
     expect(planterAfterHarvest['seeds_planted']).toBe(0);
     const afterHarvestDrives = core.agentManager.getState(GARDENER)!.drives;
     expect(afterHarvestDrives.curiosity).toBe(state.drives.curiosity + 10);
-    expect(afterHarvestDrives.comfort).toBe(state.drives.comfort + 5);
+    expect(afterHarvestDrives.comfort).toBe(55); // 50 + 5 (comfort clamps at 100 — pulled off the ceiling above)
 
     // Step 2: eat → hunger +25, vegetables −1.
     const eatResult = await execute.execute(GARDENER);

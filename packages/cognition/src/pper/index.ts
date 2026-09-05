@@ -170,6 +170,19 @@ export class PerceptionServiceImpl {
 
 export { PerceptionBuilderImpl } from './perception-builder.js';
 export { PlanBuilderImpl } from './plan-builder.js';
+export {
+  matchDrivesToAffordances,
+  formatPerceptionDriveHint,
+  formatPlanDriveHint,
+  DRIVE_URGENCY_THRESHOLD,
+  MAX_DRIVE_HINT_AFFORDANCES,
+  HINTABLE_DRIVES,
+} from './drive-affordance-matcher.js';
+export type {
+  AttributedAffordance,
+  DriveAffordanceRef,
+  DriveAffordanceMatch,
+} from './drive-affordance-matcher.js';
 export { PlanServiceImpl } from './plan-service.js';
 export type { PlanServiceOptions } from './plan-service.js';
 export { ExecuteServiceImpl } from './execute-service.js';

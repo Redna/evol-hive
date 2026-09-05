@@ -1,6 +1,7 @@
 /**
  * dynamic-world.ts — Dynamic Scenes / Living Worlds demo (spec 030, issue #117;
- * drive restoration per spec 032, issue #125)
+ * drive restoration per spec 032, issue #125; hunger chain + drive→affordance
+ * hints per spec 034, issue #130)
  * ──────────────────────────────────────────────────────────────────────────────
  * A small scene plus helper factories for runtime scene mutation:
  *  - `portableObject` — an object with a `carry` affordance; the effect
@@ -14,39 +15,72 @@
  * The scene itself is a plain spec-022 `SceneDefinition` — dynamic changes
  * are runtime deltas only; the authoring format is unchanged (Req 16).
  *
- * Drive economy (spec 032 — closed loops; decay 0.1/s per drive, spec 019):
- *  - garden:  plant_seeds/water_plants (+curiosity, +comfort), garden-bench-1
- *    `sit_outside` (+comfort 15, +curiosity 5, +energy 3) and `relax`
- *    (+comfort 20, +energy 5) — builtin furniture handlers
- *  - workshop: work (+curiosity, −energy, −comfort), stool-1 `relax`
- *    (+comfort 20, +energy 5) — every room restores energy
- *  - social:  restored only through agent-to-agent cognitive tools —
- *    `talk_to` (own social +10) and `help` (target primary drive + own
- *    social), available whenever another agent is co-present (the Apprentice
- *    from t+60s; see dynamic-world-sim.ts)
+ * Drive economy (spec 032 + spec 034 — closed loops; decay 0.1/s per drive,
+ * spec 019). Decay AND restoration path for every drive (spec 034, Req 7):
+ *
+ *   - energy:    restored by garden-bench-1 `sit_outside` (+3) / `relax` (+5)
+ *                in the garden and stool-1 `relax` (+5) in the workshop —
+ *                every room restores energy, offsetting the workbench's
+ *                energy-negative `work` (−4)
+ *   - hunger:    restored by planter-1 `eat` (+25) — the harvest→eat chain
+ *                (plant → water → harvest → eat) closes the loop; hunger
+ *                previously had NO restoration path (spec 034, Req 6)
+ *   - comfort:   bench/stool `relax` (+20), bench `sit_outside` (+15),
+ *                water_plants (+5), harvest (+5), build_planter (+8)
+ *   - curiosity: plant_seeds (+12), water_plants (+10), take_tool (+8),
+ *                work (+6), build_planter (+20), harvest (+10),
+ *                bench `sit_outside` (+5)
+ *   - social:    restored ONLY through agent-to-agent cognitive tools —
+ *                `talk_to` (own social +10) and `help` (target's primary
+ *                drive + own social), available whenever another agent is
+ *                co-present (the Apprentice from t+60s; see
+ *                dynamic-world-sim.ts)
  * Declared `effects` mirror the builtin handler `driveChanges` so the LLM's
- * affordance tool descriptions surface the real remedies (spec 032, Req 6).
+ * affordance tool descriptions surface the real remedies (spec 032, Req 6)
+ * and the cognition drive→affordance matcher can bind urgent drives to them
+ * (spec 034, Req 1–4). `makeObject` stamps each affordance with its owning
+ * object (`objectId`/`objectName`) so the spec-034 hints name the object
+ * that offers each affordance.
  */
 
 import type { SceneDefinition, SmartObject } from '@evol-hive/shared';
 import type { SceneMutationServiceImpl } from '@evol-hive/engine';
 import type { AffordanceHandler } from '@evol-hive/engine';
+import type { AttributedAffordance } from '@evol-hive/cognition';
 
 // ── Scene ────────────────────────────────────────────────────────────────────
 
 /**
- * Affordance factory (coffee-shop pattern): `preconditions` and `effects`
- * are optional — declared `effects` mirror the builtin handler
- * `driveChanges` so the LLM tool descriptions surface the real drive
- * impacts (spec 032, Req 6).
+ * Declarative, self-describing availability condition (spec 018, Req 1):
+ * evaluated against the owning object's `state` at perception time.
+ */
+type AffordanceCondition = NonNullable<
+  SmartObject['affordances'][number]['conditions']
+>[number];
+
+/**
+ * Affordance factory (coffee-shop pattern): `preconditions`, `effects`, and
+ * `conditions` are optional — declared `effects` mirror the builtin handler
+ * `driveChanges` so the LLM tool descriptions surface the real drive impacts
+ * (spec 032, Req 6) and the drive→affordance matcher can bind urgent drives
+ * to them (spec 034, Req 1–4); declarative `conditions` gate availability at
+ * perception time without a registered PreconditionChecker (spec 018, Req 7).
  */
 function aff(
   id: string,
   label = id,
   preconditions: string[] = [],
   effects: Partial<Record<string, number>> = {},
+  conditions?: AffordanceCondition[],
 ) {
-  return { id, label, engineEffect: id, preconditions, effects };
+  return {
+    id,
+    label,
+    engineEffect: id,
+    preconditions,
+    effects,
+    ...(conditions !== undefined ? { conditions } : {}),
+  };
 }
 
 function makeObject(
@@ -56,7 +90,14 @@ function makeObject(
   roomId: string,
   affordances: ReturnType<typeof aff>[],
 ): SmartObject {
-  return { id, name, type, state: {}, affordances, roomId };
+  // Spec 034: stamp owning-object attribution on every affordance so the
+  // cognition drive→affordance hints can name the object that offers each
+  // affordance ("sit_outside at the Garden Bench"). Harmless extra fields —
+  // affordance tool definitions render id/label/effects only.
+  const attributed = affordances.map(
+    (a): AttributedAffordance => ({ ...a, objectId: id, objectName: name }),
+  );
+  return { id, name, type, state: {}, affordances: attributed, roomId };
 }
 
 const garden: SceneDefinition['rooms'][number] = {
@@ -81,7 +122,20 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
   name: 'Dynamic World Demo',
   rooms: [garden, workshop],
   objects: [
-    makeObject('planter-1', 'Planter', 'furniture', 'garden', [aff('plant_seeds', 'Plant seeds')]),
+    // Planter (spec 018 object ecosystem + spec 034 hunger chain, Req 5–6):
+    //   plant_seeds → water_plants → harvest (seeds_planted >= 3) → eat
+    //   (vegetables >= 1, hunger +25). `harvest` and `eat` are gated by
+    //   declarative `AffordanceCondition`s — no ObjectDependency needed when
+    //   the gate lives on the same object.
+    makeObject('planter-1', 'Planter', 'furniture', 'garden', [
+      aff('plant_seeds', 'Plant seeds'),
+      aff('harvest', 'Harvest vegetables', [], { curiosity: 10, comfort: 5 }, [
+        { field: 'seeds_planted', operator: '>=', value: 3 },
+      ]),
+      aff('eat', 'Eat a vegetable', [], { hunger: 25 }, [
+        { field: 'vegetables', operator: '>=', value: 1 },
+      ]),
+    ]),
     // Referenced by garden.objectIds — was missing (the runtime move_object
     // proposal was rejected with "no object with ID 'toolbox-1'").
     makeObject('toolbox-1', 'Toolbox', 'tool', 'garden', [
@@ -137,16 +191,21 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
  * working drive-restoration loop so plans can actually succeed:
  *
  *   garden:  plant_seeds (+curiosity, +comfort), water_plants (+curiosity,
- *            +comfort, consumes water) — plus garden-bench-1 `sit_outside`
- *            and `relax` (energy + comfort) from the builtin furniture plugin
+ *            +comfort, consumes water), harvest (vegetables +1 at
+ *            seeds_planted >= 3, resets the counter — spec 034, Req 5),
+ *            eat (hunger +25, consumes one vegetable — spec 034, Req 6;
+ *            closes the hunger loop: plant → water → harvest → eat) —
+ *            plus garden-bench-1 `sit_outside` and `relax` (energy +
+ *            comfort) from the builtin furniture plugin
  *   workshop: work (+curiosity, −energy, −comfort), take_tool (enables
  *            build_planter), build_planter (+curiosity, +comfort) — plus
  *            stool-1 `relax` (energy + comfort) from the furniture plugin
  *   both:    go_to_* via the builtin doorway plugin (movement)
  *
- * Drive-economy closed loops (spec 032, Req 4–5): every room restores energy
- * (bench/stool), curiosity/comfort are restored by the gardening/work loops,
- * and social is restored only by agent-to-agent cognitive tools (`talk_to` →
+ * Drive-economy closed loops (spec 032, Req 4–5; spec 034, Req 7): every
+ * room restores energy (bench/stool), hunger is restored by the planter's
+ * `eat`, curiosity/comfort are restored by the gardening/work loops, and
+ * social is restored only by agent-to-agent cognitive tools (`talk_to` →
  * own social +10; `help` → target primary drive + own social). Rest affordance
  * handlers are NOT duplicated here — they are builtin `HandlerPlugin`s
  * (registered via `autoRegisterHandlers`) and re-registering them would
@@ -174,6 +233,39 @@ export function createDynamicWorldHandlers(): Record<string, AffordanceHandler> 
         success: true,
         newState: { ...state, water_level: water - 1 },
         driveChanges: { curiosity: 10, comfort: 5 },
+      };
+    },
+    // Spec 034, Req 5: harvest closes the growth half of the hunger chain.
+    // Gated declaratively at perception time (conditions: seeds_planted >= 3)
+    // and defensively here at execution time: yields one vegetable and resets
+    // the planted-seed counter so the plant → water loop can run again.
+    harvest: async (_objectId, _agentId, state) => {
+      const planted = (state['seeds_planted'] as number) ?? 0;
+      if (planted < 3) {
+        return { success: false, failureReason: 'The vegetables are not ready to harvest yet.' };
+      }
+      return {
+        success: true,
+        newState: {
+          ...state,
+          vegetables: ((state['vegetables'] as number) ?? 0) + 1,
+          seeds_planted: 0,
+        },
+        driveChanges: { curiosity: 10, comfort: 5 },
+      };
+    },
+    // Spec 034, Req 6: eat closes the hunger loop (plant → water → harvest →
+    // eat). Gated declaratively (conditions: vegetables >= 1) and defensively
+    // here: consumes one vegetable and restores hunger +25 via driveChanges.
+    eat: async (_objectId, _agentId, state) => {
+      const vegetables = (state['vegetables'] as number) ?? 0;
+      if (vegetables < 1) {
+        return { success: false, failureReason: 'There are no ripe vegetables to eat.' };
+      }
+      return {
+        success: true,
+        newState: { ...state, vegetables: vegetables - 1 },
+        driveChanges: { hunger: 25 },
       };
     },
     work: async (_objectId, _agentId, state) => {

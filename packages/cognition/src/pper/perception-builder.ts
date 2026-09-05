@@ -26,6 +26,10 @@ import {
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
+import {
+  matchDrivesToAffordances,
+  formatPerceptionDriveHint,
+} from './drive-affordance-matcher.js';
 
 const GENERIC_SYSTEM_PROMPT = [
   'You are an autonomous NPC in a deterministic simulation.',
@@ -123,6 +127,18 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       dynamicLines.push(
         'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them.',
       );
+    }
+
+    // Drive→affordance matching hints (spec 034, Req 1): when a drive is below
+    // the urgency threshold AND the current perception contains affordances
+    // whose declared `effects` positively restore it, suggest them by name.
+    // Dynamic section only (KV-cache safety, spec 021). Social is excluded —
+    // the spec-018/024 social hints above own that drive. Drives without a
+    // restoring affordance here get NO hint (no phantom remedies, Req 4).
+    const sourceAffordancesForHints =
+      perceptionResult.maskedAffordances ?? perceptionResult.prunedAffordances;
+    for (const match of matchDrivesToAffordances(passive.drives, sourceAffordancesForHints)) {
+      dynamicLines.push(formatPerceptionDriveHint(match));
     }
 
     const contextLines = [...stableLines, '---', ...dynamicLines];

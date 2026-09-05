@@ -16,22 +16,24 @@
  * Drive economy (spec 032 — closed loops, no one-way slide):
  *   All five drives decay at 0.1/s (≈1.5 points per ~15s PPER cycle, spec 019).
  *   Restoration affordances balance the decay when used at a reasonable duty
- *   cycle:
+ *   cycle. Decay AND restoration path for every drive (spec 034, Req 7):
  *   - energy:   garden-bench-1 `sit_outside` (+3) / `relax` (+5) in the garden;
  *               stool-1 `relax` (+5) in the workshop — every room restores
  *               energy, offsetting the workbench's energy-negative `work` (−4)
- *   - comfort:  bench `sit_outside` (+15) / `relax` (+20), stool `relax` (+20),
- *               plus the gardening/work loops
+ *   - comfort:  bench `sit_outside` (+15) / `relax` (+20), stool `relax`
+ *               (+20), water_plants (+5), harvest (+5), build_planter (+8)
  *   - curiosity: plant_seeds (+12), water_plants (+10), take_tool (+8),
- *               work (+6), build_planter (+20), bench `sit_outside` (+5)
+ *               work (+6), build_planter (+20), harvest (+10),
+ *               bench `sit_outside` (+5)
  *   - social:   restored ONLY through agent-to-agent cognitive tools —
  *               `talk_to` (own social +10) and `help` (target's primary drive
  *               + own social), both require a co-present agent. Solo-window
  *               bound: at most 6 points of social decay (0.1/s × 60s, from
  *               the default 100) before the Apprentice spawns at t+60s, so
  *               social never approaches 0 while the Gardener is alone.
- *   - hunger:   decays from 100 over a 12-min run at a bounded total (≤ 72); a
- *               scene-specific food affordance is out of scope for this demo.
+ *   - hunger:   planter-1 `eat` (+25) — the plant → water → harvest → eat
+ *               chain (spec 034, Req 6) closes the loop; hunger previously
+ *               had NO restoration path and pinned at 0 in runs ≳ 16 min
  *
  * The visualizer serves the live canvas at http://localhost:3100/ so every
  * structural change is observable in the browser as it happens.
@@ -200,13 +202,20 @@ function scheduleMutations(core: EngineCore, log: (msg: string) => void): NodeJS
 
 // ── State logging ────────────────────────────────────────────────────────────
 
-function logState(core: EngineCore, log: (msg: string) => void): void {
+/**
+ * Log one state sample per active agent (spec 030; amended by spec 034,
+ * Req 8: all FIVE drives per sample — `h=` hunger and `co=` comfort alongside
+ * energy, social, and curiosity — so equilibrium validation can observe
+ * restoration bounces on every drive, not just three).
+ */
+export function logState(core: EngineCore, log: (msg: string) => void): void {
   for (const agent of core.agentManager.getActiveAgents()) {
     const state = core.agentManager.getState(agent.agentId);
     if (!state) continue;
     log(
       `[state] ${agent.agentId}: room=${state.location} ` +
-        `e=${Math.round(state.drives.energy)} s=${Math.round(state.drives.social)} ` +
+        `e=${Math.round(state.drives.energy)} h=${Math.round(state.drives.hunger)} ` +
+        `s=${Math.round(state.drives.social)} co=${Math.round(state.drives.comfort)} ` +
         `cu=${Math.round(state.drives.curiosity)} thinking=${state.isThinking}`,
     );
   }
