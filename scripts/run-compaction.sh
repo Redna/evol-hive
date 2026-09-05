@@ -97,8 +97,13 @@ gzip -k -f events.jsonl
 # ── Push compacted memory and release lock ──────────────────────────────────
 if [ "$GITHUB_ACTIONS" == "true" ]; then
   cd "$WORKTREE"
-  # Clean up old tracking files
-  git rm -f *.jsonl *.jsonl.gz 2>/dev/null || true
+  # Clean up old tracking files. NOTE: git rm is ATOMIC — one unmatched
+  # pathspec aborts the whole command (found 2026-09-05: the untracked
+  # events-0000000000-base.* merge intermediates matched *.jsonl.gz, git rm
+  # fatal'd, the || true swallowed it, and the delta files survived every
+  # compaction — the memory branch ballooned to 643MB). --ignore-unmatch
+  # makes partial matches work.
+  git rm -r -f --ignore-unmatch -- '*.jsonl' '*.jsonl.gz' 2>/dev/null || true
   # Add the new compacted file
   cp "$ORIG_DIR/events.jsonl.gz" .
   git add events.jsonl.gz
