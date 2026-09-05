@@ -1,6 +1,6 @@
 /**
  * dynamic-world-sim.ts — Long-horizon validation with dynamic scene mutations
- * (spec 030, issue #117 follow-up)
+ * (spec 030, issue #117 follow-up; drive economy per spec 032, issue #125)
  * ──────────────────────────────────────────────────────────────────────────────
  * Runs the Dynamic World demo (garden ↔ workshop) with real LLM cognition for
  * an extended period while exercising every mutation type from spec 030:
@@ -12,6 +12,26 @@
  *   t+300s  open gate       — connection restored
  *   t+360s  despawn_agent   — Apprentice goes dormant (state → YAAM)
  *   t+420s  respawn agent   — Apprentice returns from dormancy (state restored)
+ *
+ * Drive economy (spec 032 — closed loops, no one-way slide):
+ *   All five drives decay at 0.1/s (≈1.5 points per ~15s PPER cycle, spec 019).
+ *   Restoration affordances balance the decay when used at a reasonable duty
+ *   cycle:
+ *   - energy:   garden-bench-1 `sit_outside` (+3) / `relax` (+5) in the garden;
+ *               stool-1 `relax` (+5) in the workshop — every room restores
+ *               energy, offsetting the workbench's energy-negative `work` (−4)
+ *   - comfort:  bench `sit_outside` (+15) / `relax` (+20), stool `relax` (+20),
+ *               plus the gardening/work loops
+ *   - curiosity: plant_seeds (+12), water_plants (+10), take_tool (+8),
+ *               work (+6), build_planter (+20), bench `sit_outside` (+5)
+ *   - social:   restored ONLY through agent-to-agent cognitive tools —
+ *               `talk_to` (own social +10) and `help` (target's primary drive
+ *               + own social), both require a co-present agent. Solo-window
+ *               bound: at most 6 points of social decay (0.1/s × 60s, from
+ *               the default 100) before the Apprentice spawns at t+60s, so
+ *               social never approaches 0 while the Gardener is alone.
+ *   - hunger:   decays from 100 over a 12-min run at a bounded total (≤ 72); a
+ *               scene-specific food affordance is out of scope for this demo.
  *
  * The visualizer serves the live canvas at http://localhost:3100/ so every
  * structural change is observable in the browser as it happens.
