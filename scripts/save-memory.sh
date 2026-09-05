@@ -78,25 +78,23 @@ done
 cd - >/dev/null
 git worktree remove "$WORKTREE" --force 2>/dev/null || rm -rf "$WORKTREE"
 
-# ── Size-triggered compaction (incident 2026-09-05 19:26) ────────────────────
-# Old-daemon runs appended amplified deltas until the memory branch reached
-# 637MB; the next restore ingested all of it and the runner died (the daemon
-# fix caps NEW events, not replay of an already-bloated file). Compaction now
-# triggers whenever the memory branch exceeds the threshold instead of only
-# on the daily cron.
-MEM_FILE=$(git ls-tree origin/memory events.jsonl 2>/dev/null | awk '{print $4}')
-MEM_SIZE=$(git cat-file -s "$(git rev-parse origin/memory:events.jsonl 2>/dev/null)" 2>/dev/null || echo 0)
-THRESHOLD=$((100 * 1048576))  # 100MB
-if [ "${MEM_SIZE:-0}" -gt "$THRESHOLD" ]; then
-  SIZE_MB=$((MEM_SIZE / 1048576))
-  echo "Memory branch is ${SIZE_MB}MB (> 100MB) — triggering compaction."
+# ── Size-triggered compaction (incident 2026-09-05 19:26 + 23:00) ────────────
+# Two failure modes: (a) old-daamon runs appended amplified deltas, (b) the
+# branch accumulates DELTA FILES (events-*.jsonl) across runs — the original
+# check measured only events.jsonl and missed them (643MB restore = 41MB base
+# + ~600MB of deltas). Measure the TOTAL branch size across all files.
+MEM_TOTAL=$(git ls-tree -r -l origin/memory 2>/dev/null | awk '{sum += $4} END {print sum + 0}')
+THRESHOLD=$((100 * 1048576))  # 100MB across ALL memory-branch files
+if [ "${MEM_TOTAL:-0}" -gt "$THRESHOLD" ]; then
+  SIZE_MB=$((MEM_TOTAL / 1048576))
+  echo "Memory branch total is ${SIZE_MB}MB (> 100MB across all files) — triggering compaction."
   if [ -n "${GH_PAT:-}" ]; then
     gh workflow run compaction.yml --ref main || echo "⚠️ Compaction trigger failed — branch stays bloated until the next cron run."
   else
     echo "⚠️ No GH_PAT available to trigger compaction — branch stays bloated until the next cron run."
   fi
 else
-  echo "Memory branch size OK ($((MEM_SIZE / 1048576))MB)."
+  echo "Memory branch size OK ($((MEM_TOTAL / 1048576))MB total)."
 fi
 
 echo "Memory save complete."
