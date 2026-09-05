@@ -1,0 +1,7 @@
+{
+  "name": "feature-033-conversations-identity-evolution",
+  "description": "Conversations as perceivable temporal objects (smart objects with join/contribute/leave/observe affordances, sentiment-tagged turns, bounded rolling window) plus identity evolution (memory-resident self-model, guarded update_self_model, bounded session-end consolidation, dormant respawn with evolved self-model). Save format v3. Issue #128.",
+  "createdAt": "2026-09-05T14:40:00Z",
+  "specIssue": 128,
+  "specFile": "docs/specs/033-conversations-identity-evolution.md"
+}
