@@ -97,9 +97,9 @@ salience signal to weight it.
 
 **Negative / accepted costs:**
 
-- The runtime carries a minimal SGD implementation (~100 lines of matmul/backprop for
-  the small head) that must stay mathematically consistent with the Python baseline
-  trainer. Mitigation: a parity test (same batch → same weight delta) runs in CI.
+- Linear capacity: if the gate ultimately needs non-linear decision boundaries beyond
+  what frozen random features provide, revisit — the frozen-expansion trick scales
+  first; an MLP with a real training framework is the last resort.
 - A pinned Python environment exists in `training/` (requirements + version lock) —
   a build-time dependency for architecture work, not a runtime one.
 - Feature schemas (the scalar state features) are a contract between TS feature
@@ -114,6 +114,27 @@ salience signal to weight it.
 - No gRPC/REST bridge (ONNX artifacts are the bridge)
 - No heavyweight training frameworks (PyTorch/tfjs) in the runtime — sleep-time updates
   use a minimal, audited SGD implementation (see Decision amendment below)
+
+## Decision amendment: linear-probe heads, no backprop (user directive, 2026-09-05)
+
+The heads are **linear probes**, not MLPs — the runtime implements **no backprop**:
+
+- **Frozen feature layer**: ONNX embedding (384-dim, computed every tick for gating
+  anyway) ⊕ scalar drive features ⊕ optional frozen random non-linear expansion
+  (random Fourier features — restores capacity while keeping the trainable layer
+  linear)
+- **Trainable layer**: single linear readout, `p = σ(W·x + b)` (~400 parameters)
+- **The entire training implementation is one line**: `W += lr · (p − y) · x`
+  (the BCE gradient through a linear layer). Closed-form ridge
+  (`W = (XᵀX + λI)⁻¹Xᵀy`) as the batch alternative. No chain rule, no ML library,
+  no parity test — the update is inspectable at a glance.
+- Rationale: linear probes on frozen semantic embeddings are the standard tool for
+  relevance classification; the non-linearity lives in the embedding, and frozen
+  random features restore capacity without backprop. The original vision's
+  "PyTorch MLP" was a means — the requirement is _easily trainable heads_, and a
+  linear probe is the easiest trainable thing that exists.
+- Per-agent adapters become per-agent weight deltas on the same linear layer
+  (hundreds of floats) — same persistence, cold-start, and introspection properties.
 
 ## Decision amendment: sleep-time online updates (user directive, 2026-09-05)
 
@@ -130,9 +151,8 @@ System 1 head while it "sleeps" or daydreams.**
 2. **Sample set**: all outcome-labeled event samples accumulated since the last dream
    (cycle outcomes: plan changed / drive deltas / memory written / conversation
    continued → REACT; nothing changed → IGNORE).
-3. **Update**: a minimal SGD/Adam step in TypeScript over the head (the forward pass
-   already runs in Node for gating; the backward pass is the same math — this is the
-   same complexity class as the physics code, not "heavyweight ML").
+3. **Update**: the one-line linear update (`W += lr · (p − y) · x`) per sample, or a
+   closed-form ridge solve over the accumulated batch. No backprop, no library.
 4. **Guardrails (mirroring the identity-consolidation guardrails, spec 033)**:
    - bounded steps per dream (e.g. ≤ 200) + learning-rate cap
    - **validation holdout with revert**: a held-out slice is evaluated before commit;
