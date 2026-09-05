@@ -29,12 +29,28 @@ class MockContext {
   }
 
   // State setters (record the value)
-  fillStyle = '#000';
-  strokeStyle = '#000';
+  private _fillStyle = '#000';
+  private _strokeStyle = '#000';
   lineWidth = 1;
   font = '10px sans-serif';
   textAlign: CanvasTextAlign = 'left';
   textBaseline: CanvasTextBaseline = 'alphabetic';
+
+  /** fillStyle assignments are recorded so tests can assert icon tints. */
+  get fillStyle(): string {
+    return this._fillStyle;
+  }
+  set fillStyle(value: string) {
+    this._fillStyle = value;
+    this.record('fillStyle', value);
+  }
+  get strokeStyle(): string {
+    return this._strokeStyle;
+  }
+  set strokeStyle(value: string) {
+    this._strokeStyle = value;
+    this.record('strokeStyle', value);
+  }
 
   // Path methods
   beginPath(): void {
@@ -76,20 +92,12 @@ class MockContext {
     this.record('strokeText', text, x, y);
   }
 
-  // Clear
-  clearRect(x: number, y: number, w: number, h: number): void {
-    this.record('clearRect', x, y, w, h);
-  }
-
   // Misc used by renderer
   save(): void {
     this.record('save');
   }
   restore(): void {
     this.record('restore');
-  }
-  set fillStyleSetter(_: string) {
-    this.fillStyle = _;
   }
 }
 
@@ -252,5 +260,53 @@ describe('CanvasRenderer.render — relationship lines (AC-8)', () => {
     // (Room border strokes use strokeRect, not moveTo/lineTo.)
     const lineTos = ctx.calls.filter((c) => c.method === 'lineTo');
     expect(lineTos.length).toBe(0);
+  });
+
+  // ── Spec 033 (AC-10, R9): conversation objects render with sentiment tint ──
+
+  it('renders a conversation object with its sentiment-derived tint as icon background', () => {
+    const ctx = new MockContext();
+    const renderer = new CanvasRenderer(ctx as unknown as CanvasRenderingContext2D);
+    const state = makeState({
+      rooms: [
+        {
+          id: 'garden',
+          name: 'Garden',
+          description: '',
+          connections: [],
+          objects: [
+            {
+              id: 'conv-1',
+              name: 'Conversation',
+              type: 'conversation',
+              state: { topic: 'roses' },
+              affordances: [],
+              conversation: {
+                topic: 'roses',
+                participants: ['agent-a', 'agent-b'],
+                sentimentTint: '#e06c75',
+              },
+            },
+          ],
+        },
+      ],
+      agents: [],
+    });
+    renderer.render(state);
+    // The icon background fillRect for the conversation object uses the tint.
+    const fillStyleChanges = ctx.calls.filter((c) => c.method === 'fillStyle');
+    expect(fillStyleChanges.some((c) => c.args[0] === '#e06c75')).toBe(true);
+    // The topic is rendered in the chip text.
+    const fills = ctx.calls.filter((c) => c.method === 'fillText');
+    expect(fills.some((c) => String(c.args[0]).includes('roses'))).toBe(true);
+  });
+
+  it('renders plain objects without a tint (no conversation projection)', () => {
+    const ctx = new MockContext();
+    const renderer = new CanvasRenderer(ctx as unknown as CanvasRenderingContext2D);
+    const state = makeState();
+    renderer.render(state);
+    const fillStyleChanges = ctx.calls.filter((c) => c.method === 'fillStyle');
+    expect(fillStyleChanges.some((c) => c.args[0] === '#e06c75')).toBe(false);
   });
 });

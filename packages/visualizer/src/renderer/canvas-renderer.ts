@@ -193,8 +193,9 @@ export class CanvasRenderer {
     objects.forEach((obj, i) => {
       const ox = roomX + 12 + (i % 3) * 70;
       const oy = roomY + 30 + Math.floor(i / 3) * 50;
-      // Icon background.
-      ctx.fillStyle = '#2a2a4a';
+      // Icon background — conversation objects use their sentiment-derived
+      // tint (spec 033, R9/AC-10); everything else keeps the default chip.
+      ctx.fillStyle = obj.conversation?.sentimentTint ?? '#2a2a4a';
       ctx.fillRect(ox, oy, 60, 30);
       // Object name.
       ctx.fillStyle = '#c0c0d0';
@@ -203,10 +204,17 @@ export class CanvasRenderer {
       ctx.textBaseline = 'top';
       ctx.fillText(obj.name.slice(0, 8), ox + 2, oy + 2);
       // State text — first key/value pair, rounded and clamped to the chip.
-      const stateEntries = Object.entries(obj.state);
-      if (stateEntries.length > 0) {
-        const [key, val] = stateEntries[0]!;
-        ctx.fillText(formatStateLine(key, val), ox + 2, oy + 16);
+      // Conversation chips show the topic (spec 033, R9) so the live dialogue
+      // is readable at a glance; the default state line for a conversation
+      // object would be a participants array.
+      if (obj.conversation !== undefined) {
+        ctx.fillText(`topic: ${obj.conversation.topic}`.slice(0, 14), ox + 2, oy + 16);
+      } else {
+        const stateEntries = Object.entries(obj.state);
+        if (stateEntries.length > 0) {
+          const [key, val] = stateEntries[0]!;
+          ctx.fillText(formatStateLine(key, val), ox + 2, oy + 16);
+        }
       }
     });
   }
