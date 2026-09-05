@@ -59,6 +59,18 @@ import {
 } from './social/conversation-manager.js';
 import { SelfModelManager } from './agents/state/self-model-manager.js';
 import {
+  System1AgentTracker,
+  System1TriggerSourceImpl,
+  System1FeatureSystem,
+  System1IdentityTriggerSystem,
+} from './systems/index.js';
+import type {
+  System1FeatureRefresherPort,
+  System1GatePort,
+  System1IdentityTriggerPort,
+  System1OutcomeRecorderPort,
+} from '@evol-hive/shared';
+import {
   SceneMutationServiceImpl,
   SceneMutationSystem,
   DormantAgentStore,
@@ -138,6 +150,10 @@ export interface EngineCore {
    * `schedulerConfig` argument is passed.
    */
   sceneSchedulerConfig?: PPERSchedulerConfig;
+  /** System 1 tracker (spec 035) — set when System 1 ports are wired. */
+  system1Tracker?: System1AgentTracker;
+  /** System 1 trigger source (spec 035) — set when System 1 ports are wired. */
+  system1TriggerSource?: System1TriggerSourceImpl;
   /**
    * The `PPERScheduler` instance constructed by {@link assembleGameLoop}
    * (spec 022, AC-1). `undefined` until the scheduler system is registered.
@@ -319,10 +335,42 @@ export function assembleGameLoop(
    * `core` (via {@link loadScene}) and the env-var default.
    */
   schedulerConfig?: PPERSchedulerConfig,
+  /**
+   * Optional System 1 ports (spec 035, Req 7/9/17): the React/Ignore gate,
+   * outcome recorder, identity trigger, and (engine-internal) trigger source
+   * + feature plumbing. When omitted, the scheduler behaves exactly as
+   * before (every idle agent cycles).
+   */
+  system1?: {
+    gate: System1GatePort;
+    outcomeRecorder?: System1OutcomeRecorderPort;
+    identityTrigger?: System1IdentityTriggerPort;
+    featureRefresher?: System1FeatureRefresherPort;
+  },
 ): GameLoop {
   // Precedence (spec 022, Req 2/4): explicit arg > scene-level config > default.
   const resolvedSchedulerConfig: PPERSchedulerConfig =
     schedulerConfig ?? core.sceneSchedulerConfig ?? defaultPPERSchedulerConfig();
+
+  // System 1 engine-side plumbing (spec 035): the tracker + trigger source
+  // read live engine state; the gate/recorder/feature-refresher/identity
+  // trigger arrive from the cognition layer via the shared ports (ADR-0001).
+  let system1Tracker: System1AgentTracker | undefined;
+  let system1TriggerSource: System1TriggerSourceImpl | undefined;
+  if (system1 !== undefined) {
+    system1Tracker = new System1AgentTracker();
+    system1TriggerSource = new System1TriggerSourceImpl({
+      agentManager: core.agentManager,
+      socialManager: core.socialManager,
+      conversationManager: core.conversationManager,
+      mutationPort: core.mutationService,
+      tracker: system1Tracker,
+    });
+    // Expose on core for introspection/tests.
+    core.system1Tracker = system1Tracker;
+    core.system1TriggerSource = system1TriggerSource;
+  }
+
   // (0) SceneMutations — FIRST, so queued mutations land at the tick boundary
   // before any other system observes the world (spec 030, Req 1).
   core.gameLoop.registerSystem(new SceneMutationSystem(core.mutationService));
@@ -330,9 +378,47 @@ export function assembleGameLoop(
   core.gameLoop.registerSystem(new DriveDecaySystem(core.agentManager, core.driveSystem)); // (2) DriveDecaySystem
   core.gameLoop.registerSystem(new ObjectStateSystem(core.smartObjectRegistry)); // (3) ObjectStateSystem (spec 018)
   core.gameLoop.registerSystem(new ConversationLifecycleSystem(core.conversationManager)); // (3.5) ConversationLifecycleSystem (spec 033)
-  const scheduler = new PPERScheduler(core.agentManager, orchestrator, resolvedSchedulerConfig); // (4) PPERScheduler
+  const scheduler = new PPERScheduler(
+    core.agentManager,
+    orchestrator,
+    resolvedSchedulerConfig,
+    // (4) PPERScheduler — with optional System 1 gating (spec 035).
+    system1 !== undefined && system1Tracker !== undefined && system1TriggerSource !== undefined
+      ? {
+          gate: system1.gate,
+          triggerSource: system1TriggerSource,
+          ...(system1.outcomeRecorder !== undefined
+            ? { outcomeRecorder: system1.outcomeRecorder }
+            : {}),
+        }
+      : undefined,
+  );
   core.scheduler = scheduler;
   core.gameLoop.registerSystem(scheduler);
+
+  // (4.5) System 1 feature plumbing (spec 035, Req 1/7): per-tick scalar
+  // refresh + throttled async embedding refresh. Registered BEFORE the
+  // scheduler so the gate reads this tick's scalars.
+  if (system1 !== undefined && system1.featureRefresher !== undefined && system1Tracker !== undefined && system1TriggerSource !== undefined) {
+    core.gameLoop.registerSystem(
+      new System1FeatureSystem({
+        agentManager: core.agentManager,
+        triggerSource: system1TriggerSource,
+        refresher: system1.featureRefresher,
+        tracker: system1Tracker,
+      }),
+    );
+  }
+
+  // (4.6) Mid-session identity trigger (spec 035, Req 17) — optional.
+  if (system1?.identityTrigger !== undefined) {
+    core.gameLoop.registerSystem(
+      new System1IdentityTriggerSystem({
+        agentManager: core.agentManager,
+        identityTrigger: system1.identityTrigger,
+      }),
+    );
+  }
 
   // (5) MemoryMaintenanceSystem — only when a decay service is provided (spec 014, Req 17/18).
   if (memoryMaintenance?.memoryDecayService) {

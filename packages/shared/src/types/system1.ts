@@ -437,6 +437,15 @@ export interface System1GatePort {
 /** Port: engine-side hard-trigger extraction from live engine state. */
 export interface System1TriggerSourcePort {
   getHardTriggers(agentId: string): HardTriggerFlags;
+  /**
+   * Conversation context for the scalar features (Req 1): whether the agent
+   * participates in a live conversation and its turn count (0 when none).
+   * Optional for leaner mock sources. `conversationOpen` is a scalar feature,
+   * NOT a hard trigger — conversation INVITES are (Req 5), and the constraint
+   * "never suppress cycles during conversations" is covered by
+   * `conversationInvite` + the participant flag feeding `conversationOpen`.
+   */
+  getConversationContext?(agentId: string): { open: boolean; turns: number };
 }
 
 /** Port: synchronous read of the per-agent cached feature vector. */
@@ -474,6 +483,11 @@ export interface OutcomeSnapshot {
   drives: Record<string, number>;
   memoryCount: number;
   conversationTurns: number;
+  /**
+   * The scene-mutation log's current seq (optional — pins the "mutations
+   * since my last cycle" window for the trigger source).
+   */
+  mutationSeq?: number | undefined;
 }
 
 /** Port: capture the engine state needed for outcome labeling. */
@@ -493,6 +507,11 @@ export interface CycleStartContext {
 export interface System1OutcomeRecorderPort {
   onCycleStart(agentId: string, ctx: CycleStartContext): void;
   onCycleSettled(agentId: string, error?: string): void;
+  /**
+   * Optional per-tick hook: lets the recorder advance time-based bookkeeping
+   * (e.g. the ticks-since-last-completed-cycle counter) on idled ticks too.
+   */
+  onTick?(agentId: string, tickNumber: number): void;
 }
 
 /**

@@ -49,7 +49,7 @@ describe('Spec 035 — feature schema contract (Req 2)', () => {
   it('validateScalarFeatures accepts a fully-normalized vector and reports no violations', () => {
     const valid = {} as ScalarFeatures;
     for (const field of SCALAR_FEATURE_FIELDS) {
-      valid[field] = 0.5;
+      valid[field] = field === 'messagePending' || field === 'conversationOpen' || field === 'nearbyObjectStateChange' || field === 'worldMutation' || field === 'driveThresholdCrossing' ? 1 : 0.5;
     }
     expect(validateScalarFeatures(valid)).toEqual([]);
   });

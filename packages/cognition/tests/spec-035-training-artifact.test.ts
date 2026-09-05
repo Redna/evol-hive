@@ -149,7 +149,7 @@ describe('Spec 035 — the artifact reproduces the fixture expectation (AC-5 par
     );
     // Golden: σ(bias) of the committed artifact — retrain must consciously
     // update this pin.
-    expect(pZero).toBeCloseTo(0.5004995834165427, 6);
+    expect(pZero).toBeCloseTo(0.484075184, 9);
 
     // A high-urgency vector (all 1s) scores clearly above an all-zero one.
     const hot = {} as GateWeightArtifact['scalarWeights'];

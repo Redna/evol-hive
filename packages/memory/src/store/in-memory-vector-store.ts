@@ -95,6 +95,15 @@ export class InMemoryVectorStore implements VectorStore {
     return result;
   }
 
+  /** Count the nodes stored for an agent (spec 035, Req 9 — outcome probe). */
+  async countByAgent(agentId: string): Promise<number> {
+    let count = 0;
+    for (const node of this.nodes.values()) {
+      if (node.agentId === agentId) count += 1;
+    }
+    return count;
+  }
+
   async exportAll(): Promise<MemoryNode[]> {
     // Copies (including the embedding array) so mutating a returned node does
     // not affect the store (spec 017, Req 11 / AC-11).

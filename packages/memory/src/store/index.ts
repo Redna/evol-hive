@@ -7,13 +7,21 @@
  * vector store.
  */
 
-import type { MemoryEntryInput, MemoryNode } from '@evol-hive/shared';
+import type { ImportanceComposer, MemoryEntryInput, MemoryNode } from '@evol-hive/shared';
 import type { VectorStore, EmbeddingProvider, MemoryStore } from '../index.js';
 
 /** Constructor options for {@link MemoryStoreImpl}. */
 export interface MemoryStoreImplOptions {
   vectorStore: VectorStore;
   embeddingProvider: EmbeddingProvider;
+  /**
+   * Optional write-time importance composer (spec 035, Req 14): when wired,
+   * `MemoryNode.importance` is the composite (predicted prior ⊕ drive-delta
+   * magnitude ⊕ downstream utility ⊕ LLM 1–10 as one feature) clamped to the
+   * 1–10 storage contract, instead of the raw LLM-assigned score. When
+   * omitted, behavior is unchanged (backward compat).
+   */
+  importanceComposer?: ImportanceComposer;
 }
 
 /**
@@ -28,10 +36,12 @@ export class MemoryStoreImpl implements MemoryStore {
 
   private readonly vectorStore: VectorStore;
   private readonly embeddingProvider: EmbeddingProvider;
+  private readonly importanceComposer: ImportanceComposer | undefined;
 
   constructor(options: MemoryStoreImplOptions) {
     this.vectorStore = options.vectorStore;
     this.embeddingProvider = options.embeddingProvider;
+    this.importanceComposer = options.importanceComposer;
   }
 
   async store(agentId: string, entry: MemoryEntryInput, timestamp: number): Promise<MemoryNode> {
@@ -41,12 +51,20 @@ export class MemoryStoreImpl implements MemoryStore {
     // (b) Create a MemoryNode with a generated unique id.
     const id = `mem_${agentId}_${timestamp}_${MemoryStoreImpl.memCounter++}`;
 
+    // Spec 035 (Req 14): composition happens at memory-write time —
+    // `MemoryNode.importance` holds the composite when a composer is wired.
+    let importance = entry.importance;
+    if (this.importanceComposer !== undefined) {
+      const composed = this.importanceComposer(entry, { agentId, timestamp, content: entry.content });
+      importance = Math.min(10, Math.max(1, composed));
+    }
+
     const node: MemoryNode = {
       id,
       agentId,
       content: entry.content,
       embedding,
-      importance: entry.importance,
+      importance,
       type: entry.type,
       timestamp,
     };

@@ -92,13 +92,14 @@ describe('Spec 035 — hard triggers toggle from engine state (AC-1, Req 5)', ()
       tracker: new System1AgentTracker(),
     });
 
-    expect(source.getHardTriggers('a1').conversationOpen).toBe(false);
+    expect(source.getConversationContext('a1').open).toBe(false);
     const result = conversations.openOrContribute('a2', 'a1', 'hi', 'neutral', 1);
     expect(result.success).toBe(true);
-    const triggers = source.getHardTriggers('a1');
-    expect(triggers.conversationOpen).toBe(true);
-    // a1 IS a participant here → not merely invited.
-    expect(triggers.conversationInvite).toBe(false);
+    // Participation is the conversationOpen scalar feature...
+    expect(source.getConversationContext('a1').open).toBe(true);
+    // ...and a hard trigger too (constraint: never suppress cycles during
+    // conversations — conversation turns are a hard trigger, Req 5).
+    expect(source.getHardTriggers('a1').conversationInvite).toBe(true);
   });
 
   it('conversationInvite fires for a live conversation in the room the agent could join', () => {
@@ -122,7 +123,7 @@ describe('Spec 035 — hard triggers toggle from engine state (AC-1, Req 5)', ()
     // a1 is not a participant, but a live conversation exists in its room.
     const triggers = source.getHardTriggers('a1');
     expect(triggers.conversationInvite).toBe(true);
-    expect(triggers.conversationOpen).toBe(false);
+    expect(source.getConversationContext('a1').open).toBe(false);
   });
 
   it('nearbyObjectMutation fires for mutations in the agent’s room since its last cycle', () => {
@@ -141,13 +142,18 @@ describe('Spec 035 — hard triggers toggle from engine state (AC-1, Req 5)', ()
     mutations.log.push({
       seq: 1,
       tick: 5,
-      simTime: 0.1,
-      type: 'set_state',
+      type: 'add_object',
       source: 'agent',
-      actorId: 'b2',
-      roomId: 'cafe',
-      payload: { objectId: 'coffee_machine', state: { power: 'on' } },
-      summary: 'coffee_machine power → on',
+      payload: {
+        object: {
+          id: 'kettle',
+          name: 'Kettle',
+          type: 'appliance',
+          state: {},
+          affordances: [],
+          roomId: 'cafe',
+        },
+      },
     } as unknown as SceneMutationEvent);
     expect(source.getHardTriggers('a1').nearbyObjectMutation).toBe(true);
 
@@ -165,12 +171,9 @@ describe('Spec 035 — hard triggers toggle from engine state (AC-1, Req 5)', ()
     mutations.log.push({
       seq: 2,
       tick: 7,
-      simTime: 0.2,
-      type: 'add_object',
+      type: 'move_object',
       source: 'engine',
-      roomId: 'lab',
-      payload: { objectId: 'laser', name: 'Laser', type: 'device' },
-      summary: 'laser added to lab',
+      payload: { objectId: 'laser', toRoomId: 'lab' },
     } as unknown as SceneMutationEvent);
     expect(source.getHardTriggers('a1').nearbyObjectMutation).toBe(false);
   });

@@ -33,6 +33,12 @@ export interface VectorStore {
   ): Promise<void>;
   /** Return all `MemoryNode` objects stored for the given `agentId` (spec 014, Req 3). */
   queryByAgent(agentId: string): Promise<import('@evol-hive/shared').MemoryNode[]>;
+  /**
+   * Count the nodes stored for the given `agentId` (spec 035, Req 9 — the
+   * outcome probe's memoryWritten signal). Optional so existing custom
+   * stores compile unchanged.
+   */
+  countByAgent?(agentId: string): Promise<number>;
   /** Return all `MemoryNode` objects in the store, regardless of `agentId` (spec 017, Req 9). */
   exportAll(): Promise<import('@evol-hive/shared').MemoryNode[]>;
   /** Clear the store and replace its contents with the provided nodes (spec 017, Req 10). */

@@ -88,10 +88,7 @@ export * from './world/index.js';
 export * from './agents/index.js';
 
 // Engine systems (drive decay, PPER scheduler, memory maintenance, object state) — spec 005 / 014 / 018
-export * from './systems/pper-scheduler.js';
-export * from './systems/drive-decay.js';
-export * from './systems/memory-maintenance.js';
-export * from './systems/object-state.js';
+export * from './systems/index.js';
 
 // Social (agent-to-agent perception, communication, relationships) — spec 018
 export * from './social/message-queue.js';

@@ -136,6 +136,15 @@ export class SocialManager implements SocialActionBridge, ConversationBridge {
     return this.messageQueue.dequeue(agentId);
   }
 
+  /**
+   * Number of pending messages for the agent WITHOUT consuming them
+   * (spec 035, Req 5 — the System 1 gate peeks; only the Perceive phase
+   * dequeues, so a gated-idle tick never eats a pending message).
+   */
+  peekPendingMessages(agentId: string): number {
+    return this.messageQueue.pendingCount(agentId);
+  }
+
   /** Get the agent's structured relationship map (spec 018, Req 20). */
   getRelationships(agentId: string): Record<string, Relationship> {
     const state = this.agentManager.getState(agentId);
