@@ -45,6 +45,19 @@ export interface ExecuteServiceOptions {
 
 /** Concrete ExecuteService that orchestrates deterministic affordance execution. */
 export class ExecuteServiceImpl {
+  /**
+   * Consecutive execution-failure counter per agent, with the step index it
+   * accumulated on (step-skip livelock guard, spec 037 follow-up / issue #139
+   * validation): a failed affordance does NOT advance the plan, so without
+   * this guard an un-satisfiable step retries forever — the plan can never
+   * reach its later steps (observed: 108 failed plant_seeds executions while
+   * the plan's harvest step was unreachable).
+   */
+  private readonly stepFailures = new Map<string, { stepKey: string; count: number }>();
+
+  /** After this many consecutive failures the step is skipped (advances). */
+  private static readonly MAX_STEP_FAILURES = 2;
+
   constructor(private readonly options: ExecuteServiceOptions) {}
 
   async execute(agentId: string): Promise<ExecuteResult> {
@@ -175,6 +188,13 @@ export class ExecuteServiceImpl {
       if (!preconditionResult.satisfied) {
         const failedList = preconditionResult.failed.join(', ');
         const feedback = `Preconditions not met for '${step.targetAffordance}': ${failedList}.`;
+        // Step-skip livelock guard: repeated precondition failures advance the
+        // plan so later steps (which may satisfy their preconditions after
+        // world changes) remain reachable.
+        const skipped = this.registerStepFailure(agentId, step, feedback, dataProvider);
+        if (skipped !== undefined) {
+          return skipped;
+        }
         dataProvider.setSystemFeedback(agentId, feedback);
         dataProvider.setThinking(agentId, false);
         return {
@@ -193,6 +213,13 @@ export class ExecuteServiceImpl {
 
       if (!result.success) {
         const feedback = result.failureReason ?? 'Affordance execution failed.';
+        // Step-skip livelock guard (see stepFailures): after 2 consecutive
+        // failures of the SAME step, advance past it so the plan can reach
+        // later steps. Feedback names the failure either way.
+        const skipped = this.registerStepFailure(agentId, step, feedback, dataProvider);
+        if (skipped !== undefined) {
+          return skipped;
+        }
         dataProvider.setSystemFeedback(agentId, feedback);
         dataProvider.setThinking(agentId, false);
         return {
@@ -201,6 +228,9 @@ export class ExecuteServiceImpl {
           planComplete: false,
         };
       }
+
+      // Success resets the failure counter.
+      this.stepFailures.delete(agentId);
 
       // Apply drive changes on success (if present and non-empty).
       if (result.driveChanges !== undefined && Object.keys(result.driveChanges).length > 0) {
@@ -321,6 +351,41 @@ export class ExecuteServiceImpl {
         ? { success: true, driveChanges: mergedDrives }
         : { success: true };
     return { success: true, result: aggregate, planComplete };
+  }
+
+  /**
+   * Step-skip livelock guard (spec 037 follow-up, issue #139 validation):
+   * counts consecutive failures of the SAME plan step; after
+   * {@link MAX_STEP_FAILURES} the step is advanced past (skipped) so the
+   * plan's later steps stay reachable. Counter resets on step change or
+   * success.
+   *
+   * @returns an ExecuteResult with the step advanced when the skip threshold
+   * is reached, or `undefined` when the failure should be handled normally.
+   */
+  private registerStepFailure(
+    agentId: string,
+    step: { description: string },
+    feedback: string,
+    dataProvider: ExecuteDataProvider,
+  ): ExecuteResult | undefined {
+    const current = step.description;
+    const prev = this.stepFailures.get(agentId);
+    const count = prev !== undefined && prev.stepKey === current ? prev.count + 1 : 1;
+    this.stepFailures.set(agentId, { stepKey: current, count });
+    if (count < ExecuteServiceImpl.MAX_STEP_FAILURES) {
+      return undefined;
+    }
+    this.stepFailures.delete(agentId);
+    console.error(
+      `[step-skip] agent=${agentId} step='${current.slice(0, 60)}' failed ${count}x consecutively — advancing past it`,
+    );
+    dataProvider.advanceStep(agentId);
+    const planComplete = dataProvider.isPlanComplete(agentId);
+    const skipFeedback = `${feedback} (skipping this step after ${count} attempts.)`;
+    dataProvider.setSystemFeedback(agentId, skipFeedback);
+    dataProvider.setThinking(agentId, false);
+    return { success: true, planComplete, stepSkipped: true };
   }
 }
 

@@ -280,25 +280,48 @@ export class OpenAICompatibleLLMClient {
 
   async completePlan(payload: LLMContextPayload): Promise<FormulatePlanResult> {
     const messages = this.buildPayloadMessages(payload);
-    const { args } = await this.requestChat(messages, payload.tools, payload.agentId, 'plan');
+    let { args } = await this.requestChat(messages, payload.tools, payload.agentId, 'plan');
 
-    const description = args['description'];
-    const steps = args['steps'];
-    if (
-      typeof description !== 'string' ||
-      description.length === 0 ||
-      !Array.isArray(steps) ||
-      steps.length === 0
-    ) {
+    const shapeBad = (a: Record<string, unknown>): boolean =>
+      typeof a['description'] !== 'string' ||
+      (a['description'] as string).length === 0 ||
+      !Array.isArray(a['steps']) ||
+      (a['steps'] as unknown[]).length === 0;
+
+    // Empty-args repair (issue #140 arc, [llm-raw] evidence): the cloud
+    // backend intermittently emits a formulate_plan tool call with a bare
+    // empty arguments object — the same failure mode seen when required
+    // fields were added to the schema. One bounded repair-retry with an
+    // explicit correction message; a second failure still throws (spec 008:
+    // malformed responses fail rather than repair-loop).
+    if (shapeBad(args)) {
       console.error(
         `[llm-raw] agent=${payload.agentId ?? '?'} malformed formulate_plan args: ` +
           JSON.stringify(args).slice(0, 400),
       );
-      throw new LLMResponseError(
-        'LLM plan response missing required "description" (non-empty string) or "steps" (non-empty array).',
-        JSON.stringify(args),
-      );
+      const retryMessages = [
+        ...messages,
+        { role: 'assistant' as const, content: null },
+        {
+          role: 'user' as const,
+          content:
+            'CORRECTION: your previous formulate_plan tool call had empty arguments. ' +
+            'Call formulate_plan again with a non-empty "description" string and a ' +
+            'non-empty "steps" array where every step has a description and a ' +
+            'targetAffordance from the enum values.',
+        },
+      ];
+      args = (await this.requestChat(retryMessages, payload.tools, payload.agentId, 'plan')).args;
+      if (shapeBad(args)) {
+        throw new LLMResponseError(
+          'LLM plan response missing required "description" (non-empty string) or "steps" (non-empty array).',
+          JSON.stringify(args),
+        );
+      }
     }
+
+    const description = args['description'] as string;
+    const steps = args['steps'] as unknown[];
     return {
       description,
       steps: (steps as unknown[]).map((s) => {

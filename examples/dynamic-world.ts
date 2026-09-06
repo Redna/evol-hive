@@ -128,13 +128,22 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
     //   declarative `AffordanceCondition`s — no ObjectDependency needed when
     //   the gate lives on the same object.
     makeObject('planter-1', 'Planter', 'furniture', 'garden', [
-      aff('plant_seeds', 'Plant seeds'),
-      aff('harvest', 'Harvest vegetables', [], { curiosity: 10, comfort: 5 }, [
+      // Drive-economy validation (issue #139 arc): the labels ARE the model's
+      // world knowledge — the plan → harvest → eat chain must be discoverable
+      // from tool descriptions alone, because harvest/eat stay invisible
+      // (declarative conditions) until 3 seeds are planted. Without the
+      // label hints the model rationally plants once and waits forever.
+      aff(
+        'plant_seeds',
+        'Plant seeds (after 3 plantings, vegetables ripen for harvest)',
+      ),
+      aff('harvest', 'Harvest vegetables (requires 3 seeds planted)', [], { curiosity: 10, comfort: 5 }, [
         { field: 'seeds_planted', operator: '>=', value: 3 },
       ]),
       aff('eat', 'Eat a vegetable', [], { hunger: 25 }, [
         { field: 'vegetables', operator: '>=', value: 1 },
       ]),
+      aff('observe', 'Observe'),
     ]),
     // Referenced by garden.objectIds — was missing (the runtime move_object
     // proposal was rejected with "no object with ID 'toolbox-1'").

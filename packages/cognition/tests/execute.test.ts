@@ -488,4 +488,76 @@ describe('ExecuteServiceImpl.execute (AC-21 through AC-35)', () => {
     // cannot be called. Verify advanceStep was the only plan mutation.
     expect(provider.advanceStepCalls).toHaveLength(1);
   });
+
+  // Step-skip livelock guard (spec 037 follow-up, issue #139 validation):
+  // a failing step must not wedge the plan — after 2 consecutive failures of
+  // the SAME step, execute advances past it so later steps stay reachable.
+  it('skips a step after 2 consecutive execution failures (livelock guard)', async () => {
+    const plan = {
+      id: 'plan1',
+      description: 'Grow food',
+      steps: [
+        makeStep({ targetAffordance: 'plant_seeds', description: 'Plant seeds' }),
+        makeStep({ targetAffordance: 'harvest', description: 'Harvest' }),
+      ],
+      currentStepIndex: 0,
+      createdAt: 100,
+    };
+    provider.agentState = makeAgentState({ currentPlan: plan });
+    provider.currentStep = plan.steps[0]!;
+    provider.affordanceResult = {
+      success: false,
+      failureReason: 'The planter is full.',
+    };
+
+    const service = new ExecuteServiceImpl({ dataProvider: provider });
+
+    // First failure: normal failure path — no advance.
+    const r1 = await service.execute(AGENT_ID);
+    expect(r1.success).toBe(false);
+    expect(r1.error).toBe('The planter is full.');
+    expect(provider.advanceStepCalls).toHaveLength(0);
+
+    // Second failure (same step): threshold reached — the step is skipped.
+    const r2 = await service.execute(AGENT_ID);
+    expect(r2.success).toBe(true);
+    expect(r2.stepSkipped).toBe(true);
+    expect(provider.advanceStepCalls).toHaveLength(1);
+    expect(
+      provider.setSystemFeedbackCalls.at(-1)?.feedback,
+    ).toContain('skipping this step');
+
+    // The counter resets: a DIFFERENT failing step gets its own 2 attempts.
+    provider.currentStep = plan.steps[1]!;
+    const r3 = await service.execute(AGENT_ID);
+    expect(r3.success).toBe(false);
+    expect(provider.advanceStepCalls).toHaveLength(1);
+  });
+
+  it('resets the failure counter when a different step fails', async () => {
+    const plan = {
+      id: 'plan2',
+      description: 'Chain steps',
+      steps: [
+        makeStep({ targetAffordance: 'plant_seeds', description: 'Plant seeds' }),
+        makeStep({ targetAffordance: 'harvest', description: 'Harvest' }),
+      ],
+      currentStepIndex: 0,
+      createdAt: 100,
+    };
+    provider.agentState = makeAgentState({ currentPlan: plan });
+    provider.affordanceResult = { success: false, failureReason: 'boom' };
+    const service = new ExecuteServiceImpl({ dataProvider: provider });
+
+    const stepA = makeStep({ targetAffordance: 'plant_seeds', description: 'Plant seeds' });
+    const stepB = makeStep({ targetAffordance: 'harvest', description: 'Harvest' });
+    provider.currentStep = stepA;
+    await service.execute(AGENT_ID); // step A failure 1
+    provider.currentStep = stepB;
+    await service.execute(AGENT_ID); // step B failure 1 (counter reset by step change)
+    provider.currentStep = stepA;
+    const r = await service.execute(AGENT_ID); // step A failure 2 — still below threshold
+    expect(r.success).toBe(false);
+    expect(provider.advanceStepCalls).toHaveLength(0);
+  });
 });
