@@ -166,6 +166,7 @@ export class PPEROrchestratorImpl {
     this.setPhase(agentId, 'plan');
     const plan: PlanResult = await this.planService.plan(agentId, perception);
     if (!plan.success) {
+      console.error(`[plan-failed] agent=${agentId}: ${plan.error}`);
       this.recordFailure(agentId, plan.error);
       this.setPhase(agentId, 'perceive');
       return;

@@ -73,7 +73,14 @@ export class ExecuteServiceImpl {
       }
 
       // Handle steps without targetAffordance (non-physical steps).
+      // Diagnostic: description-only steps are the "narrative plan" failure
+      // mode (issue #130 arc) — the LLM writes prose steps that do nothing.
+      // Always log them; the plan schema cannot enforce binding (backend
+      // tool-calling reliability), so the prompt carries the instruction.
       if (step.targetAffordance === undefined) {
+        console.error(
+          `[system1-narrative] agent=${agentId} step='${step.description.slice(0, 60)}' has no targetAffordance — nothing to execute`,
+        );
         dataProvider.advanceStep(agentId);
         const planComplete = dataProvider.isPlanComplete(agentId);
         return { success: true, planComplete, stepSkipped: true };

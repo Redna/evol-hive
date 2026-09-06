@@ -37,6 +37,16 @@ export class PlanManagerImpl implements PlanManager {
   createPlan(agentId: string, result: FormulatePlanResult): AgentPlan {
     const id = `plan_${agentId}_${Date.now()}_${PlanManagerImpl.planCounter++}`;
     const createdAt = this.clock();
+    // Diagnostic (issue #130 arc): what did the LLM actually bind?
+    console.error(
+      `[plan-create] agent=${agentId} steps=` +
+        JSON.stringify(
+          result.steps.map((s) => ({
+            t: s.targetAffordance ?? null,
+            d: s.description.slice(0, 40),
+          })),
+        ),
+    );
 
     const steps: PlanStep[] = result.steps.map((step) => {
       const planStep: PlanStep = {

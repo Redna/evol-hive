@@ -195,6 +195,8 @@ function buildSystemPrompt(
       `You are ${persona.name}, ${personaText}.`,
       'You must formulate a plan to satisfy your most urgent drive.',
       'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
+    'EVERY step in your plan MUST set targetAffordance to one of the affordance IDs available to you. ' +
+    'Steps without targetAffordance are discarded — you cannot act by describing intentions alone.',
       'Each step should map to an available affordance when possible.',
     ].join(' ');
     return hasAgentsPresent ? `${base} ${socialDirective}` : base;
@@ -203,6 +205,8 @@ function buildSystemPrompt(
     'You are an autonomous NPC in a deterministic simulation.',
     'You must formulate a plan to satisfy your most urgent drive.',
     'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
+    'EVERY step in your plan MUST set targetAffordance to one of the affordance IDs available to you. ' +
+    'Steps without targetAffordance are discarded — you cannot act by describing intentions alone.',
     'Each step should map to an available affordance when possible.',
   ].join(' ');
   return hasAgentsPresent ? `${base} ${socialDirective}` : base;
