@@ -151,6 +151,15 @@ export class PlanBuilderImpl implements PlanBuilder {
     // Append system feedback (prior action failures) per §9.2.
     if (passive.systemFeedback !== undefined) {
       dynamicLines.push(`System feedback: ${passive.systemFeedback}`);
+      // Spec 038 (replan quality): a bare failure report does not stop the
+      // model from planning the identical action again (observed live:
+      // 108 failed plant_seeds re-plannings against a full planter). Make the
+      // anti-repeat instruction explicit, referencing the failure text.
+      dynamicLines.push(
+        'IMPORTANT: Do NOT plan an action that just failed. Choose a DIFFERENT affordance — ' +
+          'for example, if the planter is full, plan harvest or eat instead of planting more seeds; ' +
+          'if a resource is exhausted, look for another object or move to another room.',
+      );
     }
 
     // Append stuck directive when no physical actions are available (spec 008, Req 5.3, AC-16).

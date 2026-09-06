@@ -64,7 +64,7 @@ import {
 import type { EngineCore } from '@evol-hive/engine';
 import type { AffordanceHandler } from '@evol-hive/engine';
 import { VisualizerServer } from '@evol-hive/visualizer';
-import { assembleCognitionStack, buildMemorySubsystem } from './assembly.ts';
+import { assembleCognitionStack, assembleSystem1, buildMemorySubsystem } from './assembly.ts';
 import {
   DYNAMIC_WORLD_SCENE,
   createCarryEffect,
@@ -293,6 +293,20 @@ async function main(): Promise<void> {
   if (useRealLLM && memory !== undefined) {
     const stack = assembleCognitionStack(core, undefined, { memory });
     orchestrator = stack.orchestrator;
+
+    // System 1 trainable heads (spec 035) — fail-open until an artifact
+    // lands; session logs accumulate outcome samples for the first dream
+    // update. Env-overridable like coffee-shop (grand-validation wiring,
+    // issue #139 follow-up arc).
+    const system1 = assembleSystem1(core, memory, {
+      ...(process.env['SYSTEM1_GATE_ARTIFACT'] !== undefined
+        ? { gateArtifactPath: process.env['SYSTEM1_GATE_ARTIFACT'] }
+        : {}),
+      ...(process.env['SYSTEM1_SESSION_LOG_DIR'] !== undefined
+        ? { sessionLogDir: process.env['SYSTEM1_SESSION_LOG_DIR'] }
+        : { sessionLogDir: 'session-logs' }),
+    });
+
     assembleGameLoop(
       core,
       stack.orchestrator,
@@ -303,6 +317,16 @@ async function main(): Promise<void> {
             decayConfig: stack.decayConfig,
           }
         : undefined,
+      undefined,
+      undefined,
+      {
+        gate: system1.gate,
+        outcomeRecorder: system1.outcomeRecorder,
+        featureRefresher: system1.featureRefresher,
+        ...(system1.identityTrigger !== undefined
+          ? { identityTrigger: system1.identityTrigger }
+          : {}),
+      },
     );
     // Reporter is cumulative — read totals at END of run.
     tokenReporter = stack.tokenUsageReporter;

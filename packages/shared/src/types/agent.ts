@@ -209,3 +209,31 @@ export function detectDriveEdgeState(drives: AgentDrives): 'all-zero' | 'all-ful
   if (allFull) return 'all-full';
   return null;
 }
+
+/**
+ * Sanitize LLM-supplied drive deltas (issue #134): drop non-finite and
+ * non-numeric entries, clamp the rest to a bounded range, and cap the total
+ * magnitude per call. One malformed reflect/tool response must never poison
+ * the numeric drive state (NaN propagates through every later computation
+ * and permanently zeroes the agent's drives).
+ *
+ * @returns a new object containing only safe, clamped entries — possibly
+ * empty when nothing in the input was usable.
+ */
+export function sanitizeDriveOverrides(
+  overrides: Partial<Record<string, number>>,
+  maxMagnitude = 50,
+): Partial<Record<string, number>> {
+  const safe: Partial<Record<string, number>> = {};
+  if (typeof overrides !== 'object' || overrides === null) {
+    return safe;
+  }
+  for (const [key, value] of Object.entries(overrides)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      continue;
+    }
+    const clamped = Math.max(-maxMagnitude, Math.min(maxMagnitude, value));
+    safe[key] = clamped;
+  }
+  return safe;
+}

@@ -33,6 +33,7 @@ import type {
   ReflectLLMResponse,
   ReflectResult,
 } from '@evol-hive/shared';
+import { sanitizeDriveOverrides } from '@evol-hive/shared';
 import type { LLMClient, ReflectBuilder } from '../index.js';
 import { LLMResponseError } from '../llm/index.js';
 
@@ -115,11 +116,11 @@ export class ReflectServiceImpl {
       let memoryStored = false;
 
       // (1) Apply drive overrides if present and non-empty.
-      if (
-        llmResponse.driveOverrides !== undefined &&
-        Object.keys(llmResponse.driveOverrides).length > 0
-      ) {
-        dataProvider.applyDriveChanges(agentId, llmResponse.driveOverrides);
+      // Issue #134: LLM-supplied deltas are sanitized — non-finite entries
+      // dropped, magnitudes clamped — before they touch numeric drive state.
+      const safeOverrides = sanitizeDriveOverrides(llmResponse.driveOverrides ?? {});
+      if (Object.keys(safeOverrides).length > 0) {
+        dataProvider.applyDriveChanges(agentId, safeOverrides);
         drivesUpdated = true;
       }
 

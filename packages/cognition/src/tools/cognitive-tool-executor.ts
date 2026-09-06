@@ -28,6 +28,7 @@ import type {
   SelfModelBridge,
   UpdateSelfModelToolResult,
 } from '@evol-hive/shared';
+import { sanitizeDriveOverrides } from '@evol-hive/shared';
 import { conversationRelationshipDelta, participantSentimentCounts } from '@evol-hive/shared';
 import type { MemoryInjector } from '@evol-hive/memory';
 
@@ -144,9 +145,11 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       }
     }
 
-    if (driveOverrides !== undefined && Object.keys(driveOverrides).length > 0) {
+    // Issue #134: sanitize LLM-supplied deltas before they touch drive state.
+    const safeOverrides = sanitizeDriveOverrides(driveOverrides ?? {});
+    if (Object.keys(safeOverrides).length > 0) {
       try {
-        this.stateDataProvider.applyDriveChanges(agentId, driveOverrides);
+        this.stateDataProvider.applyDriveChanges(agentId, safeOverrides);
         drivesUpdated = true;
       } catch (err) {
         failed = true;
