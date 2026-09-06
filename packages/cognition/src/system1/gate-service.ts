@@ -40,8 +40,8 @@ export class System1GateServiceImpl implements System1GatePort {
     this.featureSource = options.featureSource;
   }
 
-  /** Synchronous gate decision from cached features (Req 7). */
-  decide(agentId: string, hardTriggers: HardTriggerFlags): ReactGateDecision {
+  /** Synchronous gate decision from cached features (Req 7 + exploration). */
+  decide(agentId: string, tickNumber: number, hardTriggers: HardTriggerFlags): ReactGateDecision {
     const features = this.featureSource.getFeatures(agentId);
     if (features === null) {
       // No cached features yet → fail-open (pass the candidate this tick).
@@ -53,6 +53,6 @@ export class System1GateServiceImpl implements System1GatePort {
         failOpen: true,
       };
     }
-    return this.head.decide(features, hardTriggers);
+    return this.head.decide(agentId, tickNumber, features, hardTriggers);
   }
 }

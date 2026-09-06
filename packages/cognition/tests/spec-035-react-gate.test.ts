@@ -108,7 +108,7 @@ describe('Spec 035 — ReactGateHead deterministic inference (AC-2)', () => {
     const scalarValues = SCALAR_FEATURE_FIELDS.map(() => 0);
     const vector = featureVector([1, 0, 0], scalarValues);
     // z = -0.35 + 0.1 → p = σ(-0.25) ≈ 0.4378
-    const decision = head.decide(vector, {
+    const decision = head.decide('a1', 1, vector, {
       messagePending: false,
       conversationInvite: false,
       nearbyObjectMutation: false,
@@ -127,6 +127,10 @@ describe('Spec 035 — ReactGateHead deterministic inference (AC-2)', () => {
     });
     await head.ensureLoaded();
     const decision = head.decide(
+      'a1',
+      1,
+      'a1',
+      1,
       featureVector(
         [1, 1, 1],
         SCALAR_FEATURE_FIELDS.map(() => 1),
@@ -158,6 +162,8 @@ describe('Spec 035 — ReactGateHead deterministic inference (AC-2)', () => {
     };
     expect(
       head.decide(
+        'a1',
+        1,
         featureVector(
           [1, 0, 0],
           SCALAR_FEATURE_FIELDS.map(() => 0),
@@ -173,6 +179,8 @@ describe('Spec 035 — ReactGateHead deterministic inference (AC-2)', () => {
       'driveThresholdCrossing',
     ] as const) {
       const decision = head.decide(
+        'a1',
+        1,
         featureVector(
           [1, 0, 0],
           SCALAR_FEATURE_FIELDS.map(() => 0),
@@ -204,7 +212,7 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
       [1, 0, 0],
       SCALAR_FEATURE_FIELDS.map(() => 0),
     );
-    const decision = head.decide(vector, {
+    const decision = head.decide('a1', 1, vector, {
       messagePending: false,
       conversationInvite: false,
       nearbyObjectMutation: false,
@@ -224,6 +232,10 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
     const head = new ReactGateHead({ loader, threshold: 0.5 });
     await head.ensureLoaded();
     const decision = head.decide(
+      'a1',
+      1,
+      'a1',
+      1,
       featureVector(
         [1, 0, 0],
         SCALAR_FEATURE_FIELDS.map(() => 0),
@@ -251,6 +263,10 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
     await head.ensureLoaded();
     for (let i = 0; i < 25; i++) {
       const decision = head.decide(
+        'a1',
+        1,
+        'a1',
+        1,
         featureVector(
           [0.1, 0, 0],
           SCALAR_FEATURE_FIELDS.map(() => 0.1),
@@ -276,6 +292,10 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
     });
     await head.ensureLoaded();
     const decision = head.decide(
+      'a1',
+      1,
+      'a1',
+      1,
       featureVector(
         [1, 0, 0],
         SCALAR_FEATURE_FIELDS.map(() => 0),
@@ -305,6 +325,10 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
     await head.ensureLoaded();
     expect(() =>
       head.decide(
+        'a1',
+        1,
+        'a1',
+        1,
         featureVector(
           [1, 0, 0],
           SCALAR_FEATURE_FIELDS.map(() => 0),
@@ -328,6 +352,8 @@ describe('Spec 035 — fail-open semantics (Req 6 / AC-2)', () => {
     });
     await head.ensureLoaded();
     head.decide(
+      'a1',
+      1,
       featureVector(
         [1, 0, 0],
         SCALAR_FEATURE_FIELDS.map(() => 0),
@@ -360,10 +386,10 @@ describe('Spec 035 — hot-swap (Req 12: new weights hot-swap, no restart)', () 
       nearbyObjectMutation: false,
       driveThresholdCrossing: false,
     };
-    expect(head.decide(vector, triggers).react).toBe(false);
+    expect(head.decide('a1', 1, vector, triggers).react).toBe(false);
 
     head.hotSwap(fixedArtifact({ bias: 10000, headVersion: 4 }));
-    const after = head.decide(vector, triggers);
+    const after = head.decide('a1', 1, vector, triggers);
     expect(after.react).toBe(true);
     expect(after.headVersion).toBe(4);
     expect(after.failOpen).toBe(false);
@@ -382,7 +408,7 @@ describe('Spec 035 — hot-swap (Req 12: new weights hot-swap, no restart)', () 
     head.hotSwap(fixedArtifact({ featureSchemaVersion: 999 }));
     // Still the old (healthy) artifact — a bad swap must not brick the gate.
     expect(
-      head.decide(vector, {
+      head.decide('a1', 1, vector, {
         messagePending: false,
         conversationInvite: false,
         nearbyObjectMutation: false,
@@ -438,7 +464,7 @@ describe('Spec 035 — gate over full engine-produced vectors', () => {
       snapshotText: 'test',
     };
     const vector = buildFeatureVector(snapshot, [1, 0, 0], undefined);
-    const decision = head.decide(vector, {
+    const decision = head.decide('a1', 1, vector, {
       messagePending: false,
       conversationInvite: false,
       nearbyObjectMutation: false,

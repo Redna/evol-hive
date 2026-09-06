@@ -425,13 +425,20 @@ export interface ReactGateDecision {
   headVersion: number;
   /** True when the gate is fail-open (missing/corrupt/mismatched artifact). */
   failOpen: boolean;
+  /**
+   * True when the cycle was started by the curiosity-modulated exploration
+   * factor rather than the learned gate (exploration amendment). Exploration
+   * reactions produce outcome-labeled samples in the low-p(react) region —
+   * fixing the counterfactual data starvation of a greedy gate.
+   */
+  explored?: boolean;
 }
 
 /** Port (defined in `shared` per ADR-0001): the engine scheduler consults this
  * synchronously before `startCycle`. Implemented in cognition; wired at
  * assembly. Must never await — reads cached features only (Req 7). */
 export interface System1GatePort {
-  decide(agentId: string, hardTriggers: HardTriggerFlags): ReactGateDecision;
+  decide(agentId: string, tickNumber: number, hardTriggers: HardTriggerFlags): ReactGateDecision;
 }
 
 /** Port: engine-side hard-trigger extraction from live engine state. */

@@ -53,10 +53,10 @@ class FakeOrchestrator implements PPEROrchestratorPort {
 /** Scripted gate: returns the next decision per call (or a fixed one). */
 class ScriptedGate implements System1GatePort {
   decisions: ReactGateDecision[] = [];
-  calls: { agentId: string; hardTriggers: HardTriggerFlags }[] = [];
+  calls: { agentId: string; tickNumber: number; hardTriggers: HardTriggerFlags }[] = [];
 
-  decide(agentId: string, hardTriggers: HardTriggerFlags): ReactGateDecision {
-    this.calls.push({ agentId, hardTriggers });
+  decide(agentId: string, tickNumber: number, hardTriggers: HardTriggerFlags): ReactGateDecision {
+    this.calls.push({ agentId, tickNumber, hardTriggers });
     const next = this.decisions.shift();
     if (next) return next;
     return {

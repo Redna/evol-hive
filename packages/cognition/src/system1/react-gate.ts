@@ -72,14 +72,56 @@ export function evaluateLinearProbe(
 }
 
 /**
+ * Seeded PRNG (mulberry32) — deterministic exploration draws. The seed is a
+ * pure function of (agentId, tick, headVersion), so save/replay reproduces
+ * the same exploration decisions (spec 035 determinism, AC-14).
+ */
+export function seededDraw(seedStr: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    h ^= seedStr.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  let t = (h += 0x6d2b79f5) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+/**
+ * Exploration epsilon modulated by the curiosity drive (0–100):
+ * ε = ε_base × (curiosity / 100). A high-curiosity agent explores
+ * low-p(react) situations (~8% at ε_base=0.1, curiosity=80); a low-curiosity
+ * agent almost never does. Exploration reactions produce outcome-labeled
+ * samples in the region the gate would otherwise never observe — fixing the
+ * counterfactual data starvation of a purely greedy gate — and express
+ * curiosity-driven serendipity in behavior.
+ */
+export function explorationEpsilon(curiosity: number, epsilonBase: number): number {
+  const c = Math.min(100, Math.max(0, curiosity));
+  return epsilonBase * (c / 100);
+}
+
+/**
  * Pure gate decision from an artifact + vector + triggers + threshold.
- * `react = p(react) >= threshold || hardTrigger` (Req 5, Req 7).
+ * `react = hardTrigger || seededExplore < ε(curiosity) || p(react) >= threshold`
+ * (Req 5, Req 7 + exploration factor amendment).
+ *
+ * The exploration draw is seeded on (agentId, tick, headVersion) so it is
+ * deterministic under save/replay, and it is gated by the curiosity drive —
+ * exploration is motivated, not noise.
  */
 export function decideWithArtifact(
   artifact: GateWeightArtifact,
   vector: System1FeatureVector,
   hardTriggers: HardTriggerFlags,
   threshold: number,
+  exploration?: {
+    agentId: string;
+    tickNumber: number;
+    curiosity: number;
+    epsilonBase: number;
+  },
 ): ReactGateDecision {
   const p = evaluateLinearProbe(artifact, vector);
   if (!Number.isFinite(p)) {
@@ -88,10 +130,17 @@ export function decideWithArtifact(
     throw new Error('[system1] linear probe produced a non-finite p(react)');
   }
   const hard = hasHardTrigger(hardTriggers);
+  let explored = false;
+  if (exploration && !hard) {
+    const ε = explorationEpsilon(exploration.curiosity, exploration.epsilonBase);
+    explored =
+      seededDraw(`${exploration.agentId}:${exploration.tickNumber}:${artifact.headVersion}`) < ε;
+  }
   return {
     pReact: p,
-    react: p >= threshold || hard,
+    react: hard || explored || p >= threshold,
     hardTrigger: hard,
+    explored,
     headVersion: artifact.headVersion,
     failOpen: false,
   };
@@ -127,6 +176,19 @@ export interface ReactGateHeadOptions {
   loader: ArtifactLoader;
   /** React threshold (default 0.5). */
   threshold: number;
+  /**
+   * Exploration factor (amendment): base epsilon for the curiosity-modulated
+   * exploration draw. Default 0 (off). A typical value is 0.1 — a
+   * high-curiosity agent (curiosity=80) then explores low-p(react) situations
+   * ~8% of ticks, generating outcome labels in the region a greedy gate
+   * never observes.
+   */
+  epsilonBase?: number;
+  /**
+   * Live curiosity source for the exploration draw (0-100). When absent,
+   * exploration is disabled even if epsilonBase is set.
+   */
+  curiositySource?: (agentId: string) => number;
 }
 
 /**
@@ -141,10 +203,14 @@ export class ReactGateHead {
   private warned = false;
   private readonly loader: ArtifactLoader;
   private readonly threshold: number;
+  private readonly epsilonBase: number;
+  private readonly curiositySource: ((agentId: string) => number) | undefined;
 
   constructor(options: ReactGateHeadOptions) {
     this.loader = options.loader;
     this.threshold = options.threshold;
+    this.epsilonBase = options.epsilonBase ?? 0;
+    this.curiositySource = options.curiositySource;
   }
 
   /** Lazily load the artifact once (subsequent calls are no-ops). */
@@ -207,13 +273,27 @@ export class ReactGateHead {
    * Synchronous gate decision from cached features (Req 7: no await in the
    * scheduler hot path). Never throws.
    */
-  decide(vector: System1FeatureVector, hardTriggers: HardTriggerFlags): ReactGateDecision {
+  decide(
+    agentId: string,
+    tickNumber: number,
+    vector: System1FeatureVector,
+    hardTriggers: HardTriggerFlags,
+  ): ReactGateDecision {
     const artifact = this.artifact;
     if (artifact === null) {
       return failOpenDecision(hardTriggers);
     }
     try {
-      return decideWithArtifact(artifact, vector, hardTriggers, this.threshold);
+      const exploration =
+        this.epsilonBase > 0 && this.curiositySource !== undefined
+          ? {
+              agentId,
+              tickNumber,
+              curiosity: this.curiositySource(agentId),
+              epsilonBase: this.epsilonBase,
+            }
+          : undefined;
+      return decideWithArtifact(artifact, vector, hardTriggers, this.threshold, exploration);
     } catch {
       // Any malformed-shape surprise degrades to fail-open, never a throw.
       this.artifact = null;

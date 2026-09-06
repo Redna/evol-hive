@@ -94,7 +94,7 @@ export class PPERScheduler {
           system1.outcomeRecorder?.onTick?.(agent.agentId, _tick.tickNumber);
           const hardTriggers =
             system1.triggerSource?.getHardTriggers(agent.agentId) ?? NO_HARD_TRIGGERS;
-          const decision = system1.gate.decide(agent.agentId, hardTriggers);
+          const decision = system1.gate.decide(agent.agentId, _tick.tickNumber, hardTriggers);
           // Belt-and-braces Req 5: hard triggers force a cycle regardless of
           // p(react) — even a buggy gate must never suppress an alarm.
           if (!decision.react && !hasHardTrigger(hardTriggers)) {
