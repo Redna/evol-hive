@@ -62,6 +62,7 @@ import {
   VisualizerDataAdapter,
 } from '@evol-hive/engine';
 import type { EngineCore } from '@evol-hive/engine';
+import type { AffordanceHandler } from '@evol-hive/engine';
 import { VisualizerServer } from '@evol-hive/visualizer';
 import { assembleCognitionStack, buildMemorySubsystem } from './assembly.ts';
 import {
@@ -95,9 +96,18 @@ class NoopOrchestrator implements PPEROrchestratorPort {
 function apprenticeProfile(): AgentProfile {
   return {
     id: 'apprentice-1',
-    name: 'Apprentice',
-    description: 'An eager apprentice gardener learning the trade.',
+    name: 'Tomas Lind',
+    description:
+      'Apprentice gardener — a former furniture-maker who left the workshop bench to learn how things grow.',
     traits: ['curious', 'energetic'],
+    backstory:
+      'Tomas spent three years sanding chair legs before realizing he wanted to grow ' +
+      'what he built with. He asked Maren for work until she said yes. He trusts his ' +
+      'hands more than his words and learns by doing, not by asking twice.',
+    longTermGoals: [
+      'Grow something from seed to table entirely on his own',
+      "Earn Maren's full trust",
+    ],
     // Mid-level drives (spec 034/032 validation design — see dynamic-world.ts)
     initialDrives: { energy: 45, hunger: 40, social: 60, comfort: 50, curiosity: 60 },
     startRoomId: 'workshop',
@@ -249,9 +259,30 @@ async function main(): Promise<void> {
   for (const [effect, handler] of Object.entries(createDynamicWorldHandlers())) {
     core.affordanceRegistry.registerHandler(effect, handler);
   }
-  core.affordanceRegistry.registerHandler('carry', createCarryEffect(core.mutationService));
+  // Diagnostic wrapper: every affordance execution is visible in the log —
+  // this is how we verify the drive→affordance → execute → driveChanges loop
+  // end-to-end in live runs.
+  const logged =
+    (effectId: string, handler: AffordanceHandler): AffordanceHandler =>
+    async (objectId, agentId, state) => {
+      const r = await handler(objectId, agentId, state);
+      log(
+        `[affordance] ${agentId} ${effectId} @ ${objectId} → ` +
+          (r.success
+            ? `ok${r.driveChanges ? ' drives=' + JSON.stringify(r.driveChanges) : ''}`
+            : `FAILED: ${r.failureReason ?? '?'}`),
+      );
+      return r;
+    };
+  for (const [effect, handler] of Object.entries(createDynamicWorldHandlers())) {
+    core.affordanceRegistry.registerHandler(effect, logged(effect, handler));
+  }
+  core.affordanceRegistry.registerHandler(
+    'carry',
+    logged('carry', createCarryEffect(core.mutationService)),
+  );
   for (const [effect, handler] of Object.entries(createGateHandlers(core.mutationService))) {
-    core.affordanceRegistry.registerHandler(effect, handler);
+    core.affordanceRegistry.registerHandler(effect, logged(effect, handler));
   }
 
   // Cognition stack (real LLM) or no-op orchestrator (mock), + game loop.

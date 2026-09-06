@@ -173,9 +173,18 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
   agents: [
     {
       id: 'gardener-1',
-      name: 'Gardener',
-      description: 'A methodical gardener who keeps the planters healthy.',
-      traits: ['patient'],
+      name: 'Maren Holt',
+      description:
+        'Community gardener — turned the vacant lot into this garden and runs it like a craftsman runs a workshop.',
+      traits: ['patient', 'methodical'],
+      backstory:
+        'Maren spent twelve years as a florist before trading cut stems for living soil. ' +
+        'She rebuilt the community garden from a rubble lot, one planter at a time, and ' +
+        'measures success in harvests rather than words.',
+      longTermGoals: [
+        'Make the garden fully self-sufficient',
+        'Teach someone else to grow food from seed to table',
+      ],
       // Mid-level starting drives (spec 032 AC-5 validation design): urgency
       // exists from tick 1 — decay 0.1/s reaches the hint threshold (<40)
       // within ~60s instead of ~600s, so the drive→affordance loop is
