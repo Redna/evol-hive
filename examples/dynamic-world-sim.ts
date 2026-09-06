@@ -98,7 +98,8 @@ function apprenticeProfile(): AgentProfile {
     name: 'Apprentice',
     description: 'An eager apprentice gardener learning the trade.',
     traits: ['curious', 'energetic'],
-    initialDrives: { curiosity: 80, energy: 90 },
+    // Mid-level drives (spec 034/032 validation design — see dynamic-world.ts)
+    initialDrives: { energy: 45, hunger: 40, social: 60, comfort: 50, curiosity: 60 },
     startRoomId: 'workshop',
   };
 }

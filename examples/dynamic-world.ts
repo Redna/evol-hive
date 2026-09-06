@@ -54,9 +54,7 @@ import type { AttributedAffordance } from '@evol-hive/cognition';
  * Declarative, self-describing availability condition (spec 018, Req 1):
  * evaluated against the owning object's `state` at perception time.
  */
-type AffordanceCondition = NonNullable<
-  SmartObject['affordances'][number]['conditions']
->[number];
+type AffordanceCondition = NonNullable<SmartObject['affordances'][number]['conditions']>[number];
 
 /**
  * Affordance factory (coffee-shop pattern): `preconditions`, `effects`, and
@@ -94,9 +92,11 @@ function makeObject(
   // cognition drive→affordance hints can name the object that offers each
   // affordance ("sit_outside at the Garden Bench"). Harmless extra fields —
   // affordance tool definitions render id/label/effects only.
-  const attributed = affordances.map(
-    (a): AttributedAffordance => ({ ...a, objectId: id, objectName: name }),
-  );
+  const attributed = affordances.map((a): AttributedAffordance => ({
+    ...a,
+    objectId: id,
+    objectName: name,
+  }));
   return { id, name, type, state: {}, affordances: attributed, roomId };
 }
 
@@ -176,7 +176,11 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
       name: 'Gardener',
       description: 'A methodical gardener who keeps the planters healthy.',
       traits: ['patient'],
-      initialDrives: { curiosity: 70 },
+      // Mid-level starting drives (spec 032 AC-5 validation design): urgency
+      // exists from tick 1 — decay 0.1/s reaches the hint threshold (<40)
+      // within ~60s instead of ~600s, so the drive→affordance loop is
+      // exercisable within a single run.
+      initialDrives: { energy: 45, hunger: 40, social: 55, comfort: 50, curiosity: 55 },
       startRoomId: 'garden',
     },
   ],
