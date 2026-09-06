@@ -81,7 +81,7 @@
 ## What's Next
 
 > **All 11 architecture sections (§1-§11) are fully implemented.**
-> The cognitive core is complete. Current focus: **drive-economy equilibrium (#139)**, first real System 1 dream update (trainable heads on accumulated session logs), the full-system grand validation (conversations + identity + System 1 + enum-bound plans active simultaneously), and scale.
+> The cognitive core is complete. Current focus: first real System 1 dream update (trainable heads on accumulated session logs), the full-system grand validation (conversations + identity + System 1 + enum-bound plans active simultaneously), replan quality (spec 038 candidate: penalize repeating just-failed steps), and scale. ~~Drive-economy equilibrium~~ ✅ (#139 closed 2026-09-06 — sustained oscillation confirmed).
 
 ### ✅ Phase 4: Validation & Polish
 > Prove emergent behavior works with real LLM runs. **Complete (2026-09-04).**
