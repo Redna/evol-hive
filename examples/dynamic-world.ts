@@ -43,7 +43,7 @@
  * that offers each affordance.
  */
 
-import type { SceneDefinition, SmartObject } from '@evol-hive/shared';
+import type { AffordanceResult, SceneDefinition, SmartObject } from '@evol-hive/shared';
 import type { SceneMutationServiceImpl } from '@evol-hive/engine';
 import type { AffordanceHandler } from '@evol-hive/engine';
 import type { AttributedAffordance } from '@evol-hive/cognition';
@@ -353,18 +353,30 @@ export function createCarryEffect(service: SceneMutationServiceImpl): Affordance
 }
 
 /** Gate open/close handlers wired to the mutation service (spec 030, Req 9). */
+/**
+ * Gate affordance handlers (spec 030, Req 9): open/close the garden↔workshop
+ * CONNECTION via the mutation service. The destination rooms are the demo's
+ * known topology (the Gate object carries no go_to affordance to derive them
+ * from — the createDoorwayEffect derivation requires one).
+ */
 export function createGateHandlers(
   service: SceneMutationServiceImpl,
+  roomA = 'garden',
+  roomB = 'workshop',
 ): Record<string, AffordanceHandler> {
+  const propose = (action: 'open' | 'close'): AffordanceResult => {
+    const r = service.propose({
+      type: 'set_connection_state',
+      payload: { roomA, roomB, action },
+      source: 'agent',
+    });
+    return r.accepted
+      ? { success: true }
+      : { success: false, failureReason: r.error ?? 'Gate mutation rejected.' };
+  };
   return {
-    open_gate: async (objectId) => {
-      const handler = service.createDoorwayEffect(objectId, 'open_door');
-      return handler(objectId, '', {});
-    },
-    close_gate: async (objectId) => {
-      const handler = service.createDoorwayEffect(objectId, 'close_door');
-      return handler(objectId, '', {});
-    },
+    open_gate: async () => propose('open'),
+    close_gate: async () => propose('close'),
   };
 }
 
