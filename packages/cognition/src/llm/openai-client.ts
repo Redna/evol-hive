@@ -290,6 +290,10 @@ export class OpenAICompatibleLLMClient {
       !Array.isArray(steps) ||
       steps.length === 0
     ) {
+      console.error(
+        `[llm-raw] agent=${payload.agentId ?? '?'} malformed formulate_plan args: ` +
+          JSON.stringify(args).slice(0, 400),
+      );
       throw new LLMResponseError(
         'LLM plan response missing required "description" (non-empty string) or "steps" (non-empty array).',
         JSON.stringify(args),
