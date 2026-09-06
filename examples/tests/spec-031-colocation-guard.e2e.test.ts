@@ -195,11 +195,7 @@ describe('Issue #121 E2E — execute-time co-location guard (spec 031)', () => {
     moveToolbox(core);
 
     // Direct bridge call — no room-scoped resolution involved.
-    const result = await core.bridges.execute.executeAffordance(
-      'toolbox-1',
-      'take_tool',
-      AGENT_ID,
-    );
+    const result = await core.bridges.execute.executeAffordance('toolbox-1', 'take_tool', AGENT_ID);
 
     expect(result.success).toBe(false);
     expect(result.failureReason).toBe(

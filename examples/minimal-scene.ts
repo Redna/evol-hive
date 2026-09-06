@@ -24,9 +24,18 @@ import type {
   EngineConfig,
 } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
-import { createPPEROrchestrator, OpenAICompatibleLLMClient, GuardrailEngineImpl, CognitiveToolExecutorImpl } from '@evol-hive/cognition';
+import {
+  createPPEROrchestrator,
+  OpenAICompatibleLLMClient,
+  GuardrailEngineImpl,
+  CognitiveToolExecutorImpl,
+} from '@evol-hive/cognition';
 import type { AffordanceClassifier } from '@evol-hive/cognition';
-import { OnnxEmbeddingProvider, AffordanceClassifierImpl, defaultClassifierConfig } from '@evol-hive/cognition';
+import {
+  OnnxEmbeddingProvider,
+  AffordanceClassifierImpl,
+  defaultClassifierConfig,
+} from '@evol-hive/cognition';
 import type {
   EmbeddingProvider as MemEmbeddingProvider,
   VectorStore,
@@ -286,7 +295,8 @@ export function buildMinimalEngine(): AssembledEngine {
 
   // PPER orchestrator (cognition) wired from the engine bridges + LLM.
   const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
-  const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as 'low' | 'medium' | 'high' | 'none' | undefined;
+  const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as
+    'low' | 'medium' | 'high' | 'none' | undefined;
 
   // Cognitive tool executor (spec 015, Req 24/26): wire the state data provider
   // (the engine's reflect bridge implements updateGoal + applyDriveChanges) so
@@ -319,10 +329,9 @@ export function buildMinimalEngine(): AssembledEngine {
     ? new AffordanceClassifierImpl(embeddingProvider, defaultClassifierConfig())
     : makeMockClassifier();
 
-  const guardrail =
-    config.guardrailsEnabled
-      ? new GuardrailEngineImpl(config.guardrails)
-      : undefined;
+  const guardrail = config.guardrailsEnabled
+    ? new GuardrailEngineImpl(config.guardrails)
+    : undefined;
 
   const orchestrator = createPPEROrchestrator({
     perceptionProvider: core.bridges.perception,

@@ -377,11 +377,7 @@ function buildEngine(scene: SceneDefinition, makeMockLLM: () => LLMClient): Asse
   // otherwise the drive-aware mock LLM (backward compatible).
   const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
   const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as
-    | 'low'
-    | 'medium'
-    | 'high'
-    | 'none'
-    | undefined;
+    'low' | 'medium' | 'high' | 'none' | undefined;
   const maxToolCallIterationsEnv = process.env['LLM_MAX_TOOL_CALL_ITERATIONS'];
   const maxToolCallIterations =
     maxToolCallIterationsEnv !== undefined ? Number(maxToolCallIterationsEnv) : undefined;
@@ -395,9 +391,7 @@ function buildEngine(scene: SceneDefinition, makeMockLLM: () => LLMClient): Asse
     llmClient = new OpenAICompatibleLLMClient({
       baseUrl: process.env['LLM_BASE_URL'] ?? 'http://localhost:11434/v1',
       model: process.env['LLM_MODEL'] ?? 'llama3.1',
-      ...(process.env['LLM_API_KEY'] !== undefined
-        ? { apiKey: process.env['LLM_API_KEY'] }
-        : {}),
+      ...(process.env['LLM_API_KEY'] !== undefined ? { apiKey: process.env['LLM_API_KEY'] } : {}),
       ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
       cognitiveToolExecutor,
       ...(maxToolCallIterations !== undefined ? { maxToolCallIterations } : {}),
@@ -408,10 +402,9 @@ function buildEngine(scene: SceneDefinition, makeMockLLM: () => LLMClient): Asse
 
   const classifier: AffordanceClassifier = makeMockClassifier();
 
-  const guardrail =
-    config.guardrailsEnabled
-      ? new GuardrailEngineImpl(config.guardrails)
-      : undefined;
+  const guardrail = config.guardrailsEnabled
+    ? new GuardrailEngineImpl(config.guardrails)
+    : undefined;
 
   const orchestrator = createPPEROrchestrator({
     perceptionProvider: core.bridges.perception,

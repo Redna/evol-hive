@@ -149,7 +149,10 @@ describe('AC-3b: harvest/eat handlers gate on state, mutate it, and restore driv
   });
 
   it('eat succeeds with driveChanges.hunger >= +25 and decrements vegetables', async () => {
-    const result = await handlers['eat']!('planter-1', GARDENER, { vegetables: 2, seeds_planted: 1 });
+    const result = await handlers['eat']!('planter-1', GARDENER, {
+      vegetables: 2,
+      seeds_planted: 1,
+    });
     expect(result.success).toBe(true);
     expect(result.newState!['vegetables']).toBe(1);
     expect(result.newState!['seeds_planted']).toBe(1); // unrelated state preserved

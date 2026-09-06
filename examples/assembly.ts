@@ -38,7 +38,11 @@ import type {
   System1OutcomeRecorderPort,
   GateWeightArtifact,
 } from '@evol-hive/shared';
-import { defaultMemoryDecayConfig, defaultReflectionConfig, defaultSystem1GateConfig } from '@evol-hive/shared';
+import {
+  defaultMemoryDecayConfig,
+  defaultReflectionConfig,
+  defaultSystem1GateConfig,
+} from '@evol-hive/shared';
 import type {
   LLMClient,
   LLMContextPayload,
