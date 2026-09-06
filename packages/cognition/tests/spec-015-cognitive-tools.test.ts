@@ -840,7 +840,8 @@ describe('PlanServiceImpl sets agentId (AC-32)', () => {
     const llm = new FakeLLMClient();
     llm.completePlan = vi.fn().mockResolvedValue({
       description: 'Brew coffee',
-      steps: [{ description: 'Brew' }],
+      // Spec 037: steps must bind — narrative steps trigger a retry (2 calls).
+      steps: [{ description: 'Brew', targetAffordance: 'brew_coffee' }],
     });
     const service = new PlanServiceImpl({
       planBuilder: new PlanBuilderImpl(),

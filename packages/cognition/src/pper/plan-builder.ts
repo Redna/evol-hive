@@ -11,7 +11,7 @@
 
 import type { AgentProfile, PerceptionResult, Relationship } from '@evol-hive/shared';
 import {
-  formulatePlanTool,
+  formulatePlanToolFor,
   queryMemoryTool,
   updateInternalStateTool,
   talkToTool,
@@ -166,12 +166,17 @@ export class PlanBuilderImpl implements PlanBuilder {
     // names when formulating a plan (spec 019, Req 8).
     const affordanceTools = affordancesToToolDefinitions(prunedAffordances);
 
+    // Spec 037, Req 1: the formulate_plan schema enum-binds targetAffordance to
+    // the pruned affordance IDs (+ 'wait') — the pruner's output becomes a
+    // value-space constraint, not just prompt context.
+    const planTool = formulatePlanToolFor(prunedAffordances.map((a) => a.id));
+
     return {
       systemPrompt,
       perceptionContext: contextLines.join('\n'),
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
-      tools: buildPlanTools(hasAgentsPresent, affordanceTools, isSocialPrimary),
+      tools: buildPlanTools(hasAgentsPresent, affordanceTools, isSocialPrimary, planTool),
     };
   }
 }
@@ -195,8 +200,8 @@ function buildSystemPrompt(
       `You are ${persona.name}, ${personaText}.`,
       'You must formulate a plan to satisfy your most urgent drive.',
       'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
-      'EVERY step in your plan MUST set targetAffordance to one of the affordance IDs available to you. ' +
-        'Steps without targetAffordance are discarded — you cannot act by describing intentions alone.',
+      'EVERY step in your plan MUST set targetAffordance to one of the enum values in the formulate_plan tool schema (the affordances available to you right now). ' +
+        'Use "wait" when no affordance is relevant. Steps without a valid targetAffordance are rejected — you cannot act by describing intentions alone.',
       'Each step should map to an available affordance when possible.',
     ].join(' ');
     return hasAgentsPresent ? `${base} ${socialDirective}` : base;
@@ -205,8 +210,8 @@ function buildSystemPrompt(
     'You are an autonomous NPC in a deterministic simulation.',
     'You must formulate a plan to satisfy your most urgent drive.',
     'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
-    'EVERY step in your plan MUST set targetAffordance to one of the affordance IDs available to you. ' +
-      'Steps without targetAffordance are discarded — you cannot act by describing intentions alone.',
+    'EVERY step in your plan MUST set targetAffordance to one of the enum values in the formulate_plan tool schema (the affordances available to you right now). ' +
+      'Use "wait" when no affordance is relevant. Steps without a valid targetAffordance are rejected — you cannot act by describing intentions alone.',
     'Each step should map to an available affordance when possible.',
   ].join(' ');
   return hasAgentsPresent ? `${base} ${socialDirective}` : base;
@@ -229,6 +234,8 @@ function buildPlanTools(
   hasAgentsPresent: boolean,
   affordanceTools: import('@evol-hive/shared').ToolDefinition[] = [],
   isSocialPrimary = false,
+  /** Spec 037: the per-cycle enum-bound formulate_plan tool. */
+  planTool: import('@evol-hive/shared').ToolDefinition = formulatePlanToolFor([]),
 ) {
   // Spec 024, Req 1 & Req 2: When agents are present, social tools are placed
   // FIRST in the tools array to leverage the positional bias of smaller LLMs
@@ -236,27 +243,15 @@ function buildPlanTools(
   // is demoted to the very end of the array (after all other tools) to make it
   // the least likely choice.
   if (!hasAgentsPresent) {
-    return [formulatePlanTool, queryMemoryTool, updateInternalStateTool, ...affordanceTools];
+    return [planTool, queryMemoryTool, updateInternalStateTool, ...affordanceTools];
   }
   const socialTools = [talkToTool, observeAgentTool, helpTool, ignoreTool];
   if (isSocialPrimary) {
     // Req 2: social first, cognitive + affordance next, formulate_plan LAST.
-    return [
-      ...socialTools,
-      queryMemoryTool,
-      updateInternalStateTool,
-      ...affordanceTools,
-      formulatePlanTool,
-    ];
+    return [...socialTools, queryMemoryTool, updateInternalStateTool, ...affordanceTools, planTool];
   }
   // Req 1: social first, then formulate_plan, cognitive, affordance.
-  return [
-    ...socialTools,
-    formulatePlanTool,
-    queryMemoryTool,
-    updateInternalStateTool,
-    ...affordanceTools,
-  ];
+  return [...socialTools, planTool, queryMemoryTool, updateInternalStateTool, ...affordanceTools];
 }
 
 /**
