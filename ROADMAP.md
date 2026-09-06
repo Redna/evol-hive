@@ -27,7 +27,7 @@
 | Object Interactions | [018](docs/specs/018-object-interactions.md) | ✅ Merged | #69 |
 | Multi-Agent Social | [018](docs/specs/018-multi-agent-social.md) | ✅ Merged | #70 |
 
-**21 specs, 88+ PRs — all merged. 1,140 tests passing.**
+**37 specs, 150+ PRs — all merged. 2,055+ tests passing.**
 
 ### Phase 4-5 Progress (specs 019-029)
 
@@ -41,6 +41,14 @@
 | [027](docs/specs/027-real-llm-visualizer-demo.md) | Real-LLM Visualizer Demo | ✅ Merged | #113 |
 | [028](docs/specs/028-compound-action-execution.md) | Compound Action Execution | ✅ Merged | #114 |
 | [029](docs/specs/029-visualizer-state-text-overflow.md) | Visualizer State Text Overflow Fix | ✅ Merged | (direct) |
+| [030](docs/specs/030-dynamic-scenes-living-worlds.md) | Dynamic Scenes — Living Worlds (runtime mutation, event-sourced) | ✅ Merged | #120 |
+| [031](docs/specs/031-execute-colocation-guard.md) | Execute-Time Co-Location Guard | ✅ Merged | #123 |
+| [032](docs/specs/032-dynamic-world-drive-restoration.md) | Drive Restoration Affordances (bench/stool) | ✅ Merged | #127 |
+| [033](docs/specs/033-conversations-identity-evolution.md) | Conversations as Perceivable Objects + Identity Evolution | ✅ Merged | #131 |
+| [034](docs/specs/034-drive-affordance-hints-hunger-chain.md) | Drive→Affordance Hints + Hunger Chain | ✅ Merged | #133 |
+| [035](docs/specs/035-system1-trainable-heads.md) | System 1 — Trainable React/Ignore Gate + Importance Head | ✅ Merged | #136 |
+| [036](docs/specs/036-exploration-factor.md) | Curiosity-Modulated Exploration Factor | ✅ Implemented | (direct, #138) |
+| [037](docs/specs/037-enum-bound-plan-formulation.md) | Enum-Bound Plan Formulation (+ livelock guard, empty-args repair) | ✅ Implemented | #141 |
 
 ## Completed Phases
 
@@ -73,7 +81,7 @@
 ## What's Next
 
 > **All 11 architecture sections (§1-§11) are fully implemented.**
-> The cognitive core is complete. Next focus: validation, presentation, and scale.
+> The cognitive core is complete. Current focus: **drive-economy equilibrium (#139)**, first real System 1 dream update (trainable heads on accumulated session logs), the full-system grand validation (conversations + identity + System 1 + enum-bound plans active simultaneously), and scale.
 
 ### ✅ Phase 4: Validation & Polish
 > Prove emergent behavior works with real LLM runs. **Complete (2026-09-04).**
@@ -92,6 +100,11 @@
 - [x] **Real-LLM Visualizer Demo** — coffee-shop example wired to the visualizer server with TokenUsageReporter (spec 027, #113)
 - [x] **Compound Action Execution** — LLM-planned compound actions execute via the Execute service (spec 028, #114)
 - [x] **Dynamic Scenes** — SceneMutationService (validated mutation funnel, tick-boundary apply, event-sourced), object/agent lifecycle with dormant-agent store + YAAM persistence, dynamic topology (open/close doors), `modify_scene` cognitive tool with §10 guardrails, live visualizer deltas (spec 030, #120)
+- [x] **Conversations as Perceivable Temporal Objects + Identity Evolution** — ConversationManager (rolling turn window, sentiment-gated trust), SelfModelManager, `update_self_model` tool, identity consolidation, save v3 (spec 033, #131)
+- [x] **Drive→Affordance Hints + Hunger Chain** — data-driven matcher, plant→harvest→eat closes the hunger loop (spec 034, #133)
+- [x] **System 1 Trainable Heads** — React/Ignore linear-probe gate (fail-open, hard triggers), composite importance head, self-supervised outcome labeling, dream-time weight updates with holdout revert (spec 035, #136; ADR-0002 accepted)
+- [x] **Curiosity-Modulated Exploration** — seeded epsilon for the React/Ignore gate, default-off (spec 036, #138)
+- [x] **Enum-Bound Plan Formulation** — `targetAffordance` constrained via a dynamic tool-signature enum; first affordance executions and **drive oscillation** observed live (hunger 39→97, energy 44→100); step-skip livelock guard + empty-args repair (spec 037, #141)
 
 ## Architecture Coverage Map
 
