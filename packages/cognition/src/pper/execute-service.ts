@@ -136,6 +136,11 @@ export class ExecuteServiceImpl {
 
         // Skip steps with unresolvable affordances (LLM may plan actions that
         // don't map to real affordances). Advance to the next step and continue.
+        // Diagnostic: this skip is the silent killer of live runs (issue #130
+        // validation) — always log it.
+        console.error(
+          `[system1-skip] agent=${agentId} affordance='${step.targetAffordance}' not in room '${agentState.location}' — step skipped`,
+        );
         dataProvider.advanceStep(agentId);
         const planComplete = dataProvider.isPlanComplete(agentId);
         const feedback = `Skipped step: affordance '${step.targetAffordance}' not found in room '${agentState.location}'.`;
