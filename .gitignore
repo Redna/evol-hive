@@ -45,3 +45,5 @@ events.tmp.jsonl
 models/
 .yaam_start_lines
 events.jsonl.bak
+session-logs/
+gate-artifact.json
