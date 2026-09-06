@@ -61,6 +61,84 @@ export const formulatePlanSchema = {
   additionalProperties: false,
 } as const;
 
+/**
+ * Escape affordance always present in the plan enum (spec 037, Req 1): when
+ * nothing in the room is relevant, the model must be able to legally emit a
+ * no-op step instead of an unbound narrative step.
+ */
+export const WAIT_AFFORDANCE = 'wait';
+
+/**
+ * Dynamic formulate_plan tool response schema with an **enum-bound**
+ * `targetAffordance` (spec 037, Req 1).
+ *
+ * The enum contains the affordance IDs actually available to the agent in its
+ * current room (the System 0 pruner's top-K set) plus the `wait` escape. This
+ * turns the pruner's output from prompt context into a value-space constraint:
+ * a step referencing a non-available affordance becomes (nearly) inexpressible
+ * at the tool-signature level.
+ *
+ * NOTE (spec 037, Req 3 — parameter boundary): the enum constrains *values*
+ * only. `targetAffordance` is deliberately NOT in `required` — making it
+ * required broke backend tool-calling entirely (empty args, see issue #130
+ * arc). Presence is enforced by the PlanServiceImpl validator + one
+ * retry-with-feedback instead.
+ *
+ * When `availableAffordanceIds` is empty (e.g., guardrail masking, spec 016),
+ * the enum collapses to `['wait']` — the only legal binding is a no-op.
+ */
+export function formulatePlanSchemaFor(availableAffordanceIds: string[]) {
+  const enumValues =
+    availableAffordanceIds.length > 0
+      ? [...availableAffordanceIds, WAIT_AFFORDANCE]
+      : [WAIT_AFFORDANCE];
+  return {
+    type: 'object',
+    properties: {
+      description: {
+        type: 'string',
+        description: 'High-level description of the plan.',
+      },
+      steps: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            description: { type: 'string' },
+            targetAffordance: {
+              type: 'string',
+              description:
+                "The affordance ID to execute for this step. MUST be one of the enum values. Use 'wait' when no affordance is relevant.",
+              enum: enumValues,
+            },
+          },
+          required: ['description'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['description', 'steps'],
+    additionalProperties: false,
+  };
+}
+
+/**
+ * Dynamic formulate_plan tool definition (spec 037, Req 1) — the per-cycle
+ * replacement for the static {@link formulatePlanTool}. Builders MUST use
+ * this factory so the plan schema carries the room's affordance enum.
+ */
+export function formulatePlanToolFor(availableAffordanceIds: string[]): ToolDefinition {
+  return {
+    type: 'function',
+    function: {
+      name: 'formulate_plan',
+      description:
+        "Create a plan to satisfy the agent's drives. EVERY step MUST set targetAffordance to one of the enum values (use 'wait' when nothing is relevant).",
+      parameters: formulatePlanSchemaFor(availableAffordanceIds),
+    },
+  };
+}
+
 /** The query_memory tool response schema. */
 export const queryMemorySchema = {
   type: 'object',
@@ -237,7 +315,14 @@ export function affordancesToToolDefinitions(affordances: Affordance[]): ToolDef
   return affordances.map((a) => affordanceToToolDefinition(a));
 }
 
-/** Tool definition for the Plan phase (spec 011, Req 3). */
+/**
+ * Tool definition for the Plan phase (spec 011, Req 3).
+ *
+ * @deprecated Superseded by {@link formulatePlanToolFor} (spec 037): builders
+ * now emit a per-cycle tool definition whose schema enum-binds
+ * `targetAffordance` to the room's available affordances. This static
+ * variant remains exported for backward compatibility only.
+ */
 export const formulatePlanTool: ToolDefinition = {
   type: 'function',
   function: {

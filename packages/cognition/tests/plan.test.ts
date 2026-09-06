@@ -158,7 +158,8 @@ function makeFormulatePlanResult(): FormulatePlanResult {
     description: 'Restore energy by brewing coffee',
     steps: [
       { description: 'Go to the coffee machine', targetAffordance: 'brew_coffee' },
-      { description: 'Brew coffee and drink it' },
+      // Spec 037: narrative steps are rejected — every step must bind.
+      { description: 'Brew coffee and drink it', targetAffordance: 'brew_coffee' },
     ],
   };
 }
@@ -173,7 +174,11 @@ function makeStoredPlan(): AgentPlan {
         targetAffordance: 'brew_coffee',
         completed: false,
       },
-      { description: 'Brew coffee and drink it', completed: false },
+      {
+        description: 'Brew coffee and drink it',
+        targetAffordance: 'brew_coffee',
+        completed: false,
+      },
     ],
     currentStepIndex: 0,
     createdAt: 100,

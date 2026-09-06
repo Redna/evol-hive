@@ -25,6 +25,7 @@ import type {
   ExecuteDataProvider,
   AffordanceGuard,
 } from '@evol-hive/shared';
+import { WAIT_AFFORDANCE } from '@evol-hive/shared';
 import type { GuardrailEngine } from '../index.js';
 
 /** Constructor options for {@link ExecuteServiceImpl}. */
@@ -84,6 +85,17 @@ export class ExecuteServiceImpl {
         dataProvider.advanceStep(agentId);
         const planComplete = dataProvider.isPlanComplete(agentId);
         return { success: true, planComplete, stepSkipped: true };
+      }
+
+      // Escape hatch (spec 037, Req 1): a 'wait' step is an intentional no-op.
+      // The plan enum always offers 'wait' so the model is never trapped with
+      // no legal binding; execution advances past it without touching the
+      // world. (Unbound steps never reach here for new plans — spec 037's
+      // validator rejects them — but legacy plans may still contain them.)
+      if (step.targetAffordance === WAIT_AFFORDANCE) {
+        dataProvider.advanceStep(agentId);
+        const planComplete = dataProvider.isPlanComplete(agentId);
+        return { success: true, planComplete };
       }
 
       // Plan validation (spec 016, Req 11): before executing, validate that the
