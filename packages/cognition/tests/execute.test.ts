@@ -523,9 +523,7 @@ describe('ExecuteServiceImpl.execute (AC-21 through AC-35)', () => {
     expect(r2.success).toBe(true);
     expect(r2.stepSkipped).toBe(true);
     expect(provider.advanceStepCalls).toHaveLength(1);
-    expect(
-      provider.setSystemFeedbackCalls.at(-1)?.feedback,
-    ).toContain('skipping this step');
+    expect(provider.setSystemFeedbackCalls.at(-1)?.feedback).toContain('skipping this step');
 
     // The counter resets: a DIFFERENT failing step gets its own 2 attempts.
     provider.currentStep = plan.steps[1]!;

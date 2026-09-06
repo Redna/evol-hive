@@ -133,13 +133,14 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
       // from tool descriptions alone, because harvest/eat stay invisible
       // (declarative conditions) until 3 seeds are planted. Without the
       // label hints the model rationally plants once and waits forever.
+      aff('plant_seeds', 'Plant seeds (after 3 plantings, vegetables ripen for harvest)'),
       aff(
-        'plant_seeds',
-        'Plant seeds (after 3 plantings, vegetables ripen for harvest)',
+        'harvest',
+        'Harvest vegetables (requires 3 seeds planted)',
+        [],
+        { curiosity: 10, comfort: 5 },
+        [{ field: 'seeds_planted', operator: '>=', value: 3 }],
       ),
-      aff('harvest', 'Harvest vegetables (requires 3 seeds planted)', [], { curiosity: 10, comfort: 5 }, [
-        { field: 'seeds_planted', operator: '>=', value: 3 },
-      ]),
       aff('eat', 'Eat a vegetable', [], { hunger: 25 }, [
         { field: 'vegetables', operator: '>=', value: 1 },
       ]),
