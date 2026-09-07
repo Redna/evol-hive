@@ -27,19 +27,21 @@ PR_WAIT_TIMEOUT=3600    # 60 minutes max waiting for human to merge PR
 
 # --- API helpers ---
 api() {
-  curl -s -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" "$@"
+  # --max-time: an API stall must not wedge the orchestrator (observed:
+  # post_comment hung >12 min between phases, blocking the Developer dispatch).
+  curl -s --max-time 30 --retry 2 --retry-delay 5 -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" "$@"
 }
 
 api_pat() {
-  curl -s -H "Authorization: token $PAT" -H "Accept: application/vnd.github+json" "$@"
+  curl -s --max-time 30 --retry 2 --retry-delay 5 -H "Authorization: token $PAT" -H "Accept: application/vnd.github+json" "$@"
 }
 
 api_post() {
-  curl -s -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" "$@"
+  curl -s --max-time 30 --retry 2 --retry-delay 5 -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" "$@"
 }
 
 api_post_pat() {
-  curl -s -X POST -H "Authorization: token $PAT" -H "Accept: application/vnd.github+json" "$@"
+  curl -s --max-time 30 --retry 2 --retry-delay 5 -X POST -H "Authorization: token $PAT" -H "Accept: application/vnd.github+json" "$@"
 }
 
 post_comment() {
