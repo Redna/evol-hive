@@ -5,7 +5,7 @@
 - Architecture: §2 (System Overview — adds a spatial layer), §3 (Agent State — position + spatial memory), §4 (Smart Objects — grid anchors, visibility), §6 (PPER — Execute becomes navigation-aware), §9 (Engine Routing — pathfinding service)
 - Related specs: 030 (dynamic scenes/topology), 031 (co-location guard), 037 (enum-bound plans)
 - Package: shared, engine, cognition, visualizer, examples
-- Status: 📝 Drafted (user-directed design, 2026-09-07)
+- Status: 🔄 In Progress — R1/R2/R5 first slice implemented (8c38f9b); R3/R4 cell-level fog + LLM intents phase 2 (progress: [#143](https://github.com/Redna/evol-hive/issues/143))
 - Supersedes: the earlier "spatial presentation" sketch — this is not a presentation layer; movement is an engine mechanic.
 
 ## Problem
@@ -56,7 +56,7 @@ This matches the established division of labor: LLM = high-level planner (areas,
 
 ## Acceptance Criteria
 
-- [ ] AC-1: Agents occupy grid cells; walking is cell-by-cell per tick (deterministic, verifiable)
+- [x] AC-1: Agents occupy grid cells; walking is cell-by-cell per tick (deterministic, verifiable)
 - [ ] AC-2: A plan step with `targetArea: 'workshop'` walks the agent through the door graph to the workshop; movement spans multiple ticks; execution fires on arrival
 - [ ] AC-3: A room never visited produces no affordances/objects in perception (fog); after exploration it does
 - [ ] AC-4: `talk_to` about a discovery transfers it to the listener's spatial memory (social fog-lifting)
