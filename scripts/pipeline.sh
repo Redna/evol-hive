@@ -216,8 +216,15 @@ echo "  PIPELINE STARTED — Issue #$ISSUE_NUMBER"
 echo "============================================"
 
 # ============================================================
-# PHASE 1: ARCHITECT
+# PHASE 1: ARCHITECT (skipped when SPEC_PR_OVERRIDE is provided — the spec
+# for this issue is already merged and the Developer can start immediately;
+# the wait_for_pr_merge below detects `merged` state instantly)
 # ============================================================
+if [ -n "$SPEC_PR_OVERRIDE" ]; then
+  SPEC_PR="${SPEC_PR_OVERRIDE}|merged"
+  post_comment "issues/$ISSUE_NUMBER" "## ℹ️ Pipeline: spec PR #$SPEC_PR_OVERRIDE provided — skipping Architect\n\nProceeding to Developer."
+  echo "  Spec PR override: #$SPEC_PR_OVERRIDE — skipping Architect"
+else
 echo ""
 echo "--- Phase 1: Architect ---"
 
@@ -269,6 +276,8 @@ fi
 SPEC_PR_NUM=$(echo "$SPEC_PR" | cut -d'|' -f1)
 post_comment "issues/$ISSUE_NUMBER" "## 🏗️ Architect completed\n\nSpec PR #$SPEC_PR_NUM created. Please review and merge to continue the pipeline."
 echo "  Spec PR #$SPEC_PR_NUM created, waiting for merge..."
+
+fi  # end SPEC_PR_OVERRIDE skip
 
 # ============================================================
 # PHASE 2: WAIT FOR SPEC PR MERGE

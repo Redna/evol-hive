@@ -7,6 +7,10 @@ on:
         description: "Issue number to process through the full pipeline"
         required: true
         type: string
+      spec_pr:
+        description: "Optional: already-merged spec PR number — skips the Architect phase"
+        required: false
+        type: string
 
 jobs:
   orchestrate:
@@ -34,6 +38,7 @@ jobs:
       - name: Run Pipeline Orchestrator
         env:
           ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
+          SPEC_PR_OVERRIDE: ${{ github.event.inputs.spec_pr }}
           GH_PAT: ${{ secrets.GH_PAT }}
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
