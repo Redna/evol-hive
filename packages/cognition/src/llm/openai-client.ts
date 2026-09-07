@@ -299,9 +299,12 @@ export class OpenAICompatibleLLMClient {
         `[llm-raw] agent=${payload.agentId ?? '?'} malformed formulate_plan args: ` +
           JSON.stringify(args).slice(0, 400),
       );
+      // NOTE: append ONLY a user message. An assistant message with
+      // content:null and no tool_calls is an invalid sequence — OpenAI-
+      // compatible backends reject it with 400 (observed 508× for
+      // apprentice-1 in the grand10 run, masking every repair).
       const retryMessages = [
         ...messages,
-        { role: 'assistant' as const, content: null },
         {
           role: 'user' as const,
           content:
@@ -834,7 +837,7 @@ export class OpenAICompatibleLLMClient {
       if (!response.ok) {
         const respBody = await response.text().catch(() => '');
         throw new LLMHTTPError(
-          `LLM request to ${url} failed with status ${response.status}.`,
+          `LLM request to ${url} failed with status ${response.status}. Body: ${respBody.slice(0, 300)}`,
           response.status,
           respBody,
         );
