@@ -159,13 +159,11 @@ export function createBuiltinPlugins(): HandlerPlugin[] {
 // ─── Doorway plugin ──────────────────────────────────────────────────────────
 
 /** Placeholder for the scene manager — set during auto-registration. */
-let _sceneManager:
-  | {
-      moveAgent: (agentId: string, toRoomId: string) => void;
-      /** Spec 038: grid walking when the navigator is wired (optional, backward compat). */
-      requestWalk?: (agentId: string, toRoomId: string) => boolean;
-    }
-  | null = null;
+let _sceneManager: {
+  moveAgent: (agentId: string, toRoomId: string) => void;
+  /** Spec 038: grid walking when the navigator is wired (optional, backward compat). */
+  requestWalk?: (agentId: string, toRoomId: string) => boolean;
+} | null = null;
 
 /** Internal: set the scene manager reference for movement handlers. */
 export function _setSceneManagerForPlugins(
