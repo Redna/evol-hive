@@ -14,6 +14,7 @@
  * Built-in `fetch` + `AbortController` — no external HTTP library (ADR-0001).
  */
 
+import { writeFileSync, readdirSync } from 'node:fs';
 import type {
   LLMActionResponse,
   FormulatePlanResult,
@@ -299,6 +300,18 @@ export class OpenAICompatibleLLMClient {
         `[llm-raw] agent=${payload.agentId ?? '?'} malformed formulate_plan args: ` +
           JSON.stringify(args).slice(0, 400),
       );
+      // Full-payload dump for offline bisection (first occurrence per agent).
+      try {
+        const dumpPath = `/tmp/empty-args-${payload.agentId ?? 'unknown'}.json`;
+        if (!readdirSync('/tmp').includes(`empty-args-${payload.agentId ?? 'unknown'}.json`)) {
+          writeFileSync(
+            dumpPath,
+            JSON.stringify({ messages, tools: payload.tools, args }, null, 2),
+          );
+        }
+      } catch {
+        // diagnostics only
+      }
       // NOTE: append ONLY a user message. An assistant message with
       // content:null and no tool_calls is an invalid sequence — OpenAI-
       // compatible backends reject it with 400 (observed 508× for
