@@ -30,6 +30,7 @@ import { sentimentTint } from '@evol-hive/shared';
 import type { GameLoopImpl } from '../loop/index.js';
 import type { AgentManagerImpl } from '../agents/state/index.js';
 import type { SmartObjectRegistryImpl } from '../world/objects/index.js';
+import type { WorldGrid } from '../spatial/grid.js';
 import type { SceneManagerImpl } from '../world/scenes/index.js';
 import type { SceneMutationServiceImpl } from '../world/mutations/scene-mutation-service.js';
 import type { ConversationManagerImpl } from '../social/conversation-manager.js';
@@ -50,6 +51,8 @@ export interface VisualizerDataAdapterOptions {
   scenes?: Map<string, SceneDefinition>;
   /** Optional mutation service — exposes mutation log deltas (spec 030, Req 15). */
   mutationService?: SceneMutationServiceImpl;
+  /** Spatial navigation (spec 038) — grid anchors for object placement. */
+  navigation?: { grid: WorldGrid };
   /** Optional conversation manager — conversation projections (spec 033, R9). */
   conversationManager?: ConversationManagerImpl;
 }
@@ -71,6 +74,7 @@ export class VisualizerDataAdapter implements VisualizerInterface {
   private readonly scenes: Map<string, SceneDefinition> | undefined;
   private readonly mutationService: SceneMutationServiceImpl | undefined;
   private readonly conversationManager: ConversationManagerImpl | undefined;
+  private readonly navigation?: { grid: WorldGrid };
 
   constructor(options: VisualizerDataAdapterOptions) {
     this.gameLoop = options.gameLoop;
@@ -83,6 +87,9 @@ export class VisualizerDataAdapter implements VisualizerInterface {
     this.scenes = options.scenes;
     this.mutationService = options.mutationService;
     this.conversationManager = options.conversationManager;
+    if (options.navigation !== undefined) {
+      this.navigation = options.navigation;
+    }
   }
 
   /** Compose a full `VisualizerState` snapshot from the engine (spec 023, Req 8). */
@@ -91,13 +98,14 @@ export class VisualizerDataAdapter implements VisualizerInterface {
 
     // Rooms — flatten each room with its full object list.
     const rooms: VisualizerRoom[] = this.sceneManager.getAllRooms().map((room) => {
-      const objects: VisualizerObject[] = this.smartObjectRegistry
-        .getByRoom(room.id)
-        .map((obj) => ({
+      const objects: VisualizerObject[] = this.smartObjectRegistry.getByRoom(room.id).map((obj) => {
+        const anchor = this.navigation?.grid.grid(room.id)?.getAnchor(obj.id) ?? null;
+        return {
           id: obj.id,
           name: obj.name,
           type: obj.type,
           state: obj.state,
+          cell: anchor ?? undefined,
           affordances: obj.affordances.map((a) => ({ id: a.id, label: a.label })),
           ...(obj.compoundActions
             ? {
@@ -111,7 +119,8 @@ export class VisualizerDataAdapter implements VisualizerInterface {
           // Conversation projection (spec 033, R9/AC-10): topic + participants
           // + sentiment-derived tint for live conversation objects.
           ...this.conversationProjection(obj),
-        }));
+        } as VisualizerObject;
+      });
 
       return {
         id: room.id,
@@ -147,6 +156,7 @@ export class VisualizerDataAdapter implements VisualizerInterface {
         agentId: state.agentId,
         name,
         location: state.location,
+        ...(state.position !== undefined ? { position: state.position } : {}),
         drives,
         currentGoal: state.currentGoal,
         currentPlan,

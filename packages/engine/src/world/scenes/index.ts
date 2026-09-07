@@ -25,6 +25,15 @@ export class SceneManagerImpl implements SceneManager {
    */
   private readonly closedConnections = new Set<string>();
 
+  /**
+   * The navigation system (spec 038, R1/R2) — set by the assembly after the
+   * game loop is built. When present, `requestWalk` walks the agent cell-by-
+   * cell (tick-integrated); when absent, movement falls back to the legacy
+   * teleport (`moveAgent`), preserving backward compatibility for tests and
+   * scenes without grid layout.
+   */
+  private navigator: { requestWalk(agentId: string, toRoomId: string): boolean } | null = null;
+
   constructor(agentManager: AgentManager, rooms: Map<string, Room>) {
     this.agentManager = agentManager;
     this.rooms = rooms;
@@ -47,6 +56,25 @@ export class SceneManagerImpl implements SceneManager {
 
   moveAgent(agentId: string, toRoomId: string): void {
     this.agentManager.updateState(agentId, { location: toRoomId });
+  }
+
+  /** Inject the navigation system (spec 038) — called by the assembly. */
+  setNavigator(navigator: { requestWalk(agentId: string, toRoomId: string): boolean }): void {
+    this.navigator = navigator;
+  }
+
+  /**
+   * Walk the agent to `toRoomId` along the grid (spec 038, R2): the engine
+   * computes the multi-room route, the agent advances cell-by-cell per tick,
+   * and `location` changes only on doorway crossing. Falls back to the legacy
+   * teleport when no navigator is wired. Returns false when no route exists.
+   */
+  requestWalk(agentId: string, toRoomId: string): boolean {
+    if (this.navigator !== null) {
+      return this.navigator.requestWalk(agentId, toRoomId);
+    }
+    this.moveAgent(agentId, toRoomId);
+    return true;
   }
 
   getAgentRoom(agentId: string): Room | null {

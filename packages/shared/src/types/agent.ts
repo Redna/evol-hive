@@ -50,6 +50,25 @@ export interface AgentInternalState {
    * interactions. `undefined` when the agent has no relationships.
    */
   relationships?: Record<string, Relationship>;
+  /**
+   * The agent's grid cell within the current room (spec 038, R1). `undefined`
+   * for legacy saves / scenes without grid layout — the agent is then rendered
+   * in its room slot as before.
+   */
+  position?: { x: number; y: number };
+  /**
+   * Per-agent spatial understanding (spec 038, R4 — fog of war, room-level
+   * v1). Rooms the agent has actually visited, doors seen, and when each
+   * discovery happened. Cell-level fog is phase 2.
+   */
+  spatialMemory?: {
+    /** Room IDs the agent has personally visited (arrival order). */
+    visitedRooms: string[];
+    /** Door/connection pairs seen but possibly not traversed ("garden|workshop"). */
+    knownDoors: string[];
+    /** Room ID → sim time of first arrival (audit + freshness). */
+    discoveredAt: Record<string, number>;
+  };
 }
 
 /**

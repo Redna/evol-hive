@@ -351,6 +351,7 @@ async function main(): Promise<void> {
     agentProfiles,
     scenes,
     mutationService: core.mutationService,
+    ...(core.navigation !== undefined ? { navigation: core.navigation } : {}),
   });
   const server = new VisualizerServer({ adapter, port, scenes });
   await server.start();

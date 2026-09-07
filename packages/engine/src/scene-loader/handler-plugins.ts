@@ -122,7 +122,13 @@ export function autoRegisterHandlers(core: EngineCore, scene: SceneDefinition): 
     const effectId = `go_to_${room.id}`;
     if (!registeredEffects.has(effectId)) {
       core.affordanceRegistry.registerHandler(effectId, async (_objectId, agentId) => {
-        _sceneManager?.moveAgent(agentId, room.id);
+        // Spec 038: prefer grid walking (tick-integrated, deterministic);
+        // fall back to the legacy teleport when no navigator is wired.
+        if (_sceneManager?.requestWalk !== undefined) {
+          _sceneManager.requestWalk(agentId, room.id);
+        } else {
+          _sceneManager?.moveAgent(agentId, room.id);
+        }
         return { success: true };
       });
       registeredEffects.add(effectId);
@@ -153,11 +159,20 @@ export function createBuiltinPlugins(): HandlerPlugin[] {
 // ─── Doorway plugin ──────────────────────────────────────────────────────────
 
 /** Placeholder for the scene manager — set during auto-registration. */
-let _sceneManager: { moveAgent: (agentId: string, toRoomId: string) => void } | null = null;
+let _sceneManager:
+  | {
+      moveAgent: (agentId: string, toRoomId: string) => void;
+      /** Spec 038: grid walking when the navigator is wired (optional, backward compat). */
+      requestWalk?: (agentId: string, toRoomId: string) => boolean;
+    }
+  | null = null;
 
 /** Internal: set the scene manager reference for movement handlers. */
 export function _setSceneManagerForPlugins(
-  sm: { moveAgent: (agentId: string, toRoomId: string) => void } | null,
+  sm: {
+    moveAgent: (agentId: string, toRoomId: string) => void;
+    requestWalk?: (agentId: string, toRoomId: string) => boolean;
+  } | null,
 ): void {
   _sceneManager = sm;
 }

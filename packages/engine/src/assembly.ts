@@ -43,6 +43,8 @@ import { SmartObjectRegistryImpl } from './world/objects/index.js';
 import { AffordanceRegistryImpl } from './world/affordances/index.js';
 import { PhysicsSystemImpl } from './physics/index.js';
 import { SpatialSystemImpl } from './spatial/index.js';
+import { WorldGrid } from './spatial/grid.js';
+import { NavigationSystemImpl } from './spatial/navigation.js';
 import { SceneManagerImpl } from './world/scenes/index.js';
 import { GameLoopImpl } from './loop/index.js';
 import { DriveDecaySystem } from './systems/drive-decay.js';
@@ -159,6 +161,8 @@ export interface EngineCore {
    * (spec 022, AC-1). `undefined` until the scheduler system is registered.
    */
   scheduler?: import('./systems/pper-scheduler.js').PPERScheduler;
+  /** Spatial navigation (spec 038) — grid access for the visualizer anchors. */
+  navigation?: { grid: import('./spatial/grid.js').WorldGrid };
   /** Runtime scene mutation funnel (spec 030, Req 1). Always created. */
   mutationService: SceneMutationServiceImpl;
   /** Dormant-agent store backing despawn/respawn (spec 030, Req 7/8). Always created. */
@@ -374,6 +378,38 @@ export function assembleGameLoop(
   // (0) SceneMutations — FIRST, so queued mutations land at the tick boundary
   // before any other system observes the world (spec 030, Req 1).
   core.gameLoop.registerSystem(new SceneMutationSystem(core.mutationService));
+
+  // (0.5) Spatial navigation (spec 038, R1/R2): grid + tick-integrated walking.
+  // The grid is topology-driven (doorway adjacency via getConnectedRooms, so
+  // open/close mutations re-route live) and object anchors are deterministic
+  // (hash of object id). Registered BEFORE the scheduler so walking advances
+  // before planning/execution each tick.
+  const roomModels = core.sceneManager
+    .getAllRooms()
+    .map((r) => ({ id: r.id, connections: [...r.connections] }));
+  const anchorsByRoom = new Map<string, string[]>();
+  for (const room of roomModels) {
+    anchorsByRoom.set(
+      room.id,
+      core.smartObjectRegistry.getObjectsInRoom(room.id).map((o) => o.id),
+    );
+  }
+  const worldGrid = new WorldGrid(roomModels, anchorsByRoom, (a, b) =>
+    core.sceneManager.getConnectedRooms(a).some((r) => r.id === b),
+  );
+  const navigation = new NavigationSystemImpl({
+    agentManager: core.agentManager,
+    sceneManager: core.sceneManager,
+    grid: worldGrid,
+  });
+  core.sceneManager.setNavigator(navigation);
+  core.navigation = { grid: worldGrid };
+  core.gameLoop.registerSystem(navigation); // (0.6) NavigationSystem (spec 038)
+  // Seat every active agent on the grid (deterministic spawn near the door).
+  for (const agent of core.agentManager.getActiveAgents()) {
+    const cell = worldGrid.enterRoom(agent.agentId, undefined, agent.location);
+    core.agentManager.updateState(agent.agentId, { position: cell });
+  }
   core.gameLoop.registerSystem(core.spatial); // (1) SpatialSystem
   core.gameLoop.registerSystem(new DriveDecaySystem(core.agentManager, core.driveSystem)); // (2) DriveDecaySystem
   core.gameLoop.registerSystem(new ObjectStateSystem(core.smartObjectRegistry)); // (3) ObjectStateSystem (spec 018)
@@ -479,6 +515,8 @@ export interface AssembledEngine {
   yaamEventLog: YaamEventLog;
   /** The PPER scheduler (spec 022, AC-1/AC-2). */
   scheduler?: import('./systems/pper-scheduler.js').PPERScheduler;
+  /** Spatial navigation (spec 038) — grid access for the visualizer anchors. */
+  navigation?: { grid: import('./spatial/grid.js').WorldGrid };
 }
 
 /** Build the full engine (core + registered systems) in one call. */

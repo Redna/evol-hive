@@ -43,7 +43,7 @@ class FakeOrchestrator implements PPEROrchestratorPort {
 }
 
 describe('Engine assembly factory (AC-11)', () => {
-  it('createEngine wires all subsystems and registers systems in order: SpatialSystem → DriveDecaySystem → ObjectStateSystem → PPERScheduler', () => {
+  it('createEngine wires all subsystems and registers systems in order: SceneMutations → Navigation (spec 038) → SpatialSystem → DriveDecaySystem → ObjectStateSystem → PPERScheduler', () => {
     const config = makeConfig();
     const orch = new FakeOrchestrator();
     const engine = createEngine(config, orch);
@@ -52,6 +52,7 @@ describe('Engine assembly factory (AC-11)', () => {
     const names = engine.gameLoop.systemNames();
     expect(names).toEqual([
       'scene-mutations',
+      'navigation', // spec 038
       'spatial',
       'drive-decay',
       'object-state',
@@ -97,6 +98,7 @@ describe('Engine assembly factory (AC-11)', () => {
     const loop = assembleGameLoop(core, orch);
     expect(loop.systemNames()).toEqual([
       'scene-mutations',
+      'navigation', // spec 038: grid walking advances before cognition each tick
       'spatial',
       'drive-decay',
       'object-state',

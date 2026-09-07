@@ -281,6 +281,7 @@ describe('AC-45: assembleGameLoop registers MemoryMaintenanceSystem when decay s
     const names = core.gameLoop.systemNames();
     expect(names).toEqual([
       'scene-mutations',
+      'navigation', // spec 038
       'spatial',
       'drive-decay',
       'object-state',
@@ -292,12 +293,13 @@ describe('AC-45: assembleGameLoop registers MemoryMaintenanceSystem when decay s
 });
 
 describe('AC-46: assembleGameLoop does NOT register memory-maintenance when no decay service', () => {
-  it('keeps the deterministic systems (now 6 with scene-mutations + conversation-lifecycle, spec 033)', () => {
+  it('keeps the deterministic systems (now 7 with navigation, spec 038)', () => {
     const core = createEngineCore(makeConfig());
     assembleGameLoop(core, new FakeOrchestrator());
     const names = core.gameLoop.systemNames();
     expect(names).toEqual([
       'scene-mutations',
+      'navigation', // spec 038: grid walking
       'spatial',
       'drive-decay',
       'object-state',

@@ -50,6 +50,8 @@ export interface VisualizerObject {
   id: string;
   name: string;
   type: string;
+  /** Grid anchor cell within the room (spec 038) — undefined = legacy grid. */
+  cell?: { x: number; y: number };
   state: Record<string, unknown>;
   affordances: { id: string; label: string }[];
   compoundActions?: { id: string; label: string; stepCount: number }[];
@@ -77,6 +79,8 @@ export interface VisualizerAgent {
   pperPhase: PPERPhase;
   isThinking: boolean;
   relationships: { agentId: string; trust: number; familiarity: number }[];
+  /** Grid cell within the room (spec 038) — undefined = legacy slot rendering. */
+  position?: { x: number; y: number };
 }
 
 /**

@@ -114,17 +114,25 @@ export class CanvasRenderer {
     for (const room of state.rooms) {
       const pos = roomLayout.get(room.id);
       if (!pos) continue;
-      this.drawObjects(room.objects, pos.x, pos.y);
+      this.drawObjects(room.objects, pos.x, pos.y, pos.w, pos.h);
     }
 
     // (4) Draw agents within their rooms.
+    // Spec 038: agents render at their true grid cell when the engine
+    // provides one (they walk cell-by-cell); legacy slot otherwise.
     const agentPositions = new Map<string, { x: number; y: number }>();
     for (const agent of state.agents) {
       const roomPos = roomLayout.get(agent.location);
       if (!roomPos) continue;
       const idx = state.agents.indexOf(agent);
-      const ax = roomPos.x + 40 + idx * 60;
-      const ay = roomPos.y + roomPos.h - 50;
+      const ax =
+        agent.position !== undefined
+          ? roomPos.x + ((agent.position.x + 0.5) * roomPos.w) / 12
+          : roomPos.x + 40 + idx * 60;
+      const ay =
+        agent.position !== undefined
+          ? roomPos.y + ((agent.position.y + 0.5) * roomPos.h) / 8
+          : roomPos.y + roomPos.h - 50;
       agentPositions.set(agent.agentId, { x: ax, y: ay });
       this.drawAgent(agent, ax, ay);
     }
@@ -188,11 +196,19 @@ export class CanvasRenderer {
     objects: VisualizerState['rooms'][number]['objects'],
     roomX: number,
     roomY: number,
+    roomW: number,
+    roomH: number,
   ): void {
     const ctx = this.ctx;
     objects.forEach((obj, i) => {
-      const ox = roomX + 12 + (i % 3) * 70;
-      const oy = roomY + 30 + Math.floor(i / 3) * 50;
+      // Spec 038: objects render at their grid anchor cells when available;
+      // legacy fixed chip grid otherwise.
+      const ox =
+        obj.cell !== undefined ? roomX + (obj.cell.x * roomW) / 12 + 6 : roomX + 12 + (i % 3) * 70;
+      const oy =
+        obj.cell !== undefined
+          ? roomY + (obj.cell.y * roomH) / 8 + 6
+          : roomY + 30 + Math.floor(i / 3) * 50;
       // Icon background — conversation objects use their sentiment-derived
       // tint (spec 033, R9/AC-10); everything else keeps the default chip.
       ctx.fillStyle = obj.conversation?.sentimentTint ?? '#2a2a4a';
