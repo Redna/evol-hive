@@ -129,6 +129,27 @@ for pr in json.load(sys.stdin):
 " 2>/dev/null
 }
 
+# Find a recently MERGED spec PR that references the issue (fallback when the
+# spec was already merged before the pipeline was dispatched — the Architect
+# correctly skips creating a duplicate and the pipeline should proceed to
+# Developer rather than abort).
+find_merged_spec_pr_for_issue() {
+  local issue_number=$1
+  api "https://api.github.com/repos/$REPO/pulls?state=closed&per_page=20" 2>/dev/null | python3 -c "
+import sys, json
+issue = '$issue_number'
+for pr in json.load(sys.stdin):
+    if not pr['head']['ref'].startswith('spec/'):
+        continue
+    if pr.get('merged_at') is None:
+        continue
+    text = (pr.get('title', '') or '') + ' ' + (pr.get('body') or '')
+    if ('#' + issue) in text or ('issue ' + issue) in text:
+        print(f'{pr["number"]}|merged')
+        break
+" 2>/dev/null
+}
+
 # Wait for a PR to be merged, returns 0 if merged, 1 if timeout
 wait_for_pr_merge() {
   local pr_number=$1
@@ -230,9 +251,19 @@ fi
 # Find the spec PR
 SPEC_PR=$(find_pr "spec/")
 if [ -z "$SPEC_PR" ]; then
-  post_comment "issues/$ISSUE_NUMBER" "## ⚠️ Pipeline: No spec PR found\n\n@$OWNER — the Architect completed but no spec PR was created. Please check."
-  echo "  PIPELINE ABORTED: No spec PR"
-  exit 1
+  # Protocol fallback: the spec for this issue may ALREADY be merged (the
+  # Architect correctly skips duplicates when the design is on main). Look
+  # for a recently merged spec PR referencing this issue and proceed.
+  MERGED=$(find_merged_spec_pr_for_issue "$ISSUE_NUMBER")
+  if [ -n "$MERGED" ]; then
+    SPEC_PR="$MERGED"
+    post_comment "issues/$ISSUE_NUMBER" "## ℹ️ Pipeline: spec already merged (PR #$(echo "$MERGED" | cut -d'|' -f1))\n\nProceeding to Developer."
+    echo "  Spec already merged: PR #$(echo "$MERGED" | cut -d'|' -f1) — proceeding"
+  else
+    post_comment "issues/$ISSUE_NUMBER" "## ⚠️ Pipeline: No spec PR found\n\n@$OWNER — the Architect completed but no spec PR was created. Please check."
+    echo "  PIPELINE ABORTED: No spec PR"
+    exit 1
+  fi
 fi
 
 SPEC_PR_NUM=$(echo "$SPEC_PR" | cut -d'|' -f1)
