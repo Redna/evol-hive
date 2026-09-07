@@ -1,0 +1,7 @@
+{
+  "name": "feature-039-spatial-phase2-intents-fog",
+  "description": "Spec 038 phase 2 (issue #144) — targetArea enum-bound LLM intents, navigate-then-execute, cell-level fog-filtered perception, social fog-lifting via talk_to, persistence round-trip, determinism test, visualizer fog shading, QA pass.",
+  "createdAt": "2026-09-07T21:50:00Z",
+  "specIssue": 144,
+  "specFile": "docs/specs/039-spatial-phase2-target-area-cell-fog.md"
+}

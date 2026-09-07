@@ -44,24 +44,25 @@ Living index of all feature specifications. Updated by the Architect when creati
 | Section | Topic | Spec(s) | Status |
 |---------|-------|---------|--------|
 | [§1](../architecture/01-vision.md) | Vision & Philosophy | — | ✅ Documented |
-| [§2](../architecture/02-system-overview.md) | System Overview | 008, 013, 017, 022 | ✅ Documented |
+| [§2](../architecture/02-system-overview.md) | System Overview | 008, 013, 017, 022, 039 | ✅ Documented |
 | [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002, 008, 012, 017, 022, 032, 033 | ✅ Implemented |
 | [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001, 003, 008, 013, 018, 019, 022, 031, 032, 033 | ✅ Implemented |
 | [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) + Trainable System 1 Heads | 001, 006, 007, 018, 035 | ✅ Implemented |
 | [§6](../architecture/06-pper-loop.md) | PPER Loop | 001-004, 006, 008, 012, 017, 025, 026, 031, 032, 033 | ✅ Implemented |
 | [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 011 (tool calling), 019 (affordance-as-tools), 025, 026 | ✅ Implemented |
 | [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002, 011, 015, 025, 026, 032, 033 | ✅ Implemented |
-| [§9](../architecture/09-engine-routing.md) | Engine Routing | 002, 003, 004, 006, 008, 009 | ✅ Implemented |
+| [§9](../architecture/09-engine-routing.md) | Engine Routing | 002, 003, 004, 006, 008, 009, 039 | ✅ Implemented |
 | [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | 016, 019, 030, 031, 033 | ✅ Implemented |
 | [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 004, 007, 014, 017, 025, 026 | ✅ Implemented |
 
 ## Spec Status Summary
 
 ```
-Total specs:      30
-✅ Done:          17
-🔨 In Development: 0
-🔍 In Review:      7
+Total specs:      44
+✅ Done:          23
+✅ Implemented:    2
+🔨 In Development: 1
+🔍 In Review:     11
 📝 Drafted:        5
 🚫 Blocked:        0
 ⛔ Superseded:     2
@@ -89,4 +90,5 @@ Architecture sections fully implemented: 11/11
 | [035](035-system1-trainable-heads.md) | System 1 — Trainable React/Ignore Gating + Trainable Importance Head | §5, §6, §11 | 🔍 In Review | [#132](https://github.com/Redna/evol-hive/issues/132) | [#136](https://github.com/Redna/evol-hive/pull/136) | shared, cognition, engine, memory, training |
 | [036](036-exploration-factor.md) | Curiosity-Modulated Exploration Factor — Seeded Exploration Draws for the React/Ignore Gate | §5, §6 | ✅ Implemented | [#138](https://github.com/Redna/evol-hive/issues/138) | — | shared, cognition |
 | [037](037-enum-bound-plan-formulation.md) | Enum-Bound Plan Formulation — Constrain `targetAffordance` via a Dynamic Tool Signature (+ step-skip livelock guard, empty-args repair) | §5, §7, §8, §10 | ✅ Implemented | [#140](https://github.com/Redna/evol-hive/issues/140) | [#141](https://github.com/Redna/evol-hive/pull/141) | shared, cognition, examples |
-| [038](038-spatial-navigation-fog-of-war.md) | Spatial Navigation & Fog of War — Grid-Based Agents, Engine-Side Pathfinding, High-Level LLM Intents | §2, §3, §4, §6, §9 | 📝 Drafted | — | — | shared, engine, cognition, visualizer, examples |
+| [038](038-spatial-navigation-fog-of-war.md) | Spatial Navigation & Fog of War — Grid-Based Agents, Engine-Side Pathfinding, High-Level LLM Intents | §2, §3, §4, §6, §9 | 🔄 In Progress | [#143](https://github.com/Redna/evol-hive/issues/143) | — | shared, engine, cognition, visualizer, examples |
+| [039](039-spatial-phase2-target-area-cell-fog.md) | Spatial Navigation Phase 2 — `targetArea` LLM Intents, Cell-Level Fog, Social Fog-Lifting, Determinism + QA Pass | §2, §3, §4, §6, §7, §9 | 📝 Drafted | [#144](https://github.com/Redna/evol-hive/issues/144) | — | shared, engine, cognition, visualizer |
