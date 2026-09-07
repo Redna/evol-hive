@@ -74,6 +74,7 @@ dispatch_pr_workflow() {
 # Wait for the latest run of a workflow to complete, return its conclusion
 wait_for_workflow() {
   local workflow_name=$1
+  local min_created=${2:-}
   local max_wait=3600  # 60 min max per agent
   local waited=0
 
@@ -83,13 +84,23 @@ wait_for_workflow() {
     sleep $POLL_INTERVAL
     waited=$((waited + POLL_INTERVAL))
 
-    # Get the latest run of this workflow
-    RESULT=$(api "https://api.github.com/repos/$REPO/actions/runs?per_page=5" 2>/dev/null | python3 -c "
+    # Get the latest run of this workflow created after the dispatch (a stale
+    # completed run from a previous dispatch must not match — observed on run
+    # 34163773505 where attempt 2 instantly "found" attempt 1's run).
+    RESULT=$(api "https://api.github.com/repos/$REPO/actions/runs?per_page=10" 2>/dev/null | python3 -c "
 import sys, json
+from datetime import datetime, timezone
+min_created = '$min_created'
+floor = datetime.fromisoformat(min_created.replace('Z', '+00:00')) if min_created else None
 for r in json.load(sys.stdin)['workflow_runs']:
-    if r['name'] == '$workflow_name' and r['status'] == 'completed':
-        print(f'{r[\"conclusion\"]}|{r[\"id\"]}')
-        break
+    if r['name'] != '$workflow_name' or r['status'] != 'completed':
+        continue
+    if floor is not None:
+        created = datetime.fromisoformat(r['created_at'].replace('Z', '+00:00'))
+        if created <= floor:
+            continue
+    print(f'{r[\"conclusion\"]}|{r[\"id\"]}')
+    break
 " 2>/dev/null)
 
     if [ -n "$RESULT" ]; then
@@ -195,10 +206,11 @@ ARCH_SUCCESS=false
 while [ $ARCH_RETRIES -lt $MAX_RETRIES_ARCHITECT ]; do
   ARCH_RETRIES=$((ARCH_RETRIES + 1))
   echo "  Dispatching Architect (attempt $ARCH_RETRIES/$MAX_RETRIES_ARCHITECT)..."
+  ARCH_DISPATCH_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   dispatch_workflow "$ARCHITECT_ID" "$ISSUE_NUMBER"
   sleep 10  # wait for the run to register
 
-  RESULT=$(wait_for_workflow "Architect")
+  RESULT=$(wait_for_workflow "Architect" "$ARCH_DISPATCH_AT")
 
   if [ "$RESULT" = "success" ]; then
     ARCH_SUCCESS=true
@@ -257,10 +269,11 @@ DEV_SUCCESS=false
 while [ $DEV_RETRIES -lt $MAX_RETRIES_DEVELOPER ]; do
   DEV_RETRIES=$((DEV_RETRIES + 1))
   echo "  Dispatching Developer (attempt $DEV_RETRIES/$MAX_RETRIES_DEVELOPER)..."
+  DEV_DISPATCH_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   dispatch_workflow "$DEVELOPER_ID" "$ISSUE_NUMBER"
   sleep 10
 
-  RESULT=$(wait_for_workflow "Developer")
+  RESULT=$(wait_for_workflow "Developer" "$DEV_DISPATCH_AT")
 
   if [ "$RESULT" = "success" ]; then
     DEV_SUCCESS=true
