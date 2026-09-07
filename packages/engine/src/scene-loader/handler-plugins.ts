@@ -109,6 +109,25 @@ export function autoRegisterHandlers(core: EngineCore, scene: SceneDefinition): 
       }
     }
   }
+
+  // Topology-driven movement (spec 022 follow-up, found via the dynamic-world
+  // validation arc): the doorway plugin's `movementDestinations` list was a
+  // hardcoded coffee-shop-era fixture — scenes with other rooms (dynamic
+  // world's `workshop`) silently had NO go_to handler, so movement affordances
+  // were planned but always failed and agents were room-locked (111 planned
+  // go_to_workshop steps, 0 executions). Register `go_to_<roomId>` for every
+  // room in the SCENE instead — the handler registry dedupes, so the plugin's
+  // known destinations win and the rest come from topology.
+  for (const room of scene.rooms) {
+    const effectId = `go_to_${room.id}`;
+    if (!registeredEffects.has(effectId)) {
+      core.affordanceRegistry.registerHandler(effectId, async (_objectId, agentId) => {
+        _sceneManager?.moveAgent(agentId, room.id);
+        return { success: true };
+      });
+      registeredEffects.add(effectId);
+    }
+  }
 }
 
 // ─── Built-in plugins ────────────────────────────────────────────────────────
