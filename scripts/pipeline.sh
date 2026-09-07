@@ -231,7 +231,7 @@ while [ $ARCH_RETRIES -lt $MAX_RETRIES_ARCHITECT ]; do
   dispatch_workflow "$ARCHITECT_ID" "$ISSUE_NUMBER"
   sleep 10  # wait for the run to register
 
-  RESULT=$(wait_for_workflow "Architect" "$ARCH_DISPATCH_AT")
+  RESULT=$(wait_for_workflow "Architect" "$ARCH_DISPATCH_AT" || true)
 
   if [ "$RESULT" = "success" ]; then
     ARCH_SUCCESS=true
@@ -249,12 +249,12 @@ if [ "$ARCH_SUCCESS" = "false" ]; then
 fi
 
 # Find the spec PR
-SPEC_PR=$(find_pr "spec/")
+SPEC_PR=$(find_pr "spec/" || true)
 if [ -z "$SPEC_PR" ]; then
   # Protocol fallback: the spec for this issue may ALREADY be merged (the
   # Architect correctly skips duplicates when the design is on main). Look
   # for a recently merged spec PR referencing this issue and proceed.
-  MERGED=$(find_merged_spec_pr_for_issue "$ISSUE_NUMBER")
+  MERGED=$(find_merged_spec_pr_for_issue "$ISSUE_NUMBER" || true)
   if [ -n "$MERGED" ]; then
     SPEC_PR="$MERGED"
     post_comment "issues/$ISSUE_NUMBER" "## ℹ️ Pipeline: spec already merged (PR #$(echo "$MERGED" | cut -d'|' -f1))\n\nProceeding to Developer."
@@ -304,7 +304,7 @@ while [ $DEV_RETRIES -lt $MAX_RETRIES_DEVELOPER ]; do
   dispatch_workflow "$DEVELOPER_ID" "$ISSUE_NUMBER"
   sleep 10
 
-  RESULT=$(wait_for_workflow "Developer" "$DEV_DISPATCH_AT")
+  RESULT=$(wait_for_workflow "Developer" "$DEV_DISPATCH_AT" || true)
 
   if [ "$RESULT" = "success" ]; then
     DEV_SUCCESS=true
