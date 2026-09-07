@@ -77,7 +77,7 @@ wait_for_workflow() {
   local max_wait=3600  # 60 min max per agent
   local waited=0
 
-  echo "  Waiting for $workflow_name to complete..."
+  echo "  Waiting for $workflow_name to complete..." >&2
 
   while [ $waited -lt $max_wait ]; do
     sleep $POLL_INTERVAL
@@ -95,13 +95,13 @@ for r in json.load(sys.stdin)['workflow_runs']:
     if [ -n "$RESULT" ]; then
       CONCLUSION=$(echo "$RESULT" | cut -d'|' -f1)
       RUN_ID=$(echo "$RESULT" | cut -d'|' -f2)
-      echo "  $workflow_name completed: $CONCLUSION (run $RUN_ID, waited ${waited}s)"
+      echo "  $workflow_name completed: $CONCLUSION (run $RUN_ID, waited ${waited}s)" >&2
       echo "$CONCLUSION"
       return 0
     fi
   done
 
-  echo "  $workflow_name timed out after ${max_wait}s"
+  echo "  $workflow_name timed out after ${max_wait}s" >&2
   echo "timeout"
   return 1
 }
@@ -124,7 +124,7 @@ wait_for_pr_merge() {
   local label=$2
   local waited=0
 
-  echo "  Waiting for human to merge PR #$pr_number ($label)..."
+  echo "  Waiting for human to merge PR #$pr_number ($label)..." >&2
 
   while [ $waited -lt $PR_WAIT_TIMEOUT ]; do
     sleep $PR_POLL_INTERVAL
