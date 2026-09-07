@@ -1,0 +1,7 @@
+{
+  "name": "feature-039-spatial-phase2-fog-intents",
+  "description": "Spec 038 phase-2 remainder: enum-bound targetArea plan steps (known areas only), navigation-then-execution in Execute, cell-level fog in passive perception, unknown markers, talk_to social fog-lifting, spatialMemory/position persistence round-trip, determinism AC-6 test, visualizer fog shading, full QA pass. Issue #144.",
+  "createdAt": "2026-09-07T22:10:00Z",
+  "specIssue": 144,
+  "specFile": "docs/specs/039-spatial-phase2-targetarea-fog.md"
+}
