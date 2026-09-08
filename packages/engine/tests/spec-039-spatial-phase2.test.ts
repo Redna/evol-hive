@@ -366,6 +366,74 @@ describe('social fog-lifting via talk_to (spec 039, AC-4)', () => {
     expect(mem.knownDoors.filter((d) => d === 'garden|workshop')).toHaveLength(1);
     expect(Object.keys(mem.observedObjects ?? {})).toEqual(['workbench-1']);
   });
+
+  it('after a talk_to transfer the transferred room is perceivable by the listener (fog lifted socially)', () => {
+    // QA-added (R9): AC-2's "(or receives a talk_to transfer)" clause and
+    // AC-4's "perception include the discovered area" — the transfer is
+    // asserted at the PERCEPTION level, through the real fog gate, on a
+    // single engine instance (no code change, only the fog set changes).
+    const agents = new AgentManagerImpl();
+    agents.spawn(makeProfile('speaker', 'garden'));
+    agents.spawn(makeProfile('listener', 'garden'));
+    agents.updateState('speaker', {
+      location: 'garden',
+      spatialMemory: {
+        visitedRooms: ['garden', 'workshop'],
+        knownDoors: ['garden|workshop'],
+        discoveredAt: { garden: 1, workshop: 5 },
+        observedObjects: { 'workbench-1': 'workshop' },
+      },
+    });
+    agents.updateState('listener', {
+      location: 'garden',
+      spatialMemory: { visitedRooms: ['garden'], knownDoors: [], discoveredAt: { garden: 1 } },
+    });
+
+    // The world has the workshop workbench (craft) and the garden doorway
+    // (go_to_workshop) registered, so perception has something to gate.
+    const registry = new SmartObjectRegistryImpl();
+    registry.register(
+      makeObject('workbench-1', 'workshop', [makeAffordance('craft', { comfort: 8 })]),
+    );
+    registry.register(makeObject('door-garden', 'garden', [makeAffordance('go_to_workshop', {})]));
+    const perception = new PerceptionDataProviderImpl(
+      agents,
+      registry,
+      new DriveSystemImpl(agents),
+      { getSystemFeedback: () => undefined } as never,
+    );
+
+    // BEFORE the transfer: the listener has never seen the workshop — the
+    // room is fogged and the go_to affordance for the unknown side is hidden.
+    expect(perception.getVisibleObjectsInRoom!('listener', 'workshop')).toEqual([]);
+    const gardenBefore = perception.getVisibleAffordancesInRoom!('listener', 'garden').map(
+      (a) => a.id,
+    );
+    expect(gardenBefore).not.toContain('go_to_workshop');
+
+    // The talk_to delivery lifts the listener's fog (same representation as
+    // personal discovery).
+    const social = new SocialManager(agents);
+    social.queueMessage('speaker', 'listener', 'the workshop has a workbench');
+
+    // AFTER: the workshop's objects/affordances surface for the listener —
+    // no code change, only the fog set changed.
+    const workshopObjects = perception.getVisibleObjectsInRoom!('listener', 'workshop').map(
+      (o) => o.id,
+    );
+    expect(workshopObjects).toContain('workbench-1');
+    const workshopAffordances = perception.getVisibleAffordancesInRoom!('listener', 'workshop').map(
+      (a) => a.id,
+    );
+    expect(workshopAffordances).toContain('craft');
+
+    // And the movement affordance toward the now-known room surfaces in the
+    // listener's CURRENT room (door-sighting gate satisfied by the transfer).
+    const gardenAfter = perception.getVisibleAffordancesInRoom!('listener', 'garden').map(
+      (a) => a.id,
+    );
+    expect(gardenAfter).toContain('go_to_workshop');
+  });
 });
 
 // ─── AC-5 (R6) — persistence round-trip ─────────────────────────────────────

@@ -31,7 +31,9 @@ import { formulatePlanSchemaFor, formulatePlanToolFor, WAIT_AFFORDANCE } from '@
 import { PlanBuilderImpl } from '../src/pper/plan-builder.js';
 import { checkPlanBinding } from '../src/pper/plan-service.js';
 import { ExecuteServiceImpl } from '../src/pper/execute-service.js';
+import { PerceptionServiceImpl } from '../src/pper/index.js';
 import type { NavigationStepStatus } from '../src/index.js';
+import type { PerceptionDataProvider } from '@evol-hive/shared';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -462,5 +464,140 @@ describe('ExecuteServiceImpl targetArea navigation (spec 039, AC-1)', () => {
     expect(r3.success).toBe(true);
     expect(provider.executed).toHaveLength(1);
     expect(provider.advanced).toBe(1);
+  });
+});
+
+// ─── AC-2/AC-4 (R3) — PerceptionServiceImpl consumes the fog choke point ─────
+//
+// QA-added integration seam (R9): the engine-side tests exercise the
+// provider methods directly, and the plan-builder tests inject knownAreas
+// directly — but NOTHING asserted that PerceptionServiceImpl itself routes
+// objects/affordances through the OPTIONAL fog-filtered provider methods and
+// carries knownAreas/unexploredAreas into the PerceptionResult. A regression
+// there (e.g., reverting the `typeof === 'function'` guards) would fail no
+// test: the fog would silently stop gating prunedAffordances.
+
+/** Full perception of the garden (what a legacy, fogless provider returns). */
+const legacyObjects: import('@evol-hive/shared').SmartObjectSummary[] = [
+  { id: 'planter-1', name: 'Planter', type: 'nature' },
+];
+
+const legacyAffordances: Affordance[] = [
+  {
+    id: 'water_plants',
+    label: 'Water the plants',
+    engineEffect: 'water_plants',
+    preconditions: [],
+    effects: { comfort: 5 },
+  },
+];
+
+/** Passthrough classifier — the fog gate (not the pruner) is under test. */
+const passthroughClassifier = {
+  prune: async (_driveLabel: string, affordances: Affordance[]): Promise<Affordance[]> =>
+    affordances,
+};
+
+/**
+ * A provider whose fog-filtered methods mirror the engine's
+ * PerceptionDataProviderImpl contract: unexplored room → empty lists;
+ * explored room → full lists. The legacy methods always return the FULL
+ * room contents, so consulting them is detectable as a leak. The fog flag
+ * is mutable so a single PerceptionServiceImpl instance can be observed
+ * before/after the engine flips the fog set.
+ */
+function makeFogProvider(): PerceptionDataProvider & { setExplored(v: boolean): void } {
+  const state = { explored: false };
+  const provider = {
+    getAgentLocation: () => 'garden',
+    getObjectsInRoom: () => legacyObjects, // would LEAK the fogged room
+    getAffordancesInRoom: () => legacyAffordances, // would LEAK the fogged room
+    getAgentDrives: () => ({ energy: 50, hunger: 50, social: 50, comfort: 40, curiosity: 60 }),
+    getPrimaryDriveLabel: () => 'low comfort',
+    getSystemFeedback: () => undefined,
+  } as PerceptionDataProvider;
+  Object.assign(provider, {
+    getVisibleObjectsInRoom: () => (state.explored ? legacyObjects : []),
+    getVisibleAffordancesInRoom: () => (state.explored ? legacyAffordances : []),
+    getKnownAreas: () => [...KNOWN_AREAS],
+    getUnexploredAreas: () => (state.explored ? [] : ['workshop']),
+  });
+  return Object.assign(provider, {
+    setExplored: (v: boolean) => {
+      state.explored = v;
+    },
+  }) as PerceptionDataProvider & { setExplored(v: boolean): void };
+}
+
+describe('PerceptionServiceImpl fog choke point (spec 039, AC-2/AC-4)', () => {
+  it('an unexplored room yields NO objects and NO prunedAffordances (legacy methods not consulted)', async () => {
+    const service = new PerceptionServiceImpl({
+      provider: makeFogProvider(),
+      classifier: passthroughClassifier,
+    });
+    const result = await service.perceive('a1');
+    expect(result.passive.roomId).toBe('garden');
+    expect(result.passive.objectsPresent).toEqual([]);
+    expect(result.prunedAffordances).toEqual([]);
+    expect(result.stuck).toBe(true);
+    expect(result.knownAreas).toEqual(KNOWN_AREAS);
+    expect(result.unexploredAreas).toEqual(['workshop']);
+  });
+
+  it('exploration unlocks prunedAffordances on the SAME service — only the fog set changes', async () => {
+    const provider = makeFogProvider();
+    const service = new PerceptionServiceImpl({
+      provider,
+      classifier: passthroughClassifier,
+    });
+    const fogged = await service.perceive('a1');
+    expect(fogged.prunedAffordances).toEqual([]);
+
+    // The engine flips the fog set (agent explores the room); the SAME
+    // perception service now sees the affordances — AC-2's unlock clause.
+    provider.setExplored(true);
+    const result = await service.perceive('a1');
+    expect(result.passive.objectsPresent).toEqual([
+      { objectId: 'planter-1', name: 'Planter', type: 'nature' },
+    ]);
+    expect(result.prunedAffordances.map((a) => a.id)).toContain('water_plants');
+    expect(result.stuck).toBeUndefined();
+    expect(result.knownAreas).toEqual(KNOWN_AREAS);
+    expect(result.unexploredAreas).toBeUndefined(); // nothing left unexplored
+  });
+
+  it('empty knownAreas normalizes to undefined — no targetArea enum is offered', async () => {
+    const provider = makeFogProvider();
+    Object.assign(provider, { getKnownAreas: () => [] });
+    const service = new PerceptionServiceImpl({
+      provider,
+      classifier: passthroughClassifier,
+    });
+    const result = await service.perceive('a1');
+    expect(result.knownAreas).toBeUndefined();
+  });
+
+  it('a legacy provider (no fog methods) falls back to the room-scoped path (no regression)', async () => {
+    // Strip the optional fog methods: the provider regresses to spec-038-v1
+    // shape and perception must behave exactly as before spec 039.
+    const bare: PerceptionDataProvider = {
+      getAgentLocation: () => 'garden',
+      getObjectsInRoom: () => legacyObjects,
+      getAffordancesInRoom: () => legacyAffordances,
+      getAgentDrives: () => ({ energy: 50, hunger: 50, social: 50, comfort: 40, curiosity: 60 }),
+      getPrimaryDriveLabel: () => 'low comfort',
+      getSystemFeedback: () => undefined,
+    };
+    const service = new PerceptionServiceImpl({
+      provider: bare,
+      classifier: passthroughClassifier,
+    });
+    const result = await service.perceive('a1');
+    expect(result.passive.objectsPresent).toEqual([
+      { objectId: 'planter-1', name: 'Planter', type: 'nature' },
+    ]);
+    expect(result.prunedAffordances.map((a) => a.id)).toContain('water_plants');
+    expect(result.knownAreas).toBeUndefined();
+    expect(result.unexploredAreas).toBeUndefined();
   });
 });
