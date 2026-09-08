@@ -257,7 +257,12 @@ if [ "$ARCH_SUCCESS" = "false" ]; then
   exit 1
 fi
 
-# Find the spec PR
+fi  # end SPEC_PR_OVERRIDE skip (SPEC_PR resolved in both branches)
+
+# Find the spec PR (only in the Architect path)
+if [ -n "$SPEC_PR_OVERRIDE" ]; then
+  SPEC_PR_NUM="$SPEC_PR_OVERRIDE"
+else
 SPEC_PR=$(find_pr "spec/" || true)
 if [ -z "$SPEC_PR" ]; then
   # Protocol fallback: the spec for this issue may ALREADY be merged (the
@@ -278,8 +283,7 @@ fi
 SPEC_PR_NUM=$(echo "$SPEC_PR" | cut -d'|' -f1)
 post_comment "issues/$ISSUE_NUMBER" "## 🏗️ Architect completed\n\nSpec PR #$SPEC_PR_NUM created. Please review and merge to continue the pipeline."
 echo "  Spec PR #$SPEC_PR_NUM created, waiting for merge..."
-
-fi  # end SPEC_PR_OVERRIDE skip
+fi  # end Architect-path spec PR resolution
 
 # ============================================================
 # PHASE 2: WAIT FOR SPEC PR MERGE
