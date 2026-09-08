@@ -96,7 +96,10 @@ class FakeExecuteDataProvider implements ExecuteDataProvider {
   ): { objectId: string; affordance: Affordance } | null {
     return this.resolvedAffordance;
   }
-  checkPreconditions(_affordanceId: string, _objectId: string): { satisfied: boolean; failed: string[] } {
+  checkPreconditions(
+    _affordanceId: string,
+    _objectId: string,
+  ): { satisfied: boolean; failed: string[] } {
     return { satisfied: true, failed: [] };
   }
   async executeAffordance(_objectId: string, _affordanceId: string, _agentId: string) {
@@ -245,7 +248,11 @@ describe('ReflectServiceImpl — idle-tick memory suppression (R2, AC-1, AC-2)',
   // AC-1 / R2.1: a skipped cycle with no LLM memory stores NOTHING.
   it('stores no memory on a skipped cycle with no LLM memory (AC-1, R2.1)', async () => {
     const { service } = makeReflectService(provider, {});
-    const result = await service.reflect(AGENT_ID, { success: true, planComplete: false, stepSkipped: true });
+    const result = await service.reflect(AGENT_ID, {
+      success: true,
+      planComplete: false,
+      stepSkipped: true,
+    });
 
     expect(result.success).toBe(true);
     expect(result.memoryStored).toBe(false);
@@ -255,7 +262,11 @@ describe('ReflectServiceImpl — idle-tick memory suppression (R2, AC-1, AC-2)',
   // R2.2: memoryStored is false (not undefined) when suppressed.
   it('reports memoryStored === false when suppression applies (R2.2)', async () => {
     const { service } = makeReflectService(provider, {});
-    const result = await service.reflect(AGENT_ID, { success: true, planComplete: true, stepSkipped: true });
+    const result = await service.reflect(AGENT_ID, {
+      success: true,
+      planComplete: true,
+      stepSkipped: true,
+    });
 
     expect(result.memoryStored).toBe(false);
     expect(result.cycleComplete).toBe(true);
@@ -265,7 +276,11 @@ describe('ReflectServiceImpl — idle-tick memory suppression (R2, AC-1, AC-2)',
   // suppression still applies on a skipped cycle.
   it('suppresses on a skipped cycle with empty-string memoryContent (R2.1)', async () => {
     const { service } = makeReflectService(provider, { memoryContent: '' });
-    const result = await service.reflect(AGENT_ID, { success: true, planComplete: false, stepSkipped: true });
+    const result = await service.reflect(AGENT_ID, {
+      success: true,
+      planComplete: false,
+      stepSkipped: true,
+    });
 
     expect(result.memoryStored).toBe(false);
     expect(provider.storeMemoryCalls).toHaveLength(0);
@@ -273,7 +288,11 @@ describe('ReflectServiceImpl — idle-tick memory suppression (R2, AC-1, AC-2)',
 
   it('suppresses on a skipped cycle with whitespace-only memoryContent (R2.1)', async () => {
     const { service } = makeReflectService(provider, { memoryContent: '   ' });
-    const result = await service.reflect(AGENT_ID, { success: true, planComplete: false, stepSkipped: true });
+    const result = await service.reflect(AGENT_ID, {
+      success: true,
+      planComplete: false,
+      stepSkipped: true,
+    });
 
     expect(result.memoryStored).toBe(false);
     expect(provider.storeMemoryCalls).toHaveLength(0);
@@ -298,7 +317,11 @@ describe('ReflectServiceImpl — idle-tick memory suppression (R2, AC-1, AC-2)',
       memoryImportance: 6,
       memoryType: 'observation',
     });
-    const result = await service.reflect(AGENT_ID, { success: true, planComplete: false, stepSkipped: true });
+    const result = await service.reflect(AGENT_ID, {
+      success: true,
+      planComplete: false,
+      stepSkipped: true,
+    });
 
     expect(result.success).toBe(true);
     expect(result.memoryStored).toBe(true);
@@ -315,7 +338,11 @@ describe('ReflectServiceImpl — idle-tick memory suppression (R2, AC-1, AC-2)',
     const { service } = makeReflectService(provider, {
       memoryEntry: { content: 'Legacy note while waiting', importance: 4, type: 'observation' },
     });
-    const result = await service.reflect(AGENT_ID, { success: true, planComplete: false, stepSkipped: true });
+    const result = await service.reflect(AGENT_ID, {
+      success: true,
+      planComplete: false,
+      stepSkipped: true,
+    });
 
     expect(result.memoryStored).toBe(true);
     expect(provider.storeMemoryCalls).toHaveLength(1);
@@ -469,11 +496,17 @@ describe('Execute→Reflect chain — wait-only cycle stores nothing (end-to-end
   it('goal updates on a skipped cycle still apply (suppression is memory-only)', async () => {
     const reflectProvider = new FakeReflectDataProvider();
     const { service } = makeReflectService(reflectProvider, { newGoal: 'Head to the garden' });
-    const result = await service.reflect(AGENT_ID, { success: true, planComplete: false, stepSkipped: true });
+    const result = await service.reflect(AGENT_ID, {
+      success: true,
+      planComplete: false,
+      stepSkipped: true,
+    });
 
     expect(result.success).toBe(true);
     expect(result.goalUpdated).toBe(true);
-    expect(reflectProvider.updateGoalCalls).toEqual([{ agentId: AGENT_ID, goal: 'Head to the garden' }]);
+    expect(reflectProvider.updateGoalCalls).toEqual([
+      { agentId: AGENT_ID, goal: 'Head to the garden' },
+    ]);
     expect(reflectProvider.storeMemoryCalls).toHaveLength(0);
   });
 });

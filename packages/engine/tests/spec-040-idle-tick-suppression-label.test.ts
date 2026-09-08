@@ -152,10 +152,15 @@ async function runCycle(probe: ScriptedProbe): Promise<CycleOutcomeSample[]> {
     return { sink, recorder };
   })();
 
-  const scheduler = new PPERScheduler(agents, orch, { maxConcurrentCycles: 8 } as PPERSchedulerConfig, {
-    gate,
-    outcomeRecorder: recorder,
-  });
+  const scheduler = new PPERScheduler(
+    agents,
+    orch,
+    { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+    {
+      gate,
+      outcomeRecorder: recorder,
+    },
+  );
 
   scheduler.update(TICK);
   await vi.waitFor(() => expect(sink.samples).toHaveLength(1));
