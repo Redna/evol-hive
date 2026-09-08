@@ -90,8 +90,32 @@ export function defaultEngineConfig(): EngineConfig {
  * structurally compatible with this port.
  */
 export interface PPEROrchestratorPort {
-  /** Run a single PPER cycle for the given agent (fire-and-forget from the loop). */
-  runCycle(agentId: string): Promise<void>;
+  /**
+   * Run a single PPER cycle for the given agent (fire-and-forget from the
+   * loop). Resolves with the cycle's causal outcome (spec 041, R1.2): what
+   * the phases DID — not what state looks like afterward. The scheduler
+   * forwards it to the outcome recorder for labeling; a rejected cycle
+   * carries no outcome (the scheduler passes `undefined` + the message).
+   */
+  runCycle(agentId: string): Promise<PPERCycleOutcome>;
   /** Get the current phase for an agent. */
   getPhase(agentId: string): import('./cognition.js').PPERPhase;
+}
+
+/**
+ * The causal outcome of one PPER cycle (spec 041, R1.1): what the phases DID,
+ * not what diffed state looks like afterward. Ambient drive decay is
+ * invisible by construction — any applied affordance delta, however small,
+ * counts.
+ */
+export interface PPERCycleOutcome {
+  /**
+   * `true` when the cycle applied drive changes: the Execute phase's
+   * aggregate `driveChanges` was non-empty (the compound action's
+   * once-applied merged map included) OR the Reflect phase applied sanitized
+   * `driveOverrides` (`drivesUpdated: true` — the deviation-rejected reflect
+   * branch included). `false` when the cycle did not touch drives (wait-only
+   * cycles, plan/execute failures, cooldown skips, no-op reflects).
+   */
+  appliedDriveChanges: boolean;
 }

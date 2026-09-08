@@ -16,6 +16,7 @@
 
 import type {
   PPERSchedulerConfig,
+  PPERCycleOutcome,
   PPEROrchestratorPort,
   System1GatePort,
   System1OutcomeRecorderPort,
@@ -125,21 +126,30 @@ export class PPERScheduler {
 
     this.orchestrator
       .runCycle(agentId)
-      .catch((err: unknown) => {
-        // Error resilience (Req 19): log and guarantee isThinking is false.
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(`[PPERScheduler] PPER cycle for agent ${agentId} failed: ${message}`);
-      })
-      .finally(() => {
+      // Normalize the rejection into the settle payload (spec 041, R3.1):
+      // the error path carries no outcome, only the message.
+      .then(
+        (outcome) => ({ outcome, error: undefined as string | undefined }),
+        (err: unknown) => {
+          // Error resilience (Req 19): log and keep the loop alive.
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(`[PPERScheduler] PPER cycle for agent ${agentId} failed: ${message}`);
+          return { outcome: undefined as PPERCycleOutcome | undefined, error: message };
+        },
+      )
+      .then(({ outcome, error }) => {
+        // The `finally` block: runs exactly once for resolve AND reject.
         this.activeCycles -= 1;
         // Guarantee isThinking is false regardless of what the orchestrator did.
         const state = this.agentManager.getState(agentId);
         if (state?.isThinking) {
           this.agentManager.updateState(agentId, { isThinking: false });
         }
-        // Outcome labeling (spec 035, Req 9): the cycle settled — record the
-        // REACT/IGNORE sample.
-        this.system1?.outcomeRecorder?.onCycleSettled(agentId);
+        // Outcome labeling (spec 035, Req 9; spec 041, R3.1): the cycle
+        // settled — record the REACT/IGNORE sample, threading the causal
+        // outcome through (undefined on a rejected cycle — the recorder
+        // falls back safely).
+        this.system1?.outcomeRecorder?.onCycleSettled(agentId, outcome, error);
       });
   }
 }

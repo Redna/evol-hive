@@ -9,8 +9,13 @@
 
 /** Orchestrates the Perceive → Plan → Execute → Reflect cycle for an agent. */
 export interface PPEROrchestrator {
-  /** Run a single PPER cycle for the given agent. */
-  runCycle(agentId: string): Promise<void>;
+  /**
+   * Run a single PPER cycle for the given agent. Resolves with the cycle's
+   * causal outcome (spec 041, R1.2): `appliedDriveChanges` is `true` when the
+   * Execute phase's aggregate result carried non-empty `driveChanges` or the
+   * Reflect phase reported `drivesUpdated: true`.
+   */
+  runCycle(agentId: string): Promise<import('@evol-hive/shared').PPERCycleOutcome>;
   /** Get the current phase for an agent. */
   getPhase(agentId: string): import('@evol-hive/shared').PPERPhase;
 }

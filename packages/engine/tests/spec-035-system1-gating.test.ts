@@ -11,12 +11,13 @@ import { describe, it, expect, vi } from 'vitest';
 import type {
   GameTick,
   HardTriggerFlags,
+  OutcomeSnapshot,
+  PPERCycleOutcome,
   PPEROrchestratorPort,
   PPERSchedulerConfig,
   ReactGateDecision,
   System1GatePort,
   System1OutcomeProbePort,
-  OutcomeSnapshot,
   CycleOutcomeSample,
 } from '@evol-hive/shared';
 import { FEATURE_SCHEMA_VERSION } from '@evol-hive/shared';
@@ -38,11 +39,14 @@ function makeAgent(id = 'a1', energy = 50) {
 class FakeOrchestrator implements PPEROrchestratorPort {
   runCycleCalls: string[] = [];
   llmCallCount = 0;
+  /** Outcomes returned by runCycle — the last entry repeats (spec 041). */
+  outcomes: PPERCycleOutcome[] = [{ appliedDriveChanges: false }];
 
-  async runCycle(agentId: string): Promise<void> {
+  async runCycle(agentId: string): Promise<PPERCycleOutcome> {
     this.runCycleCalls.push(agentId);
     // Stand-in for the LLM-driven cycle: every cycle costs one "LLM call".
     this.llmCallCount += 1;
+    return this.outcomes.shift() ?? this.outcomes[this.outcomes.length - 1]!;
   }
 
   getPhase(_agentId: string) {
@@ -446,10 +450,14 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     expect(sink.samples[0]!.label).toBe('react');
   });
 
-  it('drive-delta outcomes label REACT even without a plan change', async () => {
+  it('a cycle that APPLIED drive changes (orchestrator outcome) labels REACT even with an unchanged plan (spec 041)', async () => {
     const agents = new AgentManagerImpl();
     agents.spawn(makeAgent('a1'));
     const orch = new FakeOrchestrator();
+    // The orchestrator's CAUSAL signal: the Execute phase applied a drive
+    // change (any magnitude) or Reflect applied sanitized overrides. Snapshot
+    // diffing is gone — the label no longer derives from drive snapshots.
+    orch.outcomes = [{ appliedDriveChanges: true }];
     const gate = new ScriptedGate();
     gate.decisions = [decision(0.9, true)];
     const { sink, probe, recorder } = makeRecorder();
@@ -464,10 +472,11 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
       },
     );
 
+    // Identical before/after drive snapshots — under the old diff-based
+    // labeler this sample would be IGNORE despite the applied delta.
     const before = baseSnapshot(null);
-    const afterDrives = baseSnapshot(null);
-    afterDrives.drives = { energy: 62, hunger: 50, social: 50, comfort: 50, curiosity: 50 };
-    probe.snapshots = [before, afterDrives];
+    const after = baseSnapshot(null);
+    probe.snapshots = [before, after];
     scheduler.update(TICK);
     await vi.waitFor(() => expect(sink.samples).toHaveLength(1));
     expect(sink.samples[0]!.label).toBe('react');

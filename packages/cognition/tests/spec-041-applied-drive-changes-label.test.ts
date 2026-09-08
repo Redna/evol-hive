@@ -29,6 +29,7 @@ import type {
 import type { LLMClient, PPEROrchestrator } from '../src/index.js';
 import type { AffordanceClassifier } from '../src/classifier/index.js';
 import { PPEROrchestratorImpl } from '../src/pper/orchestrator.js';
+import { GuardrailEngineImpl } from '../src/guardrails/index.js';
 import { defaultPPERErrorConfig } from '@evol-hive/shared';
 
 // ─── Fakes ───────────────────────────────────────────────────────────────────
@@ -337,37 +338,98 @@ describe('Spec 041 — early-return paths report what actually ran (R2.2)', () =
   });
 
   it('deviation-rejected execute → reflect runs; reflect without overrides → false', async () => {
+    // Real deviation harness (spec-016 AC-20/AC-22 pattern): the plan's step
+    // targets 'sleep' but the current step targets 'brew_coffee' — the
+    // guardrail's plan validation rejects the action (deviationRejected).
     const state = makeState();
-    const orch = makeOrchestrator(
-      state,
-      {
-        result: {
-          success: false,
-          error: 'plan validation deviation',
-          planComplete: false,
-          deviationRejected: true,
-        },
+    const planProvider: PlanDataProvider = {
+      ...makePlanProvider(state),
+      storePlan: (_id, _result) => {
+        const plan: AgentPlan = {
+          id: 'plan-1',
+          description: 'Sleep plan',
+          steps: [{ description: 'Sleep', completed: false, targetAffordance: 'sleep' }],
+          currentStepIndex: 0,
+          createdAt: 0,
+        };
+        state.currentPlan = plan;
+        return plan;
       },
-      { response: { memoryContent: 'reflected on deviation', memoryImportance: 4, memoryType: 'observation' } },
-    );
+    };
+    const executeProvider: ExecuteDataProvider = {
+      ...makeExecuteProvider(state, { result: { success: true } }),
+      resolveAffordance: () => ({
+        objectId: 'coffee-1',
+        affordance: {
+          id: 'brew_coffee',
+          label: 'Brew coffee',
+          engineEffect: 'brew_coffee',
+          preconditions: [],
+          effects: {},
+        },
+      }),
+    };
+    const orch = new PPEROrchestratorImpl({
+      perceptionProvider: makePerceptionProvider(state),
+      planProvider,
+      executeProvider,
+      reflectProvider: makeReflectProvider(state),
+      classifier: makeClassifier(),
+      llmClient: makeMockLLM({
+        response: { memoryContent: 'reflected on deviation', memoryImportance: 4, memoryType: 'observation' },
+      }),
+      guardrail: new GuardrailEngineImpl({
+        affordanceMasking: true,
+        contextualForcing: true,
+        planValidation: true,
+      }),
+    });
     const outcome = await orch.runCycle('a1');
     expect(outcome).toEqual({ appliedDriveChanges: false });
   });
 
   it('deviation-rejected execute → reflect applies driveOverrides → true (the deviation branch included)', async () => {
     const state = makeState();
-    const orch = makeOrchestrator(
-      state,
-      {
-        result: {
-          success: false,
-          error: 'plan validation deviation',
-          planComplete: false,
-          deviationRejected: true,
-        },
+    const planProvider: PlanDataProvider = {
+      ...makePlanProvider(state),
+      storePlan: (_id, _result) => {
+        const plan: AgentPlan = {
+          id: 'plan-1',
+          description: 'Sleep plan',
+          steps: [{ description: 'Sleep', completed: false, targetAffordance: 'sleep' }],
+          currentStepIndex: 0,
+          createdAt: 0,
+        };
+        state.currentPlan = plan;
+        return plan;
       },
-      { response: { driveOverrides: { comfort: 8 } } },
-    );
+    };
+    const executeProvider: ExecuteDataProvider = {
+      ...makeExecuteProvider(state, { result: { success: true } }),
+      resolveAffordance: () => ({
+        objectId: 'coffee-1',
+        affordance: {
+          id: 'brew_coffee',
+          label: 'Brew coffee',
+          engineEffect: 'brew_coffee',
+          preconditions: [],
+          effects: {},
+        },
+      }),
+    };
+    const orch = new PPEROrchestratorImpl({
+      perceptionProvider: makePerceptionProvider(state),
+      planProvider,
+      executeProvider,
+      reflectProvider: makeReflectProvider(state),
+      classifier: makeClassifier(),
+      llmClient: makeMockLLM({ response: { driveOverrides: { comfort: 8 } } }),
+      guardrail: new GuardrailEngineImpl({
+        affordanceMasking: true,
+        contextualForcing: true,
+        planValidation: true,
+      }),
+    });
     const outcome = await orch.runCycle('a1');
     expect(outcome).toEqual({ appliedDriveChanges: true });
   });

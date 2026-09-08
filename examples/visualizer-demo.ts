@@ -29,6 +29,7 @@ import type {
   SceneDefinition,
   EngineConfig,
   PPEROrchestratorPort,
+  PPERCycleOutcome,
   PPERPhase,
   AffordanceResult,
   Room,
@@ -183,8 +184,10 @@ function makeConfig(): EngineConfig {
 // the mock demo stays deterministic — no simulated cycles).
 
 export class MockOrchestrator implements PPEROrchestratorPort {
-  async runCycle(_agentId: string): Promise<void> {
+  async runCycle(_agentId: string): Promise<PPERCycleOutcome> {
     // No-op — the visualizer does not require PPER cycles to run.
+    // Nothing ran → nothing applied (spec 041 causal outcome).
+    return { appliedDriveChanges: false };
   }
   getPhase(_agentId: string): PPERPhase {
     return 'perceive';
