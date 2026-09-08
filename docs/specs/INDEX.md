@@ -61,8 +61,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      30
 ✅ Done:          17
 🔨 In Development: 0
-🔍 In Review:      7
-📝 Drafted:        5
+🔍 In Review:      8
+📝 Drafted:        4
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -90,4 +90,4 @@ Architecture sections fully implemented: 11/11
 | [036](036-exploration-factor.md) | Curiosity-Modulated Exploration Factor — Seeded Exploration Draws for the React/Ignore Gate | §5, §6 | ✅ Implemented | [#138](https://github.com/Redna/evol-hive/issues/138) | — | shared, cognition |
 | [037](037-enum-bound-plan-formulation.md) | Enum-Bound Plan Formulation — Constrain `targetAffordance` via a Dynamic Tool Signature (+ step-skip livelock guard, empty-args repair) | §5, §7, §8, §10 | ✅ Implemented | [#140](https://github.com/Redna/evol-hive/issues/140) | [#141](https://github.com/Redna/evol-hive/pull/141) | shared, cognition, examples |
 | [038](038-spatial-navigation-fog-of-war.md) | Spatial Navigation & Fog of War — Grid-Based Agents, Engine-Side Pathfinding, High-Level LLM Intents | §2, §3, §4, §6, §9 | 📝 Drafted | — | — | shared, engine, cognition, visualizer, examples |
-| [039](039-spatial-phase2-targetarea-fog.md) | Spatial Phase 2 — `targetArea` LLM Intents, Cell-Level Fog, Social Fog-Lifting, Determinism & QA | §2, §3, §6, §7, §9 | 📝 Drafted | [#144](https://github.com/Redna/evol-hive/issues/144) | — | shared, engine, cognition, visualizer, examples |
+| [039](039-spatial-phase2-targetarea-fog.md) | Spatial Phase 2 — `targetArea` LLM Intents, Cell-Level Fog, Social Fog-Lifting, Determinism & QA | §2, §3, §6, §7, §9 | 🔍 In Review | [#144](https://github.com/Redna/evol-hive/issues/144) | — | shared, engine, cognition, visualizer, examples |
