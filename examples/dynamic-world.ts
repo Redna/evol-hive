@@ -104,7 +104,10 @@ const garden: SceneDefinition['rooms'][number] = {
   id: 'garden',
   name: 'Community Garden',
   description: 'A small garden with planters and a gate.',
-  connections: ['workshop'],
+  // greenhouse added (grand validation): the spec-030 movement filter offers
+  // `go_to_<dest>` only when hasConnection(room, dest) — a door OBJECT alone
+  // is not enough; the topology edge must exist from THIS room's side too.
+  connections: ['workshop', 'greenhouse'],
   objectIds: ['planter-1', 'gate-1', 'toolbox-1', 'garden-bench-1', 'doorway-garden', 'doorway-garden-greenhouse'],
 };
 
