@@ -6,7 +6,7 @@
 - Related specs: 038 (spatial navigation & fog of war — this is the **phase-2 remainder**; first slice R1/R2/R5 implemented in 8c38f9b, tracked by #143), 037 (enum-bound plan formulation — the schema pattern reused here), 030 (dynamic scenes / door topology), 031 (co-location guard — preserved when crossing doors), 017 (persistence save/load), 023 (Canvas 2D visualizer)
 - Issue: [#144](https://github.com/Redna/evol-hive/issues/144) (tracks #143)
 - Package: shared, engine, cognition, visualizer, examples
-- Status: 📝 Drafted
+- Status: 🔍 In Review — implementation complete, TDD suites green, PR [#148](https://github.com/Redna/evol-hive/pull/148) (R9 QA pass pending)
 
 ## Problem
 

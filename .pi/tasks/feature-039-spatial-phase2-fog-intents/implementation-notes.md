@@ -27,8 +27,11 @@ Status: implementation complete; full suite + typecheck + lint + format:check + 
 
 shared 310 · visualizer 27 · memory 101 · cognition 826 · engine 740 · examples 135 · cli 4 — **all passing, 0 regressions** (engine/cognition suites ≤ pre-existing failures = zero).
 
-## Remaining
+## Final state — resume-session audit (2026-09-08)
 
-1. Open PR (requires the `GH_TOKEN` override for CI to run).
-2. `docs/specs/INDEX.md`: 039 → 🔍 In Review.
-3. R9 QA pass over the whole 038 slice (pipeline's QA agent).
+- PR **#148** opened (`feat: Spatial Phase 2 — targetArea LLM intents, cell-level fog, social fog-lifting, determinism`); body references spec 039 + issue #144 with full AC coverage mapping.
+- `docs/specs/INDEX.md`: 039 → 🔍 In Review with PR link (commit ee49fbe). In-file spec status line updated to 🔍 In Review this session.
+- Gates re-verified green this session: `pnpm typecheck` / `lint` / `format:check` / `build` / `test` all exit 0; full suite receipts confirmed (shared 310 · visualizer 27 · memory 101 · cognition 826 · engine 740 · examples 135 · cli 4; spec-039 suites: cognition 22, engine 23, visualizer 4).
+- CI: the App-token push of ee49fbe left a `pull_request` CI run in `action_required`; approved via `gh api .../actions/runs/34173590562/approve` (PAT override). Later pushes made with the PAT credential so CI triggers without approval.
+- **Remaining**: R9 — QA pass over the whole 038 slice (AC-1..AC-7) by the pipeline's QA agent on PR #148; PR merge after QA.
+- YAAM note: daemon RPC was not used for this workspace (no `scratchpad:feature-144`/039 events in the memory branch); this file is the durable breadcrumb.
