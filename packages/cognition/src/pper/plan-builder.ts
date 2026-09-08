@@ -148,6 +148,24 @@ export class PlanBuilderImpl implements PlanBuilder {
       dynamicLines.push(formatPlanDriveHint(match));
     }
 
+    // Known-map summary + unknown markers (spec 039, R1/R4). DYNAMIC section
+    // only — the spec-021 stable prefix stays byte-identical. Known areas are
+    // the exact targetArea enum values; unexplored-but-known doors/areas are
+    // rendered as explicit markers ("a door to 'workshop' — unexplored") so
+    // the LLM can plan exploration without perceiving the unknown side.
+    const { knownAreas, unexploredAreas } = perceptionResult;
+    if (knownAreas !== undefined && knownAreas.length > 0) {
+      dynamicLines.push(`Known areas: ${knownAreas.join(', ')}`);
+      dynamicLines.push(
+        'Set targetArea on a step to navigate to a known area first — the engine walks you there and the affordance executes on arrival.',
+      );
+    }
+    if (unexploredAreas !== undefined) {
+      for (const area of unexploredAreas) {
+        dynamicLines.push(`a door to '${area}' — unexplored`);
+      }
+    }
+
     // Append system feedback (prior action failures) per §9.2.
     if (passive.systemFeedback !== undefined) {
       dynamicLines.push(`System feedback: ${passive.systemFeedback}`);
@@ -177,14 +195,21 @@ export class PlanBuilderImpl implements PlanBuilder {
 
     // Spec 037, Req 1: the formulate_plan schema enum-binds targetAffordance to
     // the pruned affordance IDs (+ 'wait') — the pruner's output becomes a
-    // value-space constraint, not just prompt context.
-    const planTool = formulatePlanToolFor(prunedAffordances.map((a) => a.id));
+    // value-space constraint, not just prompt context. Spec 039, R1: when the
+    // agent knows areas, steps additionally gain the enum-bound targetArea.
+    const planTool = formulatePlanToolFor(
+      prunedAffordances.map((a) => a.id),
+      knownAreas,
+    );
 
     return {
       systemPrompt,
       perceptionContext: contextLines.join('\n'),
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
+      // Spec 039, R1: the known-area value space rides with the payload so
+      // the plan validator can enforce area-bound steps.
+      ...(knownAreas !== undefined ? { knownAreas } : {}),
       tools: buildPlanTools(hasAgentsPresent, affordanceTools, isSocialPrimary, planTool),
     };
   }

@@ -17,6 +17,16 @@ const PHASE_COLORS: Record<string, string> = {
   reflect: '#9b59b6', // purple
 };
 
+/**
+ * Fog shading fill for unexplored cells (spec 038 AC-5 / spec 039 R8).
+ * Exported so tests can identify the fog pass among the fill calls.
+ */
+export const FOG_CELL_FILL = 'rgba(10, 10, 24, 0.78)';
+
+/** Grid dimensions per room — must match the engine's RoomGrid (spec 038). */
+const FOG_GRID_WIDTH = 12;
+const FOG_GRID_HEIGHT = 8;
+
 /** Drive keys in canonical order, with display labels and colors. */
 const DRIVES: { key: keyof VisualizerAgent['drives']; label: string; color: string }[] = [
   { key: 'energy', label: 'E', color: '#e74c3c' },
@@ -87,11 +97,23 @@ export class CanvasRenderer {
     // Layout: position rooms in a grid.
     const roomLayout = this.layoutRooms(state.rooms);
 
+    // The fog viewer (spec 039, R8): the first agent carrying fog data.
+    // Its fog shades unexplored cells and hides out-of-fog agents/objects.
+    // No agent carries fog (legacy state) → everything renders normally.
+    const viewer = state.agents.find((a) => a.fog !== undefined) ?? null;
+
     // (1) Draw rooms.
     for (const room of state.rooms) {
       const pos = roomLayout.get(room.id);
       if (!pos) continue;
       this.drawRoom(room, pos.x, pos.y, pos.w, pos.h);
+    }
+
+    // (1.5) Fog shading over unexplored cells (spec 039, R8): a translucent
+    // dark overlay per unexplored cell of each room, derived from the
+    // viewer's spatial memory (exploredCells / visitedRooms).
+    if (viewer?.fog !== undefined) {
+      this.drawFog(state, roomLayout, viewer.fog);
     }
 
     // (2) Draw connection lines between rooms (doors).
@@ -110,18 +132,37 @@ export class CanvasRenderer {
       }
     }
 
-    // (3) Draw objects within rooms.
+    // (3) Draw objects within rooms — objects anchored in cells outside the
+    // viewer's fog do not render for that viewer (spec 039, R8). Objects
+    // without a cell (legacy) always render.
     for (const room of state.rooms) {
       const pos = roomLayout.get(room.id);
       if (!pos) continue;
-      this.drawObjects(room.objects, pos.x, pos.y, pos.w, pos.h);
+      const fog = viewer?.fog;
+      const objects =
+        fog !== undefined
+          ? room.objects.filter(
+              (obj) => obj.cell === undefined || this.cellInFog(room.id, obj.cell, fog),
+            )
+          : room.objects;
+      this.drawObjects(objects, pos.x, pos.y, pos.w, pos.h);
     }
 
     // (4) Draw agents within their rooms.
     // Spec 038: agents render at their true grid cell when the engine
     // provides one (they walk cell-by-cell); legacy slot otherwise.
+    // Spec 039, R8: agents outside the viewer's fog do not render for that
+    // viewer (the viewer itself always renders).
     const agentPositions = new Map<string, { x: number; y: number }>();
     for (const agent of state.agents) {
+      if (
+        viewer?.fog !== undefined &&
+        agent !== viewer &&
+        agent.position !== undefined &&
+        !this.cellInFog(agent.location, agent.position, viewer.fog)
+      ) {
+        continue;
+      }
       const roomPos = roomLayout.get(agent.location);
       if (!roomPos) continue;
       const idx = state.agents.indexOf(agent);
@@ -142,6 +183,45 @@ export class CanvasRenderer {
 
     // (6) Draw the status overlay (tick, running, speed).
     this.drawStatus(state);
+  }
+
+  /**
+   * Fog pass (spec 039, R8): paint a translucent dark cell over every
+   * UNEXPLORED cell of each room. A room counts as explored cell-wise when
+   * its cell key is present in `exploredCells`; unvisited rooms are fully
+   * fogged. Deterministic — cells iterate in row-major order.
+   */
+  private drawFog(
+    state: VisualizerState,
+    roomLayout: Map<string, { x: number; y: number; w: number; h: number }>,
+    fog: { visitedRooms: string[]; exploredCells: Record<string, string[]> },
+  ): void {
+    const ctx = this.ctx;
+    for (const room of state.rooms) {
+      const pos = roomLayout.get(room.id);
+      if (!pos) continue;
+      const explored = new Set(fog.exploredCells[room.id] ?? []);
+      for (let y = 0; y < FOG_GRID_HEIGHT; y++) {
+        for (let x = 0; x < FOG_GRID_WIDTH; x++) {
+          if (explored.has(`${x},${y}`)) continue;
+          const fx = pos.x + (x * pos.w) / FOG_GRID_WIDTH;
+          const fy = pos.y + (y * pos.h) / FOG_GRID_HEIGHT;
+          ctx.fillStyle = FOG_CELL_FILL;
+          ctx.fillRect(fx, fy, pos.w / FOG_GRID_WIDTH, pos.h / FOG_GRID_HEIGHT);
+        }
+      }
+    }
+  }
+
+  /** Is a grid cell inside the fog set for a room? (No fog for a room → false.) */
+  private cellInFog(
+    roomId: string,
+    cell: { x: number; y: number },
+    fog: { exploredCells: Record<string, string[]> },
+  ): boolean {
+    const cells = fog.exploredCells[roomId];
+    if (cells === undefined) return false;
+    return cells.includes(`${cell.x},${cell.y}`);
   }
 
   /** Position rooms in a simple grid layout. */

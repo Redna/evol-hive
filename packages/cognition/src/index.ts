@@ -95,6 +95,12 @@ export interface LLMContextPayload {
   /** Tool definitions sent to the LLM via the `tools` parameter (spec 011). */
   tools: import('@evol-hive/shared').ToolDefinition[];
   /**
+   * The agent's KNOWN areas (spec 039, R1) — the targetArea enum value space
+   * carried from the perception result so the plan validator can enforce
+   * area-bound steps. `undefined` when no areas are known (no targetArea).
+   */
+  knownAreas?: string[];
+  /**
    * The agent this payload belongs to (spec 015, Req 5). Set by the PPER
    * services after the builder creates the payload. The LLM client reads it
    * to pass `agentId` to the `CognitiveToolExecutor` during the tool call

@@ -81,6 +81,13 @@ export interface VisualizerAgent {
   relationships: { agentId: string; trust: number; familiarity: number }[];
   /** Grid cell within the room (spec 038) — undefined = legacy slot rendering. */
   position?: { x: number; y: number };
+  /**
+   * The agent's fog of war (spec 039, R8): visited rooms + explored cells
+   * per room ("x,y" keys). The viewer's fog drives the canvas fog shading;
+   * agents/objects outside it do not render for that viewer. `undefined` =
+   * legacy state (no fog, everything renders).
+   */
+  fog?: { visitedRooms: string[]; exploredCells: Record<string, string[]> };
 }
 
 /**

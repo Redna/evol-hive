@@ -404,11 +404,22 @@ export function assembleGameLoop(
   });
   core.sceneManager.setNavigator(navigation);
   core.navigation = { grid: worldGrid };
+  // Navigation port for targetArea steps (spec 039, R2) — the execute bridge
+  // routes area intents through the grid's doorway graph.
+  core.bridges.execute.setNavigation(navigation);
   core.gameLoop.registerSystem(navigation); // (0.6) NavigationSystem (spec 038)
-  // Seat every active agent on the grid (deterministic spawn near the door).
+  // Seat every active agent on the grid (deterministic spawn near the door)
+  // and seed its spatial memory: the start room is personally visited, its
+  // doors are seen, its object anchors are observed, the spawn cell (+ free
+  // neighbours) is explored (spec 039, AC-8 — deterministic, no RNG).
   for (const agent of core.agentManager.getActiveAgents()) {
     const cell = worldGrid.enterRoom(agent.agentId, undefined, agent.location);
     core.agentManager.updateState(agent.agentId, { position: cell });
+    navigation.seedSpawnKnowledge(
+      agent.agentId,
+      agent.location,
+      anchorsByRoom.get(agent.location) ?? [],
+    );
   }
   core.gameLoop.registerSystem(core.spatial); // (1) SpatialSystem
   core.gameLoop.registerSystem(new DriveDecaySystem(core.agentManager, core.driveSystem)); // (2) DriveDecaySystem

@@ -157,6 +157,21 @@ export class VisualizerDataAdapter implements VisualizerInterface {
         name,
         location: state.location,
         ...(state.position !== undefined ? { position: state.position } : {}),
+        // Fog of war (spec 039, R8): the agent's spatial memory drives the
+        // canvas fog shading + per-viewer object/agent hiding.
+        ...(state.spatialMemory !== undefined
+          ? {
+              fog: {
+                visitedRooms: [...state.spatialMemory.visitedRooms],
+                exploredCells: Object.fromEntries(
+                  Object.entries(state.spatialMemory.exploredCells ?? {}).map(([room, cells]) => [
+                    room,
+                    [...cells],
+                  ]),
+                ),
+              },
+            }
+          : {}),
         drives,
         currentGoal: state.currentGoal,
         currentPlan,

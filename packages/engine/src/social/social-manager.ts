@@ -46,12 +46,78 @@ export class SocialManager implements SocialActionBridge, ConversationBridge {
 
   // ── SocialActionBridge methods ─────────────────────────────────────────────
 
-  /** Queue a social message for the target agent (spec 018, Req 17). */
+  /**
+   * Queue a social message for the target agent (spec 018, Req 17).
+   *
+   * Spec 039 (R5 — social fog-lifting): delivering a message shares the
+   * speaker's sightings — what the speaker has observed (rooms, doors,
+   * object anchors with last-seen room, explored cells) enters the
+   * LISTENER's spatial memory using the same representation personal
+   * discovery writes, so perception fog and targetArea enums pick it up
+   * automatically. Idempotent: already-known rooms/doors/anchors are kept.
+   */
   queueMessage(fromAgentId: string, toAgentId: string, content: string): void {
     const fromName = this.agentManager.getProfile(fromAgentId)?.name ?? fromAgentId;
     const timestamp = Date.now();
     const message: SocialMessage = { fromAgentId, fromName, content, timestamp };
     this.messageQueue.enqueue(toAgentId, message);
+    this.transferSightings(fromAgentId, toAgentId);
+  }
+
+  /**
+   * Transfer the speaker's spatial sightings into the listener's spatial
+   * memory (spec 039, R5) — same representation as personal discovery:
+   * rooms → visitedRooms, doors → knownDoors, object anchors →
+   * observedObjects, explored cells → exploredCells. Timestamps carry the
+   * speaker's discovery times where present (last-seen state).
+   */
+  private transferSightings(fromAgentId: string, toAgentId: string): void {
+    if (fromAgentId === toAgentId) return;
+    const speaker = this.agentManager.getState(fromAgentId);
+    const listener = this.agentManager.getState(toAgentId);
+    if (!speaker?.spatialMemory || !listener) return;
+    const source = speaker.spatialMemory;
+    const target = listener.spatialMemory ?? {
+      visitedRooms: [],
+      knownDoors: [],
+      discoveredAt: {},
+    };
+
+    const visitedRooms = [...target.visitedRooms];
+    const knownDoors = [...target.knownDoors];
+    const discoveredAt = { ...target.discoveredAt };
+    const observedObjects = { ...(target.observedObjects ?? {}) };
+    const exploredCells: Record<string, string[]> = { ...(target.exploredCells ?? {}) };
+
+    for (const room of source.visitedRooms) {
+      if (!visitedRooms.includes(room)) {
+        visitedRooms.push(room);
+        discoveredAt[room] = source.discoveredAt[room] ?? Date.now();
+      }
+    }
+    for (const door of source.knownDoors) {
+      if (!knownDoors.includes(door)) knownDoors.push(door);
+    }
+    for (const [objectId, roomId] of Object.entries(source.observedObjects ?? {})) {
+      if (observedObjects[objectId] === undefined) {
+        observedObjects[objectId] = roomId;
+      }
+    }
+    for (const [roomId, cells] of Object.entries(source.exploredCells ?? {})) {
+      const known = new Set(exploredCells[roomId] ?? []);
+      for (const cell of cells) known.add(cell);
+      exploredCells[roomId] = [...known];
+    }
+
+    this.agentManager.updateState(toAgentId, {
+      spatialMemory: {
+        visitedRooms,
+        knownDoors,
+        discoveredAt,
+        observedObjects,
+        exploredCells,
+      },
+    });
   }
 
   /** Update a structured relationship between two agents (spec 018, Req 17). */
