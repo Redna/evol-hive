@@ -97,4 +97,42 @@ describe('AffordanceClassifier.prune (AC-13, AC-14, AC-15)', () => {
     const pruned = await classifier.prune(DRIVE_LABEL, []);
     expect(pruned).toEqual([]);
   });
+
+  it('movement affordances are never similarity-pruned (wait-domination fix)', async () => {
+    // go_to_* has NO drive similarity (vector [0,0]) — under the old rule it
+    // was filtered and the LLM could not express movement intent at all.
+    const affordances: Affordance[] = [
+      makeAffordance('brew_coffee', 'Brew coffee'), // sim 1.0
+      makeAffordance('read', 'Read a book'), // sim 0
+      makeAffordance('go_to_workshop', 'Go to workshop'), // sim 0, movement
+    ];
+    const pruned = await classifier.prune(DRIVE_LABEL, affordances);
+    const ids = pruned.map((a) => a.id);
+    expect(ids).toContain('brew_coffee'); // drive-anchored: passes the filter
+    expect(ids).toContain('go_to_workshop'); // movement: guaranteed
+    expect(ids).not.toContain('read'); // non-movement + no similarity: pruned
+  });
+
+  it('movement affordances do not crowd drive-anchored actions out of top-K', async () => {
+    // 3 drive-matched actions + 2 movement affordances, topK 5: the anchor
+    // budget shrinks by the movement count, so all 3 still surface.
+    const affordances: Affordance[] = [
+      makeAffordance('brew_coffee', 'Brew coffee'), // sim 1.0
+      makeAffordance('eat_snack', 'Eat snack'), // sim 0.5
+      makeAffordance('sit_down', 'Sit down'), // sim 0.4
+      makeAffordance('go_to_workshop', 'Go to workshop'), // sim 0
+      makeAffordance('go_to_garden', 'Go to garden'), // sim 0
+    ];
+    const pruned = await classifier.prune(DRIVE_LABEL, affordances);
+    const ids = pruned.map((a) => a.id);
+    for (const expected of [
+      'brew_coffee',
+      'eat_snack',
+      'sit_down',
+      'go_to_workshop',
+      'go_to_garden',
+    ]) {
+      expect(ids).toContain(expected);
+    }
+  });
 });

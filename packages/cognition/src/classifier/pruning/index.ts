@@ -45,20 +45,31 @@ export class AffordanceClassifierImpl implements AffordanceClassifier {
     const topK = options?.topK ?? this.config.topK;
     const threshold = options?.similarityThreshold ?? this.config.similarityThreshold;
 
+    // Movement affordances are NEVER similarity-pruned: navigation is the
+    // means to every drive, not a drive itself. When nothing urgent anchors
+    // them, the drive-similarity filter removes `go_to_*` from the enum and
+    // the LLM cannot express movement intent — live runs then produced
+    // wait-only plans whose descriptions leaked the suppressed intent
+    // ("go to the greenhouse to find food" with targetAffordance=wait).
+    const movement = affordances.filter((a) => a.engineEffect.startsWith('go_to_'));
+    const candidates = affordances.filter((a) => !a.engineEffect.startsWith('go_to_'));
+
     const queryVec = await this.embeddingProvider.embed(driveLabel);
-    const labels = affordances.map((a) => a.label);
+    const labels = candidates.map((a) => a.label);
     const vectors = await this.embeddingProvider.embedBatch(labels);
 
-    const scored = affordances.map((affordance, i) => ({
+    const scored = candidates.map((affordance, i) => ({
       affordance,
       score: cosineSimilarity(queryVec, vectors[i] ?? []),
     }));
 
-    return scored
+    const pruned = scored
       .filter((s) => s.score >= threshold)
       .sort((x, y) => y.score - x.score)
-      .slice(0, topK)
+      .slice(0, Math.max(0, topK - movement.length))
       .map((s) => s.affordance);
+
+    return [...pruned, ...movement];
   }
 }
 
