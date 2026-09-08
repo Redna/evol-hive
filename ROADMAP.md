@@ -83,7 +83,7 @@
 ## What's Next
 
 > **All 11 architecture sections (§1-§11) are fully implemented.**
-> The cognitive core is complete. Current focus: first real System 1 dream update (trainable heads on accumulated session logs), the full-system grand validation (conversations + identity + System 1 + enum-bound plans active simultaneously), replan quality (spec 038 candidate: penalize repeating just-failed steps), and scale. ~~Drive-economy equilibrium~~ ✅ (#139 closed 2026-09-06 — sustained oscillation confirmed).
+> The cognitive core is complete. Current focus: **behavioral verification of the spatial layer** (spec 039 shipped: targetArea intents, cell fog, social fog-lifting, determinism), the System 1 label pipeline (wait-only ignore refinement + decay-noise threshold + exploration ε — dream v4 trained on 7.4K samples, headVersion 3→4), and the wait-domination behavioral arc (pruner now guarantees movement affordances in the enum; observe the LLM's room-to-room autonomy in the next validation). ~~Drive-economy equilibrium~~ ✅ (#139). ~~First conversations~~ ✅ (2026-09-08 — `talk_to` exchanges observed live: herb offers, work offers, trust deltas).
 
 ### ✅ Phase 4: Validation & Polish
 > Prove emergent behavior works with real LLM runs. **Complete (2026-09-04).**
