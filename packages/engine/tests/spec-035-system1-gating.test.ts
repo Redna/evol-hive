@@ -386,6 +386,38 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     expect(sink.samples[0]!.outcome!.planChanged).toBe(true);
   });
 
+  it('sub-threshold drive decay does not mask a wait-only cycle (decay-noise fix)', async () => {
+    const agents = new AgentManagerImpl();
+    agents.spawn(makeAgent('a1'));
+    const orch = new FakeOrchestrator();
+    const gate = new ScriptedGate();
+    gate.decisions = [decision(0.9, true)];
+    const { sink, probe, recorder } = makeRecorder();
+
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        outcomeRecorder: recorder,
+      },
+    );
+
+    // Before/after: different wait-only plans + tiny drive decay (0.1/s over
+    // a cycle ≈ a few points of physics). The cycle's only effect was the
+    // no-op plan — ambient decay must not flip it to REACT.
+    const waitSnap = (id: string, energy: number): OutcomeSnapshot => ({
+      ...baseSnapshot(id),
+      planStepIds: ['wait'],
+      drives: { energy, hunger: 50, social: 50, comfort: 50, curiosity: 50 },
+    });
+    probe.snapshots = [waitSnap('plan_D1', 50.6), waitSnap('plan_D2', 47.9)];
+    scheduler.update(TICK);
+    await vi.waitFor(() => expect(sink.samples).toHaveLength(1));
+    expect(sink.samples[0]!.label).toBe('ignore');
+  });
+
   it('a movement plan (non-wait steps) still labels REACT', async () => {
     const agents = new AgentManagerImpl();
     agents.spawn(makeAgent('a1'));

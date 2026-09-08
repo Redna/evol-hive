@@ -163,9 +163,15 @@ function toAgentDrives(drives: Record<string, number>): AgentDrives {
 
 /** Compares drive maps for any change (deterministic). */
 function drivesDiffer(a: Record<string, number>, b: Record<string, number>): boolean {
+  // Decay-noise threshold: drives decay 0.1/s ambiently, so an exact
+  // comparison made EVERY cycle "drive-changing" and the wait-only ignore
+  // refinement never fired (0.1/s × cycle length ≈ 2-5 points of pure
+  // physics). Affordance driveChanges are ≥3 points; deltas below ±1 are
+  // decay, not the cycle's effect.
+  const DRIVE_CHANGE_EPSILON = 1.0;
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const key of keys) {
-    if ((a[key] ?? 0) !== (b[key] ?? 0)) return true;
+    if (Math.abs((a[key] ?? 0) - (b[key] ?? 0)) >= DRIVE_CHANGE_EPSILON) return true;
   }
   return false;
 }
