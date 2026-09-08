@@ -209,6 +209,9 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
     // second food source so the eat chain is not planter-exclusive.
     makeObject('potting-table-1', 'Potting Table', 'furniture', 'greenhouse', [
       aff('repot_seedlings', 'Repot seedlings', [], { curiosity: 12, comfort: 5 }),
+      // Spec-032 invariant: every room must restore energy — the greenhouse's
+      // rest affordance (CI caught its absence in the grand-validation scene).
+      aff('rest_among_seedlings', 'Rest among the seedlings', [], { comfort: 15, energy: 4 }),
       aff('observe', 'Observe'),
     ]),
     makeObject('seed-shelf-1', 'Seed Shelf', 'furniture', 'greenhouse', [
