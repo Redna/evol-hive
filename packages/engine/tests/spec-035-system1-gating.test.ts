@@ -412,7 +412,7 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
       planStepIds: ['wait'],
       drives: { energy, hunger: 50, social: 50, comfort: 50, curiosity: 50 },
     });
-    probe.snapshots = [waitSnap('plan_D1', 50.6), waitSnap('plan_D2', 47.9)];
+    probe.snapshots = [waitSnap('plan_D1', 50.6), waitSnap('plan_D2', 49.9)];
     scheduler.update(TICK);
     await vi.waitFor(() => expect(sink.samples).toHaveLength(1));
     expect(sink.samples[0]!.label).toBe('ignore');
