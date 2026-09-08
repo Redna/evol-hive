@@ -81,7 +81,10 @@ interface ExecuteScript {
   result?: ExecuteResult;
 }
 
-function makeExecuteProvider(state: AgentInternalState, script: ExecuteScript): ExecuteDataProvider {
+function makeExecuteProvider(
+  state: AgentInternalState,
+  script: ExecuteScript,
+): ExecuteDataProvider {
   return {
     getAgentState: () => state,
     getCurrentStep: () => ({
@@ -169,8 +172,11 @@ function makeMockLLM(reflectScript: ReflectScript): LLMClient {
   };
 }
 
-
-function makeOrchestrator(state: AgentInternalState, script: ExecuteScript, reflectScript: ReflectScript): PPEROrchestrator {
+function makeOrchestrator(
+  state: AgentInternalState,
+  script: ExecuteScript,
+  reflectScript: ReflectScript,
+): PPEROrchestrator {
   return new PPEROrchestratorImpl({
     perceptionProvider: makePerceptionProvider(state),
     planProvider: makePlanProvider(state),
@@ -376,7 +382,11 @@ describe('Spec 041 — early-return paths report what actually ran (R2.2)', () =
       reflectProvider: makeReflectProvider(state),
       classifier: makeClassifier(),
       llmClient: makeMockLLM({
-        response: { memoryContent: 'reflected on deviation', memoryImportance: 4, memoryType: 'observation' },
+        response: {
+          memoryContent: 'reflected on deviation',
+          memoryImportance: 4,
+          memoryType: 'observation',
+        },
       }),
       guardrail: new GuardrailEngineImpl({
         affordanceMasking: true,

@@ -60,7 +60,11 @@ class FakeOrchestrator implements PPEROrchestratorPort {
 
 class ScriptedGate implements System1GatePort {
   decisions: ReactGateDecision[] = [];
-  decide(_agentId: string, _tickNumber: number, _hardTriggers: HardTriggerFlags): ReactGateDecision {
+  decide(
+    _agentId: string,
+    _tickNumber: number,
+    _hardTriggers: HardTriggerFlags,
+  ): ReactGateDecision {
     const next = this.decisions.shift();
     if (next) return next;
     return { pReact: 0, react: false, hardTrigger: false, headVersion: 1, failOpen: false };
@@ -144,7 +148,9 @@ describe('Spec 041 — scheduler threads the outcome (R3.1)', () => {
     const orch = new FakeOrchestrator();
     orch.outcomes = [{ appliedDriveChanges: true }];
     const gate = new ScriptedGate();
-    gate.decisions = [{ pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false }];
+    gate.decisions = [
+      { pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false },
+    ];
     const { spy, settledCalls } = makeRecorderHarness();
     const scheduler = new PPERScheduler(
       agents,
@@ -166,7 +172,9 @@ describe('Spec 041 — scheduler threads the outcome (R3.1)', () => {
     const orch = new FakeOrchestrator();
     orch.outcomes = [new Error('LLM exploded')];
     const gate = new ScriptedGate();
-    gate.decisions = [{ pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false }];
+    gate.decisions = [
+      { pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false },
+    ];
     const { settledCalls } = makeRecorderHarness();
     const scheduler = new PPERScheduler(
       agents,
@@ -193,7 +201,9 @@ describe('Spec 041 — scheduler threads the outcome (R3.1)', () => {
       getPhase: () => 'perceive' as const,
     };
     const gate = new ScriptedGate();
-    gate.decisions = [{ pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false }];
+    gate.decisions = [
+      { pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false },
+    ];
     const { settledCalls } = makeRecorderHarness();
     const scheduler = new PPERScheduler(
       agents,
@@ -219,7 +229,9 @@ describe('Spec 041 — labeling from the applied signal (R3.2 / AC-1, AC-2)', ()
     const orch = new FakeOrchestrator();
     orch.outcomes = [{ appliedDriveChanges: false }]; // wait-only refinement path
     const gate = new ScriptedGate();
-    gate.decisions = [{ pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false }];
+    gate.decisions = [
+      { pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false },
+    ];
     const { sink, spy, probe, tracker } = makeRecorderHarness();
 
     const before = baseSnapshot('plan_W1');
@@ -251,7 +263,9 @@ describe('Spec 041 — labeling from the applied signal (R3.2 / AC-1, AC-2)', ()
     const orch = new FakeOrchestrator();
     orch.outcomes = [{ appliedDriveChanges: true }]; // a 1-point affordance delta upstream
     const gate = new ScriptedGate();
-    gate.decisions = [{ pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false }];
+    gate.decisions = [
+      { pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false },
+    ];
     const { sink, spy, probe } = makeRecorderHarness();
 
     // Identical before/after snapshots — under the old diff-based labeler
@@ -279,7 +293,9 @@ describe('Spec 041 — labeling from the applied signal (R3.2 / AC-1, AC-2)', ()
     const orch = new FakeOrchestrator();
     orch.outcomes = [{ appliedDriveChanges: true }];
     const gate = new ScriptedGate();
-    gate.decisions = [{ pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false }];
+    gate.decisions = [
+      { pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false },
+    ];
     const { sink, spy, probe } = makeRecorderHarness();
     probe.snapshots = [baseSnapshot(null), baseSnapshot(null)];
 
@@ -301,7 +317,9 @@ describe('Spec 041 — labeling from the applied signal (R3.2 / AC-1, AC-2)', ()
     const orch = new FakeOrchestrator();
     orch.outcomes = []; // legacy orchestrator — scheduler passes no outcome
     const gate = new ScriptedGate();
-    gate.decisions = [{ pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false }];
+    gate.decisions = [
+      { pReact: 0.9, react: true, hardTrigger: false, headVersion: 1, failOpen: false },
+    ];
     const { sink, spy, probe } = makeRecorderHarness();
 
     const before = baseSnapshot(null);
@@ -330,7 +348,9 @@ describe('Spec 041 — labeling from the applied signal (R3.2 / AC-1, AC-2)', ()
     const orch = new FakeOrchestrator();
     orch.outcomes = [{ appliedDriveChanges: false }];
     const gate = new ScriptedGate();
-    gate.decisions = [{ pReact: 0, react: false, hardTrigger: true, headVersion: 1, failOpen: false }];
+    gate.decisions = [
+      { pReact: 0, react: false, hardTrigger: true, headVersion: 1, failOpen: false },
+    ];
     const { sink, spy, probe } = makeRecorderHarness();
     probe.snapshots = [baseSnapshot(null), baseSnapshot(null)];
 
@@ -354,7 +374,11 @@ describe('Spec 041 — labeling from the applied signal (R3.2 / AC-1, AC-2)', ()
 
 /** Minimal recorder spy used by the scheduler-threading-only tests. */
 function spyOnly(
-  settledCalls: { agentId: string; outcome: PPERCycleOutcome | undefined; error: string | undefined }[],
+  settledCalls: {
+    agentId: string;
+    outcome: PPERCycleOutcome | undefined;
+    error: string | undefined;
+  }[],
 ): {
   onCycleStart(agentId: string, ctx: import('@evol-hive/shared').CycleStartContext): void;
   onCycleSettled(agentId: string, outcome?: PPERCycleOutcome, error?: string): void;

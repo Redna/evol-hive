@@ -63,11 +63,7 @@ describe('System1OutcomeRecorderPort.onCycleSettled (R1.3)', () => {
     }[] = [];
     const recorder: System1OutcomeRecorderPort = {
       onCycleStart(_agentId: string, _ctx: CycleStartContext): void {},
-      onCycleSettled(
-        agentId: string,
-        outcome?: PPERCycleOutcome,
-        error?: string,
-      ): void {
+      onCycleSettled(agentId: string, outcome?: PPERCycleOutcome, error?: string): void {
         calls.push({ agentId, outcome, error });
       },
     };
