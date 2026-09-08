@@ -245,7 +245,20 @@ describe('targetArea navigation-then-execution (spec 039, AC-1)', () => {
     const sa = a.agentManager.getState('a1')!;
     const sb = b.agentManager.getState('a1')!;
     expect(sa.position).toEqual(sb.position);
-    expect(sa.spatialMemory).toEqual(sb.spatialMemory);
+    // QA note (spec 039 R9): `discoveredAt` is wall-clock audit data
+    // (`Date.now()` at seeding), NOT a deterministic field — deep-equality
+    // across two rebuilds flakes whenever the builds straddle a ms boundary
+    // (observed under full-suite load). Compare the deterministic structure;
+    // timestamps only need to be present.
+    const stripTimestamps = (mem: NonNullable<typeof sa.spatialMemory>) => ({
+      ...mem,
+      discoveredAt: Object.fromEntries(Object.keys(mem.discoveredAt).map((k) => [k, 0])),
+    });
+    expect(stripTimestamps(sa.spatialMemory!)).toEqual(stripTimestamps(sb.spatialMemory!));
+    for (const v of Object.values(sa.spatialMemory!.discoveredAt)) expect(v).toBeGreaterThan(0);
+    expect(Object.keys(sa.spatialMemory!.discoveredAt).sort()).toEqual(
+      Object.keys(sb.spatialMemory!.discoveredAt).sort(),
+    );
   });
 
   it('scenes without anchors auto-assign anchor cells deterministically (AC-8)', () => {
