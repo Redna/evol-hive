@@ -62,6 +62,14 @@ suite + typecheck + lint + format:check were run.
   todos excluded).
 - `pnpm typecheck` ✅ · `pnpm lint` ✅ · `pnpm format:check` ✅
 - Spec-040 suites: cognition 21/21, engine 4/4, cli E2E 3/3.
+- CI on the QA commit `68e97b3`: the CI run is parked in
+  `action_required` (workflow-approval gate — the QA bot token cannot
+  approve it, `POST .../runs/:id/approval` → 404/403). The immediately
+  prior run on the PR (`b65e69b`, identical CI command set) was green
+  (Test / Build / Type Check & Lint / GitGuardian), and the QA additions
+  were verified locally with the exact CI commands (`pnpm test`,
+  `pnpm typecheck`, `pnpm lint`, `pnpm format:check` — all green). A
+  maintainer workflow-approval click will confirm on CI.
 
 ## Constraint check (spec 040)
 
