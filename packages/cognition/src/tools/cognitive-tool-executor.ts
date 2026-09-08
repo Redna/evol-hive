@@ -226,6 +226,9 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       }
 
       this.socialBridge.queueMessage(agentId, targetAgentId, message);
+      // Spec 033 (R6): sentiment-gated deltas when a conversation is wired;
+      // legacy blind +5/+2 deltas otherwise (backward compat, AC-14).
+      const delta = conversationDelta ?? { familiarity: 5, trust: 2 };
       // Telemetry: social tools bypass the engine's affordance logger (they
       // execute cognition-side), so live runs showed a +49 social jump with
       // no visible cause. Surface every exchange.
@@ -234,9 +237,6 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
           `(${JSON.stringify(message.slice(0, 80))}) trust=${delta.trust >= 0 ? '+' : ''}${delta.trust} ` +
           `familiarity=${delta.familiarity >= 0 ? '+' : ''}${delta.familiarity}`,
       );
-      // Spec 033 (R6): sentiment-gated deltas when a conversation is wired;
-      // legacy blind +5/+2 deltas otherwise (backward compat, AC-14).
-      const delta = conversationDelta ?? { familiarity: 5, trust: 2 };
       this.socialBridge.updateRelationship(agentId, targetAgentId, {
         familiarity: delta.familiarity,
         trust: delta.trust,
