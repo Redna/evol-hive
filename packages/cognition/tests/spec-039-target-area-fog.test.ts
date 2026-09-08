@@ -193,9 +193,8 @@ describe('PlanBuilderImpl fog context (spec 039, AC-3)', () => {
     const payload = new PlanBuilderImpl().build(makePerception());
     const ctx = payload.perceptionContext;
     // Unknown marker for the known-but-unexplored room.
-    expect(ctx).toContain('workshop');
-    expect(ctx).toContain('unexplored');
-    // The unknown side is NOT perceived: no workshop objects in context.
+    expect(ctx).toContain("a door to 'workshop' — unexplored");
+    // The unknown side is NOT perceived: no workshop objects/affordances.
     expect(ctx).not.toContain('workbench');
     expect(ctx).not.toContain('craft');
   });
@@ -292,10 +291,12 @@ class FakeExecuteProvider implements ExecuteDataProvider {
     return this.agentState as never;
   }
   getCurrentStep(): PlanStep | null {
-    return this.agentState.currentPlan.steps[0] ?? null;
+    const plan = this.agentState.currentPlan;
+    return plan.steps[plan.currentStepIndex] ?? null;
   }
   isPlanComplete(): boolean {
-    return false;
+    const plan = this.agentState.currentPlan;
+    return plan.currentStepIndex >= plan.steps.length;
   }
   resolveAffordance(_roomId: string, affordanceId: string) {
     // 'craft' lives in the workshop only; 'water_plants' in the garden.
@@ -317,6 +318,7 @@ class FakeExecuteProvider implements ExecuteDataProvider {
   }
   advanceStep(): void {
     this.advanced += 1;
+    this.agentState.currentPlan.currentStepIndex += 1;
   }
   applyDriveChanges(agentId: string, changes: Partial<Record<string, number>>): void {
     void agentId;

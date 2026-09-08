@@ -8,6 +8,12 @@
  * preserved). First arrival in a room updates the agent's spatial memory and
  * rewards curiosity (R5) — exploration finally has a real remedy.
  *
+ * Spec 039 phase 2 (R2): `navigateToArea` resolves an LLM `targetArea`
+ * intent (a known room or object anchor — never cell coordinates) into a
+ * multi-tick walk; the caller (Execute) executes the affordance only when
+ * arrival is observed. Every cell the agent walks is recorded into
+ * `spatialMemory.exploredCells` (cell-level fog for the visualizer, R8).
+ *
  * Determinism: paths come from WorldGrid (pure functions of grid + door
  * state); movement is one cell per tick. No RNG.
  */
@@ -25,6 +31,16 @@ interface WalkState {
   cells: Cell[];
   /** Rooms still to traverse after the current one (inclusive of destination). */
   roomQueue: string[];
+}
+
+/**
+ * A pending `targetArea` walk (spec 039, R2): the LLM's area intent being
+ * walked out by the engine. `kind: 'room'` walks to the room itself;
+ * `kind: 'object'` walks to the object's anchor cell (stops adjacent).
+ */
+interface PendingArea {
+  area: string;
+  kind: 'room' | 'object';
 }
 
 export interface NavigationSystemOptions {
@@ -45,6 +61,8 @@ export interface SceneManagerImplAlias {
 export class NavigationSystemImpl {
   readonly name = 'navigation';
   private readonly walks = new Map<string, WalkState>();
+  /** Pending targetArea walks (spec 039, R2) — one per agent. */
+  private readonly pendingAreas = new Map<string, PendingArea>();
 
   constructor(private readonly options: NavigationSystemOptions) {}
 
@@ -77,6 +95,133 @@ export class NavigationSystemImpl {
     return this.walks.has(agentId);
   }
 
+  /** Is a targetArea walk pending for the agent (spec 039, R2)? */
+  hasPendingArea(agentId: string): boolean {
+    return this.pendingAreas.has(agentId);
+  }
+
+  /**
+   * Resolve an LLM `targetArea` intent into navigation (spec 039, R2).
+   *
+   * The agent reasons over AREAS it knows — a room (visited or seen through
+   * a door) or an object anchor recorded in spatial memory — never cell
+   * coordinates. Unknown areas fail with `'unknown-area'` (fog holds: the
+   * engine never reveals or routes to what the agent has not observed);
+   * known areas route through the WorldGrid doorway graph (spec 030
+   * topology — open doors only) and walk over multiple ticks.
+   *
+   * Callers poll: `'walking'` while the multi-tick walk is in progress,
+   * `'arrived'` once the agent stands at the target (adjacent to the anchor
+   * for object targets), `'no-route'` when no open route exists.
+   */
+  navigateToArea(agentId: string, targetArea: string): import('@evol-hive/shared').NavigationStepStatus {
+    const state = this.options.agentManager.getState(agentId);
+    if (!state) return 'unknown-area';
+
+    // (1) A pending walk: poll for arrival instead of re-routing.
+    const pending = this.pendingAreas.get(agentId);
+    if (pending !== undefined) {
+      if (this.walks.has(agentId)) return 'walking';
+      if (pending.kind === 'room') {
+        if (state.location === pending.area) {
+          this.pendingAreas.delete(agentId);
+          return 'arrived';
+        }
+        // The walk ended somewhere else (world moved the agent) — re-route.
+      } else {
+        const objectRoom = this.objectRoom(agentId, pending.area);
+        if (objectRoom !== undefined && state.location === objectRoom) {
+          if (this.isAdjacentToAnchor(agentId, pending.area)) {
+            this.pendingAreas.delete(agentId);
+            return 'arrived';
+          }
+          // Room reached — walk the remaining cells to the anchor.
+          if (this.walkToObject(agentId, pending.area)) return 'walking';
+          return 'no-route'; // anchor unreachable (fully blocked)
+        }
+        // Walk ended in a different room — re-route to the object's room.
+      }
+      this.pendingAreas.delete(agentId);
+    }
+
+    // (2) Already standing at the target.
+    if (state.location === targetArea) return 'arrived';
+
+    // (3) Object anchor target (spec 039, R1 — observed anchors only).
+    const objectRoom = this.objectRoom(agentId, targetArea);
+    if (objectRoom !== undefined) {
+      if (objectRoom === state.location) {
+        if (this.walkToObject(agentId, targetArea)) {
+          this.pendingAreas.set(agentId, { area: targetArea, kind: 'object' });
+          return 'walking';
+        }
+        return 'no-route'; // anchor unreachable (fully blocked)
+      }
+      const route = this.options.grid.route(state.location, objectRoom);
+      if (route.length === 0) return 'no-route';
+      if (!this.requestWalkTo(agentId, objectRoom)) return 'no-route';
+      this.pendingAreas.set(agentId, { area: targetArea, kind: 'object' });
+      return 'walking';
+    }
+
+    // (4) Room target (spec 039, R1 — visited or door-adjacent rooms only).
+    if (!this.isKnownRoom(agentId, targetArea)) return 'unknown-area';
+    const route = this.options.grid.route(state.location, targetArea);
+    if (route.length === 0) return 'no-route';
+    if (!this.requestWalkTo(agentId, targetArea)) return 'no-route';
+    this.pendingAreas.set(agentId, { area: targetArea, kind: 'room' });
+    return 'walking';
+  }
+
+  /** The room an object anchor was last seen in (spatial memory), if known. */
+  private objectRoom(agentId: string, objectId: string): string | undefined {
+    const state = this.options.agentManager.getState(agentId);
+    return state?.spatialMemory?.observedObjects?.[objectId];
+  }
+
+  /** Rooms the agent knows: visited, door-adjacent (seen), or anchor-hosting. */
+  private isKnownRoom(agentId: string, roomId: string): boolean {
+    const state = this.options.agentManager.getState(agentId);
+    const memory = state?.spatialMemory;
+    if (!memory) return false;
+    if (memory.visitedRooms.includes(roomId)) return true;
+    for (const pair of memory.knownDoors) {
+      const [a, b] = pair.split('|');
+      if (a === roomId || b === roomId) return true;
+    }
+    return false;
+  }
+
+  /** Is the agent standing adjacent to (or on) the object's anchor cell? */
+  private isAdjacentToAnchor(agentId: string, objectId: string): boolean {
+    const state = this.options.agentManager.getState(agentId);
+    if (!state?.position) return false;
+    const anchor = this.options.grid.grid(state.location)?.getAnchor(objectId);
+    if (!anchor) return false;
+    return Math.abs(state.position.x - anchor.x) + Math.abs(state.position.y - anchor.y) <= 1;
+  }
+
+  /**
+   * Start a cell walk to the object's anchor (stops adjacent — anchor cells
+   * block walking). Returns false when no path exists.
+   */
+  private walkToObject(agentId: string, objectId: string): boolean {
+    const state = this.options.agentManager.getState(agentId);
+    if (!state?.position) return false;
+    const path = this.options.grid.pathToObject(state.location, state.position, objectId);
+    if (path.length === 0) return false;
+    this.walks.set(agentId, { cells: path, roomQueue: [] });
+    return true;
+  }
+
+  /** requestWalk with a boolean contract (false = no open route). */
+  private requestWalkTo(agentId: string, toRoomId: string): boolean {
+    const state = this.options.agentManager.getState(agentId);
+    if (!state) return false;
+    if (state.location === toRoomId) return true;
+    return this.requestWalk(agentId, toRoomId);
+  }
+
   /** Game-loop system tick: advance every navigating agent one cell. */
   update(tick: GameTick): void {
     void tick;
@@ -89,6 +234,7 @@ export class NavigationSystemImpl {
     const state = this.options.agentManager.getState(agentId);
     if (!state) {
       this.walks.delete(agentId);
+      this.pendingAreas.delete(agentId);
       return;
     }
     const grid = this.options.grid.grid(state.location);
@@ -98,6 +244,9 @@ export class NavigationSystemImpl {
     if (next !== undefined) {
       grid?.setAgentCell(agentId, next);
       this.options.agentManager.updateState(agentId, { position: next });
+      // Cell-level fog (spec 039, R3/R8): every walked cell enters the
+      // agent's explored set for the visualizer's shading.
+      this.markExploredCell(agentId, state.location, next);
     }
 
     // Standing on the door cell with more rooms to traverse → cross.
@@ -124,6 +273,8 @@ export class NavigationSystemImpl {
         const door = newGrid?.getDoorCell() ?? { x: 0, y: 0 };
         this.options.grid.enterRoom(agentId, state.location, toRoom);
         this.options.agentManager.updateState(agentId, { position: door });
+        // Cell-level fog: the door cell of the newly entered room is explored.
+        this.markExploredCell(agentId, toRoom, door);
         if (newQueue.length === 0) {
           this.walks.delete(agentId);
           return;
@@ -180,7 +331,13 @@ export class NavigationSystemImpl {
   /** Doors of a room enter memory as seen (R4): "garden|workshop" pairs. */
   private recordDoors(
     agentId: string,
-    memory: { visitedRooms: string[]; knownDoors: string[]; discoveredAt: Record<string, number> },
+    memory: {
+      visitedRooms: string[];
+      knownDoors: string[];
+      discoveredAt: Record<string, number>;
+      observedObjects?: Record<string, string>;
+      exploredCells?: Record<string, string[]>;
+    },
     roomId: string,
   ): void {
     void agentId;
@@ -191,5 +348,70 @@ export class NavigationSystemImpl {
       }
     }
     this.options.agentManager.updateState(agentId, { spatialMemory: memory });
+  }
+
+  /**
+   * Record a cell into the agent's explored set (spec 039, R3/R8 — cell-level
+   * fog). Deterministic: set-insertion, no RNG.
+   */
+  private markExploredCell(agentId: string, roomId: string, cell: Cell): void {
+    const state = this.options.agentManager.getState(agentId);
+    if (!state?.spatialMemory) return; // legacy agent — no fog tracking
+    const memory = state.spatialMemory;
+    const key = `${cell.x},${cell.y}`;
+    const cells = memory.exploredCells ?? {};
+    const known = cells[roomId] ?? [];
+    if (known.includes(key)) return;
+    this.options.agentManager.updateState(agentId, {
+      spatialMemory: {
+        ...memory,
+        exploredCells: { ...cells, [roomId]: [...known, key] },
+      },
+    });
+  }
+
+  /**
+   * Seed the agent's spatial memory for its spawn room (spec 039, AC-8): the
+   * start room counts as personally visited, its doors are seen, its object
+   * anchors are observed, and the spawn cell (+ free neighbours) is explored.
+   * Deterministic — scenes load identically every run.
+   */
+  seedSpawnKnowledge(agentId: string, roomId: string, objectIds: string[]): void {
+    const state = this.options.agentManager.getState(agentId);
+    if (!state) return;
+    const memory = state.spatialMemory ?? { visitedRooms: [], knownDoors: [], discoveredAt: {} };
+    if (!memory.visitedRooms.includes(roomId)) {
+      memory.visitedRooms = [...memory.visitedRooms, roomId];
+      memory.discoveredAt[roomId] = Date.now();
+    }
+    this.recordDoors(agentId, memory, roomId);
+    const observed = { ...(memory.observedObjects ?? {}) };
+    for (const objectId of objectIds) {
+      observed[objectId] = roomId;
+    }
+    // Explored cells: the spawn cell + its free neighbours (deterministic).
+    const cells = { ...(memory.exploredCells ?? {}) };
+    const position = state.position;
+    const explored = new Set<string>(cells[roomId] ?? []);
+    if (position) {
+      explored.add(`${position.x},${position.y}`);
+      const grid = this.options.grid.grid(roomId);
+      if (grid) {
+        for (const n of [
+          { x: position.x - 1, y: position.y },
+          { x: position.x + 1, y: position.y },
+          { x: position.x, y: position.y - 1 },
+          { x: position.x, y: position.y + 1 },
+        ]) {
+          if (n.x >= 0 && n.x < grid.width && n.y >= 0 && n.y < grid.height && !grid.isBlocked(n)) {
+            explored.add(`${n.x},${n.y}`);
+          }
+        }
+      }
+    }
+    cells[roomId] = [...explored];
+    this.options.agentManager.updateState(agentId, {
+      spatialMemory: { ...memory, observedObjects: observed, exploredCells: cells },
+    });
   }
 }

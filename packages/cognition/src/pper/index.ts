@@ -20,13 +20,21 @@ import type { GuardrailEngine } from '../index.js';
 /**
  * Assembles a PassivePerception from the engine-facing data provider.
  * Only carries { objectId, name, type } per object — never deep state (§6.1).
+ *
+ * Spec 039 (R3): when the provider implements the fog-filtered
+ * `getVisibleObjectsInRoom`, the object list is limited to the agent's
+ * explored area — objects in never-visited rooms / unobserved anchors do
+ * not surface. Legacy providers (method absent) fall back unchanged.
  */
 export class PassivePerceptionAssembler {
   constructor(private readonly provider: PerceptionDataProvider) {}
 
   buildPassivePerception(agentId: string): PassivePerception {
     const roomId = this.provider.getAgentLocation(agentId);
-    const summaries = this.provider.getObjectsInRoom(roomId);
+    const summaries =
+      typeof this.provider.getVisibleObjectsInRoom === 'function'
+        ? this.provider.getVisibleObjectsInRoom(agentId, roomId)
+        : this.provider.getObjectsInRoom(roomId);
     const objectsPresent = summaries.map((s) => ({
       objectId: s.id,
       name: s.name,
@@ -76,10 +84,15 @@ export class PerceptionServiceImpl {
   async perceive(agentId: string): Promise<PerceptionResult> {
     const passive = this.assembler.buildPassivePerception(agentId);
     const primaryDriveLabel = this.options.provider.getPrimaryDriveLabel(agentId);
+    // Spec 039 (R3): fog-filtered affordances when the provider offers them
+    // (explored-area gate + door-sighting gate for go_to destinations);
+    // legacy providers fall back to the room-scoped path unchanged.
     const allAffordances =
-      typeof this.options.provider.getAvailableAffordancesInRoom === 'function'
-        ? this.options.provider.getAvailableAffordancesInRoom(passive.roomId)
-        : this.options.provider.getAffordancesInRoom(passive.roomId);
+      typeof this.options.provider.getVisibleAffordancesInRoom === 'function'
+        ? this.options.provider.getVisibleAffordancesInRoom(agentId, passive.roomId)
+        : typeof this.options.provider.getAvailableAffordancesInRoom === 'function'
+          ? this.options.provider.getAvailableAffordancesInRoom(passive.roomId)
+          : this.options.provider.getAffordancesInRoom(passive.roomId);
     const prunedAffordances = await this.options.classifier.prune(
       primaryDriveLabel,
       allAffordances,
@@ -154,6 +167,24 @@ export class PerceptionServiceImpl {
       maskedAffordances = guardrail.maskAffordances(prunedAffordances, hasPlan);
     }
 
+    // Known areas + unexplored markers (spec 039, R1/R4). Populated from
+    // the provider when implemented; `undefined` keeps legacy behavior.
+    let knownAreas: string[] | undefined;
+    let unexploredAreas: string[] | undefined;
+    try {
+      if (typeof this.options.provider.getKnownAreas === 'function') {
+        knownAreas = this.options.provider.getKnownAreas(agentId);
+        if (knownAreas !== undefined && knownAreas.length === 0) knownAreas = undefined;
+      }
+      if (typeof this.options.provider.getUnexploredAreas === 'function') {
+        const unexplored = this.options.provider.getUnexploredAreas(agentId);
+        if (unexplored !== undefined && unexplored.length > 0) unexploredAreas = unexplored;
+      }
+    } catch {
+      knownAreas = undefined;
+      unexploredAreas = undefined;
+    }
+
     return {
       passive,
       prunedAffordances,
@@ -164,6 +195,8 @@ export class PerceptionServiceImpl {
       ...(relationships !== undefined ? { relationships } : {}),
       ...(compoundActions ? { compoundActions } : {}),
       ...(objectDependencies ? { objectDependencies } : {}),
+      ...(knownAreas !== undefined ? { knownAreas } : {}),
+      ...(unexploredAreas !== undefined ? { unexploredAreas } : {}),
     };
   }
 }

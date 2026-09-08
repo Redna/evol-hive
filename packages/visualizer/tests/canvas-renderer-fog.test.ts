@@ -130,7 +130,7 @@ function makeState(fog?: {
         objects: [
           {
             id: 'workbench-1',
-            name: 'Workbench',
+            name: 'Bench',
             type: 'furniture',
             state: {},
             cell: { x: 3, y: 3 },
@@ -197,7 +197,7 @@ describe('CanvasRenderer fog shading (spec 039, AC-7)', () => {
     const renderer = new CanvasRenderer(ctx as unknown as CanvasRenderingContext2D);
     renderer.render(makeState(fog));
     const drawn = ctx.calls.filter((c) => c.method === 'fillText').map((c) => String(c.args[0]));
-    expect(drawn).toContain('Workbench');
+    expect(drawn).toContain('Bench');
   });
 
   it('renders everything when the viewer has no fog (legacy state, backward compat)', () => {

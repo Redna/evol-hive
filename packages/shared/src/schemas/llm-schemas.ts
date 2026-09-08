@@ -70,28 +70,40 @@ export const WAIT_AFFORDANCE = 'wait';
 
 /**
  * Dynamic formulate_plan tool response schema with an **enum-bound**
- * `targetAffordance` (spec 037, Req 1).
+ * `targetAffordance` (spec 037, Req 1) and — spec 039, R1 — an optional,
+ * enum-bound `targetArea` on plan steps.
  *
- * The enum contains the affordance IDs actually available to the agent in its
- * current room (the System 0 pruner's top-K set) plus the `wait` escape. This
- * turns the pruner's output from prompt context into a value-space constraint:
- * a step referencing a non-available affordance becomes (nearly) inexpressible
- * at the tool-signature level.
+ * The targetAffordance enum contains the affordance IDs actually available
+ * to the agent in its current room (the System 0 pruner's top-K set) plus
+ * the `wait` escape.
  *
- * NOTE (spec 037, Req 3 — parameter boundary): the enum constrains *values*
- * only. `targetAffordance` is deliberately NOT in `required` — making it
- * required broke backend tool-calling entirely (empty args, see issue #130
- * arc). Presence is enforced by the PlanServiceImpl validator + one
- * retry-with-feedback instead.
+ * When `knownAreas` is provided (non-empty), plan steps additionally gain an
+ * OPTIONAL `targetArea` property whose enum is the agent's KNOWN areas
+ * (visited rooms, door-adjacent rooms, observed object anchors) — the value
+ * space is the fog: an unvisited room or unobserved object can never be
+ * emitted. The LLM reasons over areas/objects it knows, never cell
+ * coordinates (spec 038 constraint). When `knownAreas` is absent or empty
+ * the schema is byte-identical to spec 037 (backward compatibility).
  *
- * When `availableAffordanceIds` is empty (e.g., guardrail masking, spec 016),
- * the enum collapses to `['wait']` — the only legal binding is a no-op.
+ * NOTE (spec 037, Req 3 — parameter boundary): the enums constrain *values*
+ * only. `targetAffordance`/`targetArea` are deliberately NOT in `required`
+ * — making them required broke backend tool-calling entirely (empty args,
+ * see issue #130 arc). Presence is enforced by the PlanServiceImpl validator
+ * + one retry-with-feedback instead.
+ *
+ * When `availableAffordanceIds` is empty (e.g., guardrail masking, spec
+ * 016), the affordance enum collapses to `['wait']` — the only legal
+ * physical binding is a no-op.
  */
-export function formulatePlanSchemaFor(availableAffordanceIds: string[]) {
+export function formulatePlanSchemaFor(availableAffordanceIds: string[], knownAreas?: string[]) {
   const enumValues =
     availableAffordanceIds.length > 0
       ? [...availableAffordanceIds, WAIT_AFFORDANCE]
       : [WAIT_AFFORDANCE];
+  // Spec 039, R1: targetArea is enum-bound to KNOWN areas only. An empty
+  // value space must not produce an empty enum (illegal JSON Schema) — omit
+  // the property entirely instead, preserving the spec-037 schema shape.
+  const areaEnum = knownAreas !== undefined && knownAreas.length > 0 ? [...knownAreas] : null;
   return {
     type: 'object',
     properties: {
@@ -111,6 +123,16 @@ export function formulatePlanSchemaFor(availableAffordanceIds: string[]) {
                 "The affordance ID to execute for this step. MUST be one of the enum values. Use 'wait' when no affordance is relevant.",
               enum: enumValues,
             },
+            ...(areaEnum !== null
+              ? {
+                  targetArea: {
+                    type: 'string',
+                    description:
+                      "The KNOWN area (room or object anchor) this step navigates to first. MUST be one of the enum values. Omit for same-room steps — the engine walks the agent there before the affordance executes.",
+                    enum: areaEnum,
+                  },
+                }
+              : {}),
           },
           required: ['description'],
           additionalProperties: false,
@@ -127,14 +149,17 @@ export function formulatePlanSchemaFor(availableAffordanceIds: string[]) {
  * replacement for the static {@link formulatePlanTool}. Builders MUST use
  * this factory so the plan schema carries the room's affordance enum.
  */
-export function formulatePlanToolFor(availableAffordanceIds: string[]): ToolDefinition {
+export function formulatePlanToolFor(availableAffordanceIds: string[], knownAreas?: string[]): ToolDefinition {
   return {
     type: 'function',
     function: {
       name: 'formulate_plan',
       description:
-        "Create a plan to satisfy the agent's drives. EVERY step MUST set targetAffordance to one of the enum values (use 'wait' when nothing is relevant).",
-      parameters: formulatePlanSchemaFor(availableAffordanceIds),
+        "Create a plan to satisfy the agent's drives. EVERY step MUST set targetAffordance to one of the enum values (use 'wait' when nothing is relevant)." +
+        (knownAreas !== undefined && knownAreas.length > 0
+          ? ' Steps may also set targetArea to one of the KNOWN areas to navigate there first — the affordance executes on arrival.'
+          : ''),
+      parameters: formulatePlanSchemaFor(availableAffordanceIds, knownAreas),
     },
   };
 }

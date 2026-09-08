@@ -30,6 +30,14 @@ export interface PlanStep {
   completed: boolean;
   /** The affordance this step maps to, if known. */
   targetAffordance?: string;
+  /**
+   * The area this step navigates to first (spec 039, R1). Enum-bound at
+   * schema-build time to the agent's KNOWN areas (visited/door-adjacent
+   * rooms + observed object anchors) — an unexplored area can never appear
+   * in the value space. When present, the engine navigates before executing
+   * the affordance on arrival (spec 039, R2).
+   */
+  targetArea?: string;
 }
 
 /** The full internal state of an agent at any point in time. */
@@ -57,9 +65,14 @@ export interface AgentInternalState {
    */
   position?: { x: number; y: number };
   /**
-   * Per-agent spatial understanding (spec 038, R4 — fog of war, room-level
-   * v1). Rooms the agent has actually visited, doors seen, and when each
-   * discovery happened. Cell-level fog is phase 2.
+   * Per-agent spatial understanding (spec 038, R4 — fog of war). Rooms the
+   * agent has actually visited, doors seen, and when each discovery happened.
+   *
+   * Spec 039 phase 2 (all fields optional for backward compatibility with
+   * pre-phase-2 saves): `observedObjects` records the object anchors the
+   * agent has seen (social transfer uses the same representation), and
+   * `exploredCells` tracks the cells the agent has walked (cell-level fog
+   * for the visualizer).
    */
   spatialMemory?: {
     /** Room IDs the agent has personally visited (arrival order). */
@@ -68,6 +81,10 @@ export interface AgentInternalState {
     knownDoors: string[];
     /** Room ID → sim time of first arrival (audit + freshness). */
     discoveredAt: Record<string, number>;
+    /** Object anchors observed (personally or via talk_to) — objectId → last-seen roomId. */
+    observedObjects?: Record<string, string>;
+    /** Cells explored per room ("x,y" keys) — cell-level fog (visualizer shading). */
+    exploredCells?: Record<string, string[]>;
   };
 }
 

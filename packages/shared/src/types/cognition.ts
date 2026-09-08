@@ -92,13 +92,21 @@ export interface PerceptionResult {
    * no relationships.
    */
   relationships?: Record<string, Relationship>;
-  /**
-   * The evolved identity self-model (spec 033, R11/AC-13). Populated by the
-   * perception service via `provider.getSelfModel` when the provider implements
-   * it and a self-model exists. `undefined` → prompt falls back to the spawn
-   * persona (backward compat).
-   */
+  /** The agent's evolved identity self-model (spec 033, R11/AC-13). */
   selfModel?: SelfModel;
+  /**
+   * Areas/objects the agent KNOWS (spec 039, R1) — visited rooms,
+   * door-adjacent rooms, and observed object anchors. The `targetArea` plan
+   * enum is built from exactly this set; a never-visited, never-mentioned
+   * area never appears. `undefined` for legacy providers (no fog wired).
+   */
+  knownAreas?: string[];
+  /**
+   * Known-but-unexplored areas (spec 039, R4) — rooms behind doors the agent
+   * has seen but never crossed. Rendered as unknown markers in context;
+   * never as full perception of the unknown side.
+   */
+  unexploredAreas?: string[];
 }
 
 /** Active observation result (Section 6.2) — deep JSON state of a target object. */
@@ -179,7 +187,7 @@ export interface CognitiveTool {
 /** Result of the formulate_plan tool. */
 export interface FormulatePlanResult {
   description: string;
-  steps: { description: string; targetAffordance?: string }[];
+  steps: { description: string; targetAffordance?: string; targetArea?: string }[];
 }
 
 /** Result of the query_memory tool (active recall). */
@@ -543,6 +551,33 @@ export interface PerceptionDataProvider {
    * unchanged — when absent, prompts fall back to the spawn persona.
    */
   getSelfModel?(agentId: string): SelfModel | null;
+  /**
+   * Fog-filtered object list for the agent's CURRENT room (spec 039, R3).
+   * Objects outside the agent's explored area (never-visited room,
+   * unobserved anchor) do not surface. Optional so legacy implementations
+   * compile unchanged — when absent, the perception service falls back to
+   * {@link getObjectsInRoom} (no fog).
+   */
+  getVisibleObjectsInRoom?(agentId: string, roomId: string): SmartObjectSummary[];
+  /**
+   * Fog-filtered available affordances for the agent's CURRENT room (spec
+   * 039, R3). Same explored-area gate as {@link getVisibleObjectsInRoom} plus
+   * the door-sighting gate: `go_to_<room>` affordances only surface when the
+   * agent knows the destination (seen door or visited room). Optional — when
+   * absent, the existing room-scoped affordance path is used unchanged.
+   */
+  getVisibleAffordancesInRoom?(agentId: string, roomId: string): Affordance[];
+  /**
+   * The agent's KNOWN areas (spec 039, R1): visited rooms, door-adjacent
+   * rooms, and observed object anchors. This is the exact targetArea enum
+   * value space. Optional — when absent, no targetArea enum is offered.
+   */
+  getKnownAreas?(agentId: string): string[];
+  /**
+   * Known-but-unexplored areas (spec 039, R4): rooms behind doors the agent
+   * has seen but never crossed. Optional — when absent, no markers are rendered.
+   */
+  getUnexploredAreas?(agentId: string): string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -565,7 +600,17 @@ export interface ExecuteResult {
   stepSkipped?: boolean;
   /** `true` when the action was rejected by plan validation (spec 016, Req 13). */
   deviationRejected?: boolean;
+  /**
+   * `true` when the step is waiting on multi-tick navigation (spec 039, R2):
+   * the affordance executes on arrival; the step stays current meanwhile.
+   */
+  navigating?: boolean;
 }
+
+/**
+ * Status of a `targetArea` navigation request (spec 039, R2).
+ */
+export type NavigationStepStatus = 'walking' | 'arrived' | 'no-route' | 'unknown-area';
 
 /**
  * The intermediate result of resolving and attempting an affordance (spec 003,
@@ -648,6 +693,17 @@ export interface ExecuteDataProvider {
     objectName: string;
     roomId: string;
   } | null;
+  /**
+   * Navigate the agent toward a target area/anchor before execution (spec
+   * 039, R2). The engine routes through the WorldGrid doorway graph; the
+   * affordance executes only on arrival. Returns the navigation status:
+   * `'walking'` (route accepted, spans ticks), `'arrived'` (at the target —
+   * execute now), `'no-route'` (no open route — fail gracefully), or
+   * `'unknown-area'` (fog — the agent does not know the area). Optional so
+   * legacy providers compile and behave unchanged (same-cell steps never
+   * consult it).
+   */
+  navigateToArea?(agentId: string, targetArea: string): NavigationStepStatus;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -92,6 +92,10 @@ function makeScene(agentId = 'a1'): SceneDefinition {
     objects: [
       makeObject('planter-1', 'garden', [makeAffordance('harvest', { hunger: 10 })]),
       makeObject('workbench-1', 'workshop', [makeAffordance('craft', { comfort: 8 })]),
+      // Doorway objects carry the cross-room movement affordances (the
+      // builtin go_to_* handler path — spec 022/030).
+      makeObject('door-garden', 'garden', [makeAffordance('go_to_workshop', {})]),
+      makeObject('door-workshop', 'workshop', [makeAffordance('go_to_garden', {})]),
     ],
     agents: [makeProfile(agentId)],
   };
@@ -128,7 +132,7 @@ describe('fog-gated perception (spec 039, AC-2)', () => {
 
   it('a visited room is perceivable: objects and affordances surface', () => {
     const objects = core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden');
-    expect(objects.map((o) => o.id)).toEqual(['planter-1']);
+    expect(objects.map((o) => o.id).sort()).toEqual(['door-garden', 'planter-1']);
     const affordances = core.bridges.perception.getVisibleAffordancesInRoom!('a1', 'garden');
     expect(affordances.map((a) => a.id)).toContain('harvest');
   });
@@ -159,7 +163,7 @@ describe('fog-gated perception (spec 039, AC-2)', () => {
         observedObjects: { 'planter-1': 'garden' },
       },
     });
-    expect(core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden')).toHaveLength(1);
+    expect(core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden')).toHaveLength(2);
     expect(
       core.bridges.perception
         .getVisibleAffordancesInRoom!('a1', 'garden')
@@ -202,7 +206,7 @@ describe('fog-gated perception (spec 039, AC-2)', () => {
 
   it('legacy agents without spatialMemory perceive everything (backward compat)', () => {
     core.agentManager.updateState('a1', { spatialMemory: undefined });
-    expect(core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden')).toHaveLength(1);
+    expect(core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden')).toHaveLength(2);
   });
 
   it('knownAreas lists visited + door-adjacent rooms and observed object anchors', () => {
@@ -399,7 +403,10 @@ describe('spatialMemory + position persistence round-trip (spec 039, AC-5)', () 
     await core.persistence!.load(saved);
     const state = core.agentManager.getState('a1')!;
     expect(state.location).toBe('garden');
-    expect(state.spatialMemory).toBeDefined(); // re-seeded by assembly seating
+    // Pre-phase-2 records carry no spatial fields — the agent loads WITHOUT
+    // spatialMemory (fog stays open for it until its next navigation
+    // discovery). Optional fields, never a load error.
+    expect(state.spatialMemory).toBeUndefined();
   });
 });
 

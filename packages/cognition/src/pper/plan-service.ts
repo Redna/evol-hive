@@ -69,8 +69,13 @@ export class PlanServiceImpl {
       // feedback before failing the cycle (no silent narrative advance).
       const availableIds = payload.availableAffordances.map((a) => a.id);
 
+      // Spec 039, R1: the targetArea enum (when present in the payload) is
+      // part of the step-binding value space — a step bound by a KNOWN area
+      // is legal even when its targetAffordance lives at the destination.
+      const knownAreas = payload.knownAreas;
+
       let result = await llmClient.completePlan(payload);
-      let verdict = checkPlanBinding(result, availableIds);
+      let verdict = checkPlanBinding(result, availableIds, knownAreas);
       console.error(
         `[plan-bind] agent=${agentId} steps=${result.steps.length} bound=${verdict.bound} ` +
           `violations=${JSON.stringify(verdict.violations)}`,
@@ -93,7 +98,7 @@ export class PlanServiceImpl {
           perceptionContext: `${payload.perceptionContext}\n\nCORRECTION: ${verdict.feedback}`,
         };
         result = await llmClient.completePlan(retryPayload);
-        verdict = checkPlanBinding(result, availableIds);
+        verdict = checkPlanBinding(result, availableIds, knownAreas);
         console.error(
           `[plan-bind] agent=${agentId} retry steps=${result.steps.length} bound=${verdict.bound} ` +
             `violations=${JSON.stringify(verdict.violations)}`,
@@ -157,6 +162,8 @@ export interface PlanBindingVerdict {
 export function checkPlanBinding(
   result: FormulatePlanResult,
   availableIds: string[],
+  /** Spec 039, R1 — the agent's known areas (targetArea value space). */
+  knownAreas?: string[],
 ): PlanBindingVerdict {
   // (1) Shape — hard fail, NO retry (§7 / Req 15): malformed responses are
   // treated as a failure rather than repaired.
@@ -174,6 +181,9 @@ export function checkPlanBinding(
   // (2) Binding.
   const allowed = new Set<string>(availableIds);
   allowed.add(WAIT_AFFORDANCE);
+  // Spec 039, R1: a KNOWN area is a legal step binding — a targetArea-bound
+  // step navigates first and its affordance (if any) resolves on arrival.
+  const knownAreaSet = new Set<string>(knownAreas ?? []);
   const violations: string[] = [];
   let bound = 0;
   if (availableIds.length === 0) {
@@ -189,14 +199,36 @@ export function checkPlanBinding(
   }
   result.steps.forEach((step, i) => {
     const ta = step.targetAffordance;
+    const areaBound =
+      step.targetArea !== undefined && step.targetArea.length > 0;
     if (typeof ta === 'string' && ta.length > 0 && allowed.has(ta)) {
       bound += 1;
-    } else {
+      // A same-cell step may not ALSO declare a foreign targetArea binding
+      // that the validator cannot see — unknown areas stay violations.
+      if (areaBound && !knownAreaSet.has(step.targetArea!)) {
+        violations.push(
+          `step ${i + 1} ("${step.description.slice(0, 50)}") ` +
+            `targetArea='${step.targetArea}'`,
+        );
+      }
+      return;
+    }
+    if (areaBound) {
+      if (knownAreaSet.has(step.targetArea!)) {
+        // Area-bound step (spec 039): legal — navigation-then-execution.
+        bound += 1;
+        return;
+      }
       violations.push(
         `step ${i + 1} ("${step.description.slice(0, 50)}") ` +
-          `targetAffordance=${ta === undefined ? 'missing' : `'${ta}'`}`,
+          `targetArea='${step.targetArea}'`,
       );
+      return;
     }
+    violations.push(
+      `step ${i + 1} ("${step.description.slice(0, 50)}") ` +
+        `targetAffordance=${ta === undefined ? 'missing' : `'${ta}'`}`,
+    );
   });
   if (violations.length > 0) {
     return {

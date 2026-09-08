@@ -47,7 +47,7 @@ export interface BatchPlanConfig {
 export interface MultiAgentPlanEntry {
   agentId: string;
   description: string;
-  steps: { description: string; targetAffordance?: string }[];
+  steps: { description: string; targetAffordance?: string; targetArea?: string }[];
 }
 
 /**

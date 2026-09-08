@@ -86,6 +86,58 @@ export class ExecuteServiceImpl {
         return { success: false, error: 'No current step in plan', planComplete: true };
       }
 
+      // Navigation-then-execution (spec 039, R2): a step carrying targetArea
+      // navigates FIRST — the engine routes through the WorldGrid doorway
+      // graph over multiple ticks, and the affordance executes only on
+      // arrival. This branch sits BEFORE the narrative check: a step with a
+      // targetArea but no targetAffordance is a navigation step, not a
+      // narrative one. Steps without targetArea (same-cell, spec 037
+      // contract) take the existing path verbatim below. No route → graceful
+      // failure (§9.2 feedback); never a teleport, never an error leak.
+      if (step.targetArea !== undefined && step.targetArea.length > 0) {
+        if (dataProvider.navigateToArea === undefined) {
+          // Port not wired (legacy provider) — the area step cannot navigate.
+          // Graceful failure with system feedback; no step advance (the
+          // step-skip livelock guard eventually moves past it).
+          const feedback = `Navigation is not available — cannot reach '${step.targetArea}'.`;
+          dataProvider.setSystemFeedback(agentId, feedback);
+          dataProvider.setThinking(agentId, false);
+          return { success: false, error: feedback, planComplete: false };
+        }
+        // Call the port ON the provider — extracting the method would lose
+        // its `this` (bridge implementations read wired engine state).
+        const status = dataProvider.navigateToArea(agentId, step.targetArea);
+        if (status === 'walking') {
+          // Multi-tick movement in progress: the step stays current; the
+          // affordance executes on arrival (a later cycle observes it).
+          return { success: true, planComplete: false, navigating: true };
+        }
+        if (status === 'no-route' || status === 'unknown-area') {
+          const feedback =
+            status === 'no-route'
+              ? `No open route to '${step.targetArea}' right now.`
+              : `Unknown area '${step.targetArea}' — you have not seen it yet.`;
+          // Livelock-guarded failure: repeated unreachable targets advance
+          // past the step (same guard as affordance execution failures).
+          const skipped = this.registerStepFailure(agentId, step, feedback, dataProvider);
+          if (skipped !== undefined) {
+            return skipped;
+          }
+          dataProvider.setSystemFeedback(agentId, feedback);
+          dataProvider.setThinking(agentId, false);
+          return { success: false, error: feedback, planComplete: false };
+        }
+        // status === 'arrived': the agent stands at the target area. A
+        // navigation-only step (no targetAffordance) completes here; a step
+        // with a targetAffordance falls through to the same-cell execution
+        // path — now in the ARRIVAL room (co-location guard applies there).
+        if (step.targetAffordance === undefined) {
+          dataProvider.advanceStep(agentId);
+          const planComplete = dataProvider.isPlanComplete(agentId);
+          return { success: true, planComplete };
+        }
+      }
+
       // Handle steps without targetAffordance (non-physical steps).
       // Diagnostic: description-only steps are the "narrative plan" failure
       // mode (issue #130 arc) — the LLM writes prose steps that do nothing.

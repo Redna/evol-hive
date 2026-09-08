@@ -34,6 +34,14 @@ export interface ExecuteDataProviderOptions {
 }
 
 /**
+ * Navigation port for `targetArea` steps (spec 039, R2) — implemented by the
+ * engine's NavigationSystem; wired via {@link setNavigation} after assembly.
+ */
+export interface NavigationPort {
+  navigateToArea(agentId: string, targetArea: string): import('@evol-hive/shared').NavigationStepStatus;
+}
+
+/**
  * Bridge between the cognition layer and the engine for the Execute phase.
  * Implements `ExecuteDataProvider` (defined in `@evol-hive/shared`).
  */
@@ -45,6 +53,8 @@ export class ExecuteDataProviderImpl implements ExecuteDataProvider {
   private readonly affordanceRegistry: AffordanceRegistryImpl;
   private readonly physics: PhysicsSystemImpl;
   private readonly feedbackStore: SystemFeedbackStore;
+  /** Navigation port (spec 039, R2) — wired at assembly via setNavigation. */
+  private navigation: NavigationPort | undefined;
 
   constructor(options: ExecuteDataProviderOptions) {
     this.agentManager = options.agentManager;
@@ -154,6 +164,20 @@ export class ExecuteDataProviderImpl implements ExecuteDataProvider {
 
   setThinking(agentId: string, isThinking: boolean): void {
     this.agentManager.updateState(agentId, { isThinking });
+  }
+
+  /** Wire the navigation port for targetArea steps (spec 039, R2). */
+  setNavigation(navigation: NavigationPort): void {
+    this.navigation = navigation;
+  }
+
+  /**
+   * Navigate toward a target area before execution (spec 039, R2). Returns
+   * `'unknown-area'` when no navigation port is wired — Execute treats that
+   * as a graceful step failure (never a teleport).
+   */
+  navigateToArea(agentId: string, targetArea: string): import('@evol-hive/shared').NavigationStepStatus {
+    return this.navigation?.navigateToArea(agentId, targetArea) ?? 'unknown-area';
   }
 }
 

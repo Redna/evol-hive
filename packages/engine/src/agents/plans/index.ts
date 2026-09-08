@@ -43,6 +43,7 @@ export class PlanManagerImpl implements PlanManager {
         JSON.stringify(
           result.steps.map((s) => ({
             t: s.targetAffordance ?? null,
+            a: s.targetArea ?? null,
             d: s.description.slice(0, 40),
           })),
         ),
@@ -55,6 +56,11 @@ export class PlanManagerImpl implements PlanManager {
       };
       if (step.targetAffordance !== undefined) {
         planStep.targetAffordance = step.targetAffordance;
+      }
+      // Spec 039, R1: the targetArea intent rides with the stored step so
+      // Execute can navigate before executing on arrival.
+      if (step.targetArea !== undefined) {
+        planStep.targetArea = step.targetArea;
       }
       return planStep;
     });
