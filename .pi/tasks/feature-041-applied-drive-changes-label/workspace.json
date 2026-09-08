@@ -1,0 +1,7 @@
+{
+  "name": "feature-041-applied-drive-changes-label",
+  "description": "Fourth System 1 label domino — outcome recorder consumes the applied-driveChanges signal threaded from the orchestrator instead of diffing drive snapshots; ambient cycle-length decay becomes invisible by construction. Issue #152.",
+  "createdAt": "2026-08-18T00:00:00Z",
+  "specIssue": 152,
+  "specFile": "docs/specs/041-applied-drive-changes-label.md"
+}
