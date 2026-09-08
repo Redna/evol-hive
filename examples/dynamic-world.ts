@@ -105,7 +105,7 @@ const garden: SceneDefinition['rooms'][number] = {
   name: 'Community Garden',
   description: 'A small garden with planters and a gate.',
   connections: ['workshop'],
-  objectIds: ['planter-1', 'gate-1', 'toolbox-1', 'garden-bench-1', 'doorway-garden'],
+  objectIds: ['planter-1', 'gate-1', 'toolbox-1', 'garden-bench-1', 'doorway-garden', 'doorway-garden-greenhouse'],
 };
 
 const workshop: SceneDefinition['rooms'][number] = {
@@ -188,6 +188,14 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
     ]),
     makeObject('doorway-garden', 'Doorway', 'doorway', 'garden', [
       aff('go_to_workshop', 'Go to workshop'),
+      aff('observe', 'Observe'),
+    ]),
+    // Garden-side greenhouse door (grand validation): without it the
+    // greenhouse is topologically unreachable — the room declares the
+    // connection, but agents need a door OBJECT in the garden to see and
+    // plan `go_to_greenhouse` (spec 039 door-sighting gate).
+    makeObject('doorway-garden-greenhouse', 'Greenhouse Door', 'doorway', 'garden', [
+      aff('go_to_greenhouse', 'Go to greenhouse'),
       aff('observe', 'Observe'),
     ]),
     makeObject('doorway-workshop', 'Doorway', 'doorway', 'workshop', [
