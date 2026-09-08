@@ -108,9 +108,12 @@ function apprenticeProfile(): AgentProfile {
       'Grow something from seed to table entirely on his own',
       "Earn Maren's full trust",
     ],
-    // Mid-level drives (spec 034/032 validation design — see dynamic-world.ts)
-    initialDrives: { energy: 45, hunger: 40, social: 60, comfort: 50, curiosity: 60 },
-    startRoomId: 'workshop',
+    // Mid-level drives (spec 034/032 validation design — see dynamic-world.ts).
+    // social 35 (grand validation): urgency within ~50s of decay so the
+    // matcher surfaces `talk_to` while Maren is co-located in the garden;
+    // spawn moved into the garden for the same reason (was workshop).
+    initialDrives: { energy: 45, hunger: 40, social: 35, comfort: 50, curiosity: 60 },
+    startRoomId: 'garden',
   };
 }
 

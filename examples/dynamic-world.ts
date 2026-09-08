@@ -116,11 +116,26 @@ const workshop: SceneDefinition['rooms'][number] = {
   objectIds: ['workbench-1', 'stool-1', 'doorway-workshop'],
 };
 
-/** The demo scene: a garden and a workshop connected by a gated doorway. */
+// Greenhouse (grand-validation scene, conversation/exploration arc): an
+// UNEXPLORED third room. No agent starts here except iris-1 — Maren and Tomas
+// have empty spatial memory for it, so it only enters their `targetArea` enum
+// through the door-sighting gate (spec 039 R4) or social fog-lifting via a
+// `talk_to` conversation with Iris (spec 039 AC-4). The room's affordances
+// give exploration a real payoff (curiosity + a food-adjacent herb chain),
+// so curiosity-urgent agents have a reason to route there once known.
+const greenhouse: SceneDefinition['rooms'][number] = {
+  id: 'greenhouse',
+  name: 'Greenhouse',
+  description: 'A humid glass greenhouse full of herbs and seedlings.',
+  connections: ['garden'],
+  objectIds: ['potting-table-1', 'seed-shelf-1', 'doorway-greenhouse'],
+};
+
+/** The demo scene: garden, workshop, and an unexplored greenhouse. */
 export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
   id: 'dynamic-world',
   name: 'Dynamic World Demo',
-  rooms: [garden, workshop],
+  rooms: [garden, workshop, greenhouse],
   objects: [
     // Planter (spec 018 object ecosystem + spec 034 hunger chain, Req 5–6):
     //   plant_seeds → water_plants → harvest (seeds_planted >= 3) → eat
@@ -179,6 +194,21 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
       aff('go_to_garden', 'Go to garden'),
       aff('observe', 'Observe'),
     ]),
+    // Greenhouse objects: exploration payoff (curiosity + comfort) and a
+    // second food source so the eat chain is not planter-exclusive.
+    makeObject('potting-table-1', 'Potting Table', 'furniture', 'greenhouse', [
+      aff('repot_seedlings', 'Repot seedlings', [], { curiosity: 12, comfort: 5 }),
+      aff('observe', 'Observe'),
+    ]),
+    makeObject('seed-shelf-1', 'Seed Shelf', 'furniture', 'greenhouse', [
+      aff('pick_herbs', 'Pick fresh herbs', [], { curiosity: 8 }),
+      aff('eat_herbs', 'Eat a fresh herb', [], { hunger: 20 }),
+      aff('observe', 'Observe'),
+    ]),
+    makeObject('doorway-greenhouse', 'Doorway', 'doorway', 'greenhouse', [
+      aff('go_to_garden', 'Go to garden'),
+      aff('observe', 'Observe'),
+    ]),
   ],
   agents: [
     {
@@ -201,6 +231,28 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
       // exercisable within a single run.
       initialDrives: { energy: 45, hunger: 40, social: 55, comfort: 50, curiosity: 55 },
       startRoomId: 'garden',
+    },
+    {
+      // Third agent (grand validation: conversations + social fog-lifting +
+      // scale-beyond-2). Iris is the ONLY agent who knows the greenhouse —
+      // her spatial memory seeds it as visited, everyone else's is empty.
+      // Low starting social (40 → hint threshold within ~100s of decay) gives
+      // the drive→affordance matcher a standing reason to surface `talk_to`.
+      id: 'iris-1',
+      name: 'Iris Voss',
+      description:
+        'Herbalist — keeps the greenhouse humid and thriving, talks to seedlings more than to people.',
+      traits: ['observant', 'reserved'],
+      backstory:
+        'Iris studied botany for two years before deciding the glasshouse taught more ' +
+        'than any lecture hall. She keeps the community greenhouse running and trades ' +
+        'herbs for vegetables, rarely venturing beyond the garden gate.',
+      longTermGoals: [
+        'Keep every seedling in the greenhouse alive through the season',
+        'Learn the names of the people she trades with',
+      ],
+      initialDrives: { energy: 55, hunger: 45, social: 40, comfort: 55, curiosity: 50 },
+      startRoomId: 'greenhouse',
     },
   ],
 };

@@ -61,14 +61,29 @@ dispatch_workflow() {
   if [ $# -gt 0 ]; then
     inputs="{\"issue_number\":\"$1\"}"
   fi
-  api_post "https://api.github.com/repos/$REPO/actions/workflows/$id/dispatches" \
-    -d "{\"ref\":\"main\",\"inputs\":$inputs}" > /dev/null
+  # Surface the HTTP result: a 422/403 here previously vanished (silent
+  # Developer-dispatch failure — the wait then polled a run that never
+  # existed for the full timeout). Non-204 responses are logged loudly.
+  local code body
+  body=$(api_post -w "\n%{http_code}" \
+    "https://api.github.com/repos/$REPO/actions/workflows/$id/dispatches" \
+    -d "{\"ref\":\"main\",\"inputs\":$inputs}")
+  code=$(echo "$body" | tail -1)
+  if [ "$code" != "204" ]; then
+    echo "  ⚠️ dispatch_workflow($id) HTTP $code: $(echo "$body" | head -1)"
+  fi
 }
 
 dispatch_pr_workflow() {
   local id=$1; local pr=$2
-  api_post "https://api.github.com/repos/$REPO/actions/workflows/$id/dispatches" \
-    -d "{\"ref\":\"main\",\"inputs\":{\"pr_number\":\"$pr\"}}" > /dev/null
+  local code body
+  body=$(api_post -w "\n%{http_code}" \
+    "https://api.github.com/repos/$REPO/actions/workflows/$id/dispatches" \
+    -d "{\"ref\":\"main\",\"inputs\":{\"pr_number\":\"$pr\"}}")
+  code=$(echo "$body" | tail -1)
+  if [ "$code" != "204" ]; then
+    echo "  ⚠️ dispatch_pr_workflow($id, pr=$pr) HTTP $code: $(echo "$body" | head -1)"
+  fi
 }
 
 # --- Polling functions ---
