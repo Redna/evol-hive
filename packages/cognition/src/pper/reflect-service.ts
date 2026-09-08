@@ -10,7 +10,12 @@
  * (`memoryContent`, `memoryImportance`, `memoryType`, `memoryLocation`) on
  * the `ReflectLLMResponse`. When the LLM omits all memory fields, an
  * auto-fallback memory is generated from the execution result and agent
- * state, guaranteeing at least one memory per reflect cycle.
+ * state, guaranteeing at least one memory per non-skipped reflect cycle.
+ *
+ * Spec 040: the auto-fallback is SUPPRESSED on skipped cycles (`stepSkipped`
+ * — the no-targetAffordance branch and the 'wait' escape hatch) when the LLM
+ * provides no explicit memory: a wait-only cycle has nothing to remember.
+ * Explicit LLM memories are still honored on skipped cycles.
  *
  * The `isThinking` flag is always reset to `false` — on success, on
  * failure, and on any exception path. The method never re-throws; it
@@ -195,8 +200,19 @@ export class ReflectServiceImpl {
  * 3. Auto-fallback — generates a memory from the execution result and agent
  *    state when the LLM omits all memory fields (R5).
  *
- * Returns `undefined` when no memory should be stored (this should not
- * happen with the auto-fallback, but is retained for safety).
+ * Suppression (spec 040, R2.1): when the execution was an intentional no-op
+ * (`executeResult.stepSkipped === true` — the no-targetAffordance branch or
+ * the 'wait' escape hatch) and the LLM provided no explicit memory, the
+ * auto-fallback is suppressed — the function returns `undefined` and the
+ * caller stores nothing. A wait-only cycle has nothing to remember: storing
+ * the "Idle tick — no action taken." entry fired the System 1 outcome
+ * recorder's `memoryWritten` signal on EVERY cycle (issue #149), starving
+ * dream retraining of IGNORE labels and polluting retrieval with one idle
+ * node per cycle. Explicit LLM memories (1/2) still win over suppression —
+ * the agent may deliberately note something while waiting.
+ *
+ * Returns `undefined` when no memory should be stored (suppressed skipped
+ * cycle, or no fallback possible).
  */
 function resolveMemoryEntry(
   response: ReflectLLMResponse,
@@ -216,6 +232,17 @@ function resolveMemoryEntry(
   // (2) Legacy memoryEntry (spec 025, R4.3).
   if (response.memoryEntry !== undefined) {
     return response.memoryEntry;
+  }
+
+  // Suppression (spec 040, R2.1): an intentional no-op cycle (stepSkipped —
+  // the no-targetAffordance branch or the 'wait' escape hatch) with no LLM
+  // memory stores NOTHING. The auto-fallback would otherwise write an
+  // importance-3 "Idle tick — no action taken. Goal: …" node on every such
+  // cycle, which is exactly the memoryWritten signal that mislabels every
+  // wait-only cycle REACT (issue #149). Failed executions never set
+  // stepSkipped, so their learning-signal fallbacks are unaffected (R3).
+  if (executeResult.stepSkipped === true) {
+    return undefined;
   }
 
   // (3) Auto-fallback (spec 025, R5.1).

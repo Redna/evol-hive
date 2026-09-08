@@ -509,7 +509,7 @@ describe('wait escape — ExecuteServiceImpl no-op (spec 037, Req 1 / AC-5 unit 
     completed: false,
   };
 
-  it('advances past a wait step without touching the world and without stepSkipped', async () => {
+  it('advances past a wait step without touching the world, reporting stepSkipped (spec 037 Req 1; amended by spec 040 R1.1)', async () => {
     const provider = new FakeExecuteDataProvider(waitStep);
     provider.planCompleteAfterAdvance = true;
     const service = new ExecuteServiceImpl({ dataProvider: provider });
@@ -517,8 +517,10 @@ describe('wait escape — ExecuteServiceImpl no-op (spec 037, Req 1 / AC-5 unit 
 
     expect(result.success).toBe(true);
     expect(result.planComplete).toBe(true);
-    // Intentional no-op — distinct from the legacy narrative skip flag.
-    expect(result.stepSkipped).toBeUndefined();
+    // Spec 040 (R1.1): the wait branch is an intentional no-op — identical in
+    // kind to the narrative skip — so it now REPORTS stepSkipped. Reflect
+    // suppresses the idle-tick fallback memory on that flag (spec 040 R2.1).
+    expect(result.stepSkipped).toBe(true);
     expect(result.error).toBeUndefined();
     expect(provider.advanceStepCalls).toEqual([AGENT_ID]);
     // World untouched: no resolution, execution, precondition check, drive
@@ -576,7 +578,8 @@ describe('wait escape — ExecuteServiceImpl no-op (spec 037, Req 1 / AC-5 unit 
     const r2 = await service.execute(AGENT_ID);
     expect(r2.success).toBe(true);
     expect(r2.planComplete).toBe(true);
-    expect(r2.stepSkipped).toBeUndefined();
+    // Spec 040 (R1.1): wait steps report the intentional no-op via stepSkipped.
+    expect(r2.stepSkipped).toBe(true);
     expect(provider.advanceStepCalls).toHaveLength(2);
     expect(provider.executeAffordanceCalls).toHaveLength(1); // unchanged
   });

@@ -511,14 +511,16 @@ describe('ReflectServiceImpl — auto-fallback memory generation (R5, AC-13, AC-
   });
 
   // AC-14: auto-generated content for stepSkipped
-  it('auto-generated content mentions idle tick when stepSkipped is true (AC-14)', async () => {
+  // SUPERSEDED by spec 040 (R2.1): the auto-fallback idle-tick memory on a
+  // skipped cycle is now SUPPRESSED — a wait-only cycle stores nothing.
+  // The idle fallback is never generated for stepSkipped cycles.
+  it('stores NOTHING when stepSkipped is true — idle-tick fallback suppressed (spec 040, R2.1; superseded AC-14)', async () => {
     provider.agentState = makeAgentState({ currentGoal: 'Explore' });
     const { service } = makeService(provider, {});
-    await service.reflect(AGENT_ID, makeExecuteResult({ stepSkipped: true }));
+    const result = await service.reflect(AGENT_ID, makeExecuteResult({ stepSkipped: true }));
 
-    const entry = provider.storeMemoryCalls[0]!.entry;
-    expect(entry.content.toLowerCase()).toContain('idle');
-    expect(entry.content).toContain('Explore');
+    expect(result.memoryStored).toBe(false);
+    expect(provider.storeMemoryCalls).toHaveLength(0);
   });
 
   // AC-15: importance=3, type="action" on success
@@ -609,13 +611,14 @@ describe('ReflectServiceImpl — auto-fallback memory generation (R5, AC-13, AC-
   });
 
   // Auto-fallback on stepSkipped uses "observation" type (not "action")
-  it('auto-generated memory type is "observation" when stepSkipped', async () => {
+  // SUPERSEDED by spec 040 (R2.1): skipped cycles store nothing at all —
+  // the idle fallback (type "observation", importance 3) is suppressed.
+  it('stores no memory and no idle fallback when stepSkipped (spec 040, R2.1)', async () => {
     const { service } = makeService(provider, {});
-    await service.reflect(AGENT_ID, makeExecuteResult({ stepSkipped: true }));
+    const result = await service.reflect(AGENT_ID, makeExecuteResult({ stepSkipped: true }));
 
-    const entry = provider.storeMemoryCalls[0]!.entry;
-    expect(entry.type).toBe('observation');
-    expect(entry.importance).toBe(3);
+    expect(result.memoryStored).toBe(false);
+    expect(provider.storeMemoryCalls).toHaveLength(0);
   });
 });
 
