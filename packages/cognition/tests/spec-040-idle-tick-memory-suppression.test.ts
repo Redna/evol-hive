@@ -70,6 +70,8 @@ class FakeExecuteDataProvider implements ExecuteDataProvider {
   });
   currentStep: PlanStep = makeStep({ targetAffordance: WAIT_AFFORDANCE });
   planComplete = false;
+  /** Dynamic override: when set, it determines plan completion (real flow). */
+  isPlanCompleteFn: (() => boolean) | null = null;
   resolvedAffordance: { objectId: string; affordance: Affordance } | null = null;
 
   advanceStepCalls: string[] = [];
@@ -79,6 +81,10 @@ class FakeExecuteDataProvider implements ExecuteDataProvider {
     return this.agentState;
   }
   isPlanComplete(_agentId: string): boolean {
+    return this.planComplete;
+  }
+  isPlanComplete(_agentId: string): boolean {
+    if (this.isPlanCompleteFn !== null) return this.isPlanCompleteFn();
     return this.planComplete;
   }
   getCurrentStep(_agentId: string): PlanStep {
@@ -190,7 +196,10 @@ describe('ExecuteServiceImpl — WAIT_AFFORDANCE branch (R1, AC-3)', () => {
 
   it("a final 'wait' step reports planComplete alongside stepSkipped (R1.1)", async () => {
     provider.currentStep = makeStep({ targetAffordance: WAIT_AFFORDANCE });
-    provider.planComplete = true;
+    // The plan completes only AFTER the final step is advanced (the real
+    // flow: advanceStep() → isPlanComplete()). A static planComplete=true
+    // would short-circuit before the wait branch is ever reached.
+    provider.isPlanCompleteFn = () => provider.advanceStepCalls.length > 0;
     const result = await service.execute(AGENT_ID);
 
     expect(result.stepSkipped).toBe(true);

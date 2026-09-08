@@ -157,10 +157,15 @@ export class ExecuteServiceImpl {
       // no legal binding; execution advances past it without touching the
       // world. (Unbound steps never reach here for new plans — spec 037's
       // validator rejects them — but legacy plans may still contain them.)
+      // Spec 040 (R1.1): the wait branch is semantically identical to the
+      // no-targetAffordance branch above — an intentional no-op that advances
+      // the step — so it reports `stepSkipped: true` too. Reflect uses that
+      // flag to suppress the auto-fallback idle-tick memory (spec 040, R2.1):
+      // a wait-only cycle has nothing to remember.
       if (step.targetAffordance === WAIT_AFFORDANCE) {
         dataProvider.advanceStep(agentId);
         const planComplete = dataProvider.isPlanComplete(agentId);
-        return { success: true, planComplete };
+        return { success: true, planComplete, stepSkipped: true };
       }
 
       // Plan validation (spec 016, Req 11): before executing, validate that the
