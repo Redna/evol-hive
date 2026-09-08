@@ -3,8 +3,10 @@
  * (spec 035, Req 9 / AC-4)
  * ────────────────────────────────────────────────────────────────────────────
  * When a cycle completes, the runtime labels the sample by outcome:
- *   plan changed | drive deltas applied | memory written | conversation
- *   continued → REACT (y=1); nothing changed → IGNORE (y=0). Hard-trigger
+ *   plan changed | APPLIED drive changes (spec 041: the orchestrator's
+ *   causal signal — Execute `driveChanges` / Reflect sanitized overrides —
+ *   NOT a drive-snapshot diff) | memory written | conversation continued
+ *   → REACT (y=1); nothing changed → IGNORE (y=0). Hard-trigger
  *   samples are ALWAYS labeled REACT (the head must never learn to ignore
  *   alarms).
  *
@@ -26,6 +28,7 @@ import type {
   CycleOutcomeSample,
   CycleStartContext,
   OutcomeSnapshot,
+  PPERCycleOutcome,
   System1FeatureSourcePort,
   System1OutcomeProbePort,
   System1OutcomeRecorderPort,
@@ -81,7 +84,7 @@ export class System1OutcomeRecorderImpl implements System1OutcomeRecorderPort {
   }
 
   /** Compute the label from the outcome and append the sample (Req 9). */
-  onCycleSettled(agentId: string, error?: string): void {
+  onCycleSettled(agentId: string, outcome?: PPERCycleOutcome, error?: string): void {
     const pendingCycle = this.pending.get(agentId);
     this.pending.delete(agentId);
     if (!pendingCycle) return; // probe never landed — skip this sample
@@ -92,7 +95,17 @@ export class System1OutcomeRecorderImpl implements System1OutcomeRecorderPort {
 
         const planChanged =
           before.planId !== after.planId || before.planStepIndex !== after.planStepIndex;
-        const drivesChanged = drivesDiffer(before.drives, after.drives);
+        // Spec 041 (R3.2): the drive-change dimension is CAUSAL, not
+        // statistical — populated from the orchestrator's resolved outcome
+        // (the Execute phase's applied `driveChanges` / the Reflect phase's
+        // sanitized `driveOverrides`). Snapshot diffing is gone: ambient
+        // decay (0.1/s × a 60–90s cycle interval ⇒ 6–9 points) defeated any
+        // fixed epsilon, and real affordance deltas partially cancel against
+        // decay, so no threshold could separate "the cycle acted" from
+        // "physics happened". A missing outcome (probe wiring gaps, legacy
+        // orchestrators, rejected cycles) falls back to `false` — such cycles
+        // can still label REACT via the other dimensions and hard triggers.
+        const drivesChanged = outcome?.appliedDriveChanges ?? false;
         const memoryWritten = after.memoryCount > before.memoryCount;
         const conversationContinued = after.conversationTurns > before.conversationTurns;
         // Dream-label refinement: a wait-only plan is an intentional no-op.
@@ -159,19 +172,4 @@ function toAgentDrives(drives: Record<string, number>): AgentDrives {
     comfort: drives['comfort'] ?? 0,
     curiosity: drives['curiosity'] ?? 0,
   };
-}
-
-/** Compares drive maps for any change (deterministic). */
-function drivesDiffer(a: Record<string, number>, b: Record<string, number>): boolean {
-  // Decay-noise threshold: drives decay 0.1/s ambiently, so an exact
-  // comparison made EVERY cycle "drive-changing" and the wait-only ignore
-  // refinement never fired (0.1/s × cycle length ≈ 2-5 points of pure
-  // physics). Affordance driveChanges are ≥3 points; deltas below ±1 are
-  // decay, not the cycle's effect.
-  const DRIVE_CHANGE_EPSILON = 1.0;
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  for (const key of keys) {
-    if (Math.abs((a[key] ?? 0) - (b[key] ?? 0)) >= DRIVE_CHANGE_EPSILON) return true;
-  }
-  return false;
 }

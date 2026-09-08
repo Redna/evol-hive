@@ -27,6 +27,7 @@ import type {
   PlanResult,
   ExecuteResult,
   ReflectResult,
+  PPERCycleOutcome,
   PPERErrorConfig,
   PPERCycleStatus,
 } from '@evol-hive/shared';
@@ -131,8 +132,16 @@ export class PPEROrchestratorImpl {
     this.onCycleStart = options.onCycleStart;
   }
 
-  /** Run a single PPER cycle for the given agent. */
-  async runCycle(agentId: string): Promise<void> {
+  /**
+   * Run a single PPER cycle for the given agent. Resolves with the cycle's
+   * causal outcome (spec 041, R2): `appliedDriveChanges` is `true` when the
+   * Execute phase's aggregate result carried non-empty `driveChanges` (the
+   * compound action's once-applied merged map included) or the Reflect phase
+   * reported `drivesUpdated: true` (sanitized `driveOverrides` — the
+   * deviation-rejected reflect branch included). Every early-return path
+   * reports `false` unless a phase actually applied drive changes.
+   */
+  async runCycle(agentId: string): Promise<PPERCycleOutcome> {
     const failures = this.consecutiveFailures.get(agentId) ?? 0;
     const cooldownStart = this.cooldownStartedAt.get(agentId) ?? 0;
 
@@ -144,8 +153,8 @@ export class PPEROrchestratorImpl {
     if (failures >= this.errorConfig.maxConsecutiveFailures) {
       const elapsed = Date.now() - cooldownStart;
       if (elapsed < this.errorConfig.failureCooldownMs) {
-        // Still in cooldown — skip the cycle.
-        return;
+        // Still in cooldown — skip the cycle. Nothing ran → nothing applied.
+        return { appliedDriveChanges: false };
       }
       // Cooldown expired — reset and proceed (Req 2.3).
       this.consecutiveFailures.set(agentId, 0);
@@ -169,18 +178,27 @@ export class PPEROrchestratorImpl {
       console.error(`[plan-failed] agent=${agentId}: ${plan.error}`);
       this.recordFailure(agentId, plan.error);
       this.setPhase(agentId, 'perceive');
-      return;
+      // Plan failed — execute/reflect never ran → nothing was applied.
+      return { appliedDriveChanges: false };
     }
 
     // (3) Execute — deterministic affordance execution.
     this.setPhase(agentId, 'execute');
     const execute: ExecuteResult = await this.executeService.execute(agentId);
+    // Causal signal (spec 041, R2.1): drive changes the Execute phase actually
+    // applied. The execute phase attaches the aggregate result (the compound
+    // action's once-applied merged map included) and applies `driveChanges`
+    // only on success, so the signal is success-gated.
+    const executeAppliedChanges =
+      execute.success === true &&
+      execute.result?.driveChanges !== undefined &&
+      Object.keys(execute.result.driveChanges).length > 0;
     if (!execute.success) {
       // "No active plan" is not a failure (spec 008, Req 4.1, AC-11).
       if (execute.error === 'No active plan' && execute.planComplete) {
         // Expected state — cycle completes normally.
         this.setPhase(agentId, 'perceive');
-        return;
+        return { appliedDriveChanges: false };
       }
       // Plan-validation deviation routes to Reflect (spec 016, Req 12, AC-22).
       if (execute.deviationRejected === true) {
@@ -190,18 +208,18 @@ export class PPEROrchestratorImpl {
           // Reflect failure on a deviation is still not counted as a cycle
           // failure — the deviation itself is a recovery path, not an error.
           this.setPhase(agentId, 'perceive');
-          return;
+          return { appliedDriveChanges: reflect.drivesUpdated === true };
         }
         // Successful reflect after deviation — reset failure counter.
         this.consecutiveFailures.set(agentId, 0);
         this.cooldownStartedAt.delete(agentId);
         this.lastErrors.delete(agentId);
         this.setPhase(agentId, 'perceive');
-        return;
+        return { appliedDriveChanges: reflect.drivesUpdated === true };
       }
       this.recordFailure(agentId, execute.error);
       this.setPhase(agentId, 'perceive');
-      return;
+      return { appliedDriveChanges: false };
     }
 
     // (4) Reflect — LLM reflects, updates state/memory.
@@ -210,7 +228,9 @@ export class PPEROrchestratorImpl {
     if (!reflect.success) {
       this.recordFailure(agentId, reflect.error);
       this.setPhase(agentId, 'perceive');
-      return;
+      // The Execute phase's changes (if any) WERE applied before the failure —
+      // the outcome reports what ran (spec 041, R2.2).
+      return { appliedDriveChanges: executeAppliedChanges };
     }
 
     // Cycle complete — reset failure counter on success (spec 008, Req 2.1).
@@ -218,6 +238,9 @@ export class PPEROrchestratorImpl {
     this.cooldownStartedAt.delete(agentId);
     this.lastErrors.delete(agentId);
     this.setPhase(agentId, 'perceive');
+    return {
+      appliedDriveChanges: executeAppliedChanges || reflect.drivesUpdated === true,
+    };
   }
 
   /** Get the current phase for an agent ('perceive' when idle). */

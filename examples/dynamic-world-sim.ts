@@ -48,6 +48,7 @@ import type {
   AgentProfile,
   EngineConfig,
   PPEROrchestratorPort,
+  PPERCycleOutcome,
   PPERPhase,
   SmartObject,
 } from '@evol-hive/shared';
@@ -86,7 +87,10 @@ function makeConfig(): EngineConfig {
 
 /** Minimal no-op orchestrator for mock mode (parity with visualizer-demo). */
 class NoopOrchestrator implements PPEROrchestratorPort {
-  async runCycle(): Promise<void> {}
+  async runCycle(): Promise<PPERCycleOutcome> {
+    // Mock mode runs no cycles — nothing was ever applied.
+    return { appliedDriveChanges: false };
+  }
   getPhase(): PPERPhase {
     return 'perceive';
   }

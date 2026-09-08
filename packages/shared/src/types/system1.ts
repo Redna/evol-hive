@@ -20,6 +20,7 @@
  */
 
 import type { AgentDrives } from './agent.js';
+import type { PPERCycleOutcome } from './engine.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Feature schema contract (Req 1, Req 2)
@@ -522,7 +523,21 @@ export interface CycleStartContext {
 /** Port: outcome labeling lifecycle hooks driven by the scheduler (Req 7/9). */
 export interface System1OutcomeRecorderPort {
   onCycleStart(agentId: string, ctx: CycleStartContext): void;
-  onCycleSettled(agentId: string, error?: string): void;
+  /**
+   * The cycle settled — label and append the sample (Req 9, spec 041 R1.3).
+   *
+   * `outcome` is the orchestrator's resolved `PPERCycleOutcome` (what the
+   * cycle's phases DID). It is optional: probe wiring gaps and legacy
+   * orchestrators may not supply it — the recorder then treats the
+   * drive-change dimension as `false` (safe: such cycles can still label
+   * REACT via the other dimensions and hard triggers).
+   *
+   * @param outcome the causal cycle outcome (absent on orchestrator rejection
+   *   or legacy wiring — the engine's scheduler passes `undefined` + the
+   *   error message in that case)
+   * @param error the rejection message when the cycle promise rejected
+   */
+  onCycleSettled(agentId: string, outcome?: PPERCycleOutcome, error?: string): void;
   /**
    * Optional per-tick hook: lets the recorder advance time-based bookkeeping
    * (e.g. the ticks-since-last-completed-cycle counter) on idled ticks too.

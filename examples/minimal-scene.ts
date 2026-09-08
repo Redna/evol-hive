@@ -20,6 +20,7 @@ import type {
   ReflectionResult,
   MemoryNode,
   PPEROrchestratorPort,
+  PPERCycleOutcome,
   PPERPhase,
   EngineConfig,
 } from '@evol-hive/shared';
@@ -235,13 +236,14 @@ class LoggingOrchestrator implements PPEROrchestratorPort {
     this.inner = inner;
   }
 
-  async runCycle(agentId: string): Promise<void> {
-    await this.inner.runCycle(agentId);
+  async runCycle(agentId: string): Promise<PPERCycleOutcome> {
+    const outcome = await this.inner.runCycle(agentId);
     if (!this.logged) {
       this.logged = true;
       // eslint-disable-next-line no-console
       console.log(`Agent ${agentId} completed PPER cycle: success=true`);
     }
+    return outcome;
   }
 
   getPhase(agentId: string): PPERPhase {
