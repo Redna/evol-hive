@@ -441,11 +441,27 @@ export function assembleSystem1(
   options: System1AssemblyOptions = {},
 ): System1Assembled {
   // ── Gate + importance heads (lazy artifact load, fail-open) ──────────────
+  // Exploration factor (spec 036): default-off per spec; SYSTEM1_EPSILON_BASE
+  // opts a run in (typical 0.1–0.3). Exploration draws produce IGNORE-labeled
+  // outcome samples — the counterfactual data a greedy gate never generates
+  // (without it, dream retraining can only reconfirm "always react": 6,050
+  // react vs 7 ignore in grand10+grand12 session logs).
+  const epsilonBaseEnv = process.env['SYSTEM1_EPSILON_BASE'];
   const gateHead = new ReactGateHead({
     loader: options.gateArtifactPath
       ? makeFileArtifactLoader(options.gateArtifactPath)
       : async () => null,
     threshold: defaultSystem1GateConfig().threshold,
+    ...(epsilonBaseEnv !== undefined
+      ? {
+          epsilonBase: Number(epsilonBaseEnv),
+          curiositySource: (agentId: string): number => {
+            const s = core.agentManager.getState(agentId);
+            const c = s?.drives['curiosity'];
+            return typeof c === 'number' ? c : 0;
+          },
+        }
+      : {}),
   });
   void gateHead.ensureLoaded(); // best-effort; fail-open until the artifact lands
 
