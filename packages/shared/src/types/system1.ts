@@ -491,6 +491,15 @@ export interface OutcomeSnapshot {
   memoryCount: number;
   conversationTurns: number;
   /**
+   * The current plan's step affordance IDs (optional). When present, the
+   * outcome recorder labels wait-only cycles (every step targets `wait` or
+   * the plan has no steps) with no other changes as IGNORE — a cycle that
+   * produced only an intentional no-op contributed nothing (dream-label
+   * refinement: without it, wait-plans counted as `planChanged` and ~99% of
+   * samples were labeled REACT, collapsing the head to "always react").
+   */
+  planStepIds?: string[];
+  /**
    * The scene-mutation log's current seq (optional — pins the "mutations
    * since my last cycle" window for the trigger source).
    */

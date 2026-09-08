@@ -31,7 +31,7 @@ import type {
   System1OutcomeRecorderPort,
   System1SampleSinkPort,
 } from '@evol-hive/shared';
-import { FEATURE_SCHEMA_VERSION, hasHardTrigger } from '@evol-hive/shared';
+import { FEATURE_SCHEMA_VERSION, hasHardTrigger, WAIT_AFFORDANCE } from '@evol-hive/shared';
 import type { System1AgentTracker } from './system1-agent-tracker.js';
 
 /** Constructor options for {@link System1OutcomeRecorderImpl}. */
@@ -95,8 +95,19 @@ export class System1OutcomeRecorderImpl implements System1OutcomeRecorderPort {
         const drivesChanged = drivesDiffer(before.drives, after.drives);
         const memoryWritten = after.memoryCount > before.memoryCount;
         const conversationContinued = after.conversationTurns > before.conversationTurns;
+        // Dream-label refinement: a wait-only plan is an intentional no-op.
+        // A cycle whose only effect was writing a wait-plan contributed
+        // nothing — label it IGNORE so the head learns to skip these cycles
+        // (wait-dominated runs otherwise label ~99% of samples REACT).
+        // Legacy: snapshots without planStepIds keep the old behavior.
+        const stepIds = after.planStepIds;
+        const waitOnlyPlan =
+          stepIds !== undefined &&
+          stepIds.length > 0 &&
+          stepIds.every((id) => id === WAIT_AFFORDANCE);
+        const planChangedMeaningfully = planChanged && !waitOnlyPlan;
         const anythingChanged =
-          planChanged || drivesChanged || memoryWritten || conversationContinued;
+          planChangedMeaningfully || drivesChanged || memoryWritten || conversationContinued;
 
         // Req 9: hard-trigger samples are ALWAYS labeled REACT.
         const hardTrigger = hasHardTrigger(ctx.hardTriggers) || ctx.decision.hardTrigger;

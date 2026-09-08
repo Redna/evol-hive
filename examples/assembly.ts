@@ -522,6 +522,7 @@ export function assembleSystem1(
         drives: state?.drives ?? {},
         memoryCount,
         conversationTurns,
+        planStepIds: plan?.steps.map((s) => s.targetAffordance ?? '') ?? [],
         mutationSeq: lastSeq,
       };
     },

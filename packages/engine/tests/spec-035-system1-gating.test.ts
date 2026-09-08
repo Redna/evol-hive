@@ -353,6 +353,67 @@ describe('Spec 035 — outcome labeling (Req 9 / AC-4)', () => {
     expect(sink.samples[0]!.label).toBe('ignore');
   });
 
+  it('a wait-only plan with no other changes labels IGNORE (dream-label refinement)', async () => {
+    const agents = new AgentManagerImpl();
+    agents.spawn(makeAgent('a1'));
+    const orch = new FakeOrchestrator();
+    const gate = new ScriptedGate();
+    gate.decisions = [decision(0.9, true)];
+    const { sink, probe, recorder } = makeRecorder();
+
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        outcomeRecorder: recorder,
+      },
+    );
+
+    // Before: plan W (wait-only). After: plan W2 (a DIFFERENT wait-only
+    // plan) — planId changed, but the cycle produced only an intentional
+    // no-op: behaviorally an ignore.
+    const waitSnap = (id: string): OutcomeSnapshot => ({
+      ...baseSnapshot(id),
+      planStepIds: ['wait', 'wait'],
+    });
+    probe.snapshots = [waitSnap('plan_W1'), waitSnap('plan_W2')];
+    scheduler.update(TICK);
+    await vi.waitFor(() => expect(sink.samples).toHaveLength(1));
+    expect(sink.samples[0]!.label).toBe('ignore');
+    // The RAW outcome flag still reports the plan change (introspection).
+    expect(sink.samples[0]!.outcome!.planChanged).toBe(true);
+  });
+
+  it('a movement plan (non-wait steps) still labels REACT', async () => {
+    const agents = new AgentManagerImpl();
+    agents.spawn(makeAgent('a1'));
+    const orch = new FakeOrchestrator();
+    const gate = new ScriptedGate();
+    gate.decisions = [decision(0.9, true)];
+    const { sink, probe, recorder } = makeRecorder();
+
+    const scheduler = new PPERScheduler(
+      agents,
+      orch,
+      { maxConcurrentCycles: 8 } as PPERSchedulerConfig,
+      {
+        gate,
+        outcomeRecorder: recorder,
+      },
+    );
+
+    const goSnap = (id: string): OutcomeSnapshot => ({
+      ...baseSnapshot(id),
+      planStepIds: ['go_to_garden', 'observe'],
+    });
+    probe.snapshots = [goSnap('plan_G1'), goSnap('plan_G2')];
+    scheduler.update(TICK);
+    await vi.waitFor(() => expect(sink.samples).toHaveLength(1));
+    expect(sink.samples[0]!.label).toBe('react');
+  });
+
   it('drive-delta outcomes label REACT even without a plan change', async () => {
     const agents = new AgentManagerImpl();
     agents.spawn(makeAgent('a1'));
