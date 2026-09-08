@@ -27,7 +27,7 @@
 | Object Interactions | [018](docs/specs/018-object-interactions.md) | ✅ Merged | #69 |
 | Multi-Agent Social | [018](docs/specs/018-multi-agent-social.md) | ✅ Merged | #70 |
 
-**37 specs, 150+ PRs — all merged. 2,055+ tests passing.**
+**39 specs, 150+ PRs — all merged. 2,152 tests passing.**
 
 ### Phase 4-5 Progress (specs 019-029)
 
@@ -49,6 +49,8 @@
 | [035](docs/specs/035-system1-trainable-heads.md) | System 1 — Trainable React/Ignore Gate + Importance Head | ✅ Merged | #136 |
 | [036](docs/specs/036-exploration-factor.md) | Curiosity-Modulated Exploration Factor | ✅ Implemented | (direct, #138) |
 | [037](docs/specs/037-enum-bound-plan-formulation.md) | Enum-Bound Plan Formulation (+ livelock guard, empty-args repair) | ✅ Implemented | #141 |
+| [038](docs/specs/038-spatial-navigation-fog-of-war.md) | Spatial Navigation — Grid, Pathfinding, Fog of War (slice 1) | ✅ Merged | 8c38f9b |
+| [039](docs/specs/039-spatial-phase2-targetarea-fog.md) | Spatial Phase 2 — targetArea Intents, Cell Fog, Social Fog-Lifting | ✅ Merged | #148 |
 
 ## Completed Phases
 
