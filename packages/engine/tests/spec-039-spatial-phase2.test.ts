@@ -165,9 +165,7 @@ describe('fog-gated perception (spec 039, AC-2)', () => {
     });
     expect(core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden')).toHaveLength(2);
     expect(
-      core.bridges.perception
-        .getVisibleAffordancesInRoom!('a1', 'garden')
-        .map((a) => a.id),
+      core.bridges.perception.getVisibleAffordancesInRoom!('a1', 'garden').map((a) => a.id),
     ).toContain('harvest');
   });
 
@@ -182,9 +180,9 @@ describe('fog-gated perception (spec 039, AC-2)', () => {
         observedObjects: { 'planter-1': 'garden' },
       },
     });
-    const ids = core.bridges.perception
-      .getVisibleAffordancesInRoom!('a1', 'garden')
-      .map((a) => a.id);
+    const ids = core.bridges.perception.getVisibleAffordancesInRoom!('a1', 'garden').map(
+      (a) => a.id,
+    );
     expect(ids).toContain('harvest');
     expect(ids).not.toContain('go_to_workshop');
   });
@@ -198,9 +196,9 @@ describe('fog-gated perception (spec 039, AC-2)', () => {
         observedObjects: { 'planter-1': 'garden' },
       },
     });
-    const ids = core.bridges.perception
-      .getVisibleAffordancesInRoom!('a1', 'garden')
-      .map((a) => a.id);
+    const ids = core.bridges.perception.getVisibleAffordancesInRoom!('a1', 'garden').map(
+      (a) => a.id,
+    );
     expect(ids).toContain('go_to_workshop');
   });
 
@@ -312,9 +310,14 @@ describe('social fog-lifting via talk_to (spec 039, AC-4)', () => {
     });
 
     const registry = new SmartObjectRegistryImpl();
-    const perception = new PerceptionDataProviderImpl(agents, registry, new DriveSystemImpl(agents), {
-      getSystemFeedback: () => undefined,
-    } as never);
+    const perception = new PerceptionDataProviderImpl(
+      agents,
+      registry,
+      new DriveSystemImpl(agents),
+      {
+        getSystemFeedback: () => undefined,
+      } as never,
+    );
     const social = new SocialManager(agents);
     social.queueMessage('speaker', 'listener', 'the workshop has a workbench');
 
@@ -386,9 +389,7 @@ describe('spatialMemory + position persistence round-trip (spec 039, AC-5)', () 
     const saved = JSON.parse(JSON.stringify(await core.persistence!.save())) as SaveState;
     await core.persistence!.load(saved);
 
-    expect(core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden')).toEqual(
-      preObjects,
-    );
+    expect(core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden')).toEqual(preObjects);
     expect(core.bridges.perception.getKnownAreas!('a1')).toEqual(preKnown);
   });
 

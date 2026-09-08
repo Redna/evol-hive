@@ -199,16 +199,14 @@ export function checkPlanBinding(
   }
   result.steps.forEach((step, i) => {
     const ta = step.targetAffordance;
-    const areaBound =
-      step.targetArea !== undefined && step.targetArea.length > 0;
+    const areaBound = step.targetArea !== undefined && step.targetArea.length > 0;
     if (typeof ta === 'string' && ta.length > 0 && allowed.has(ta)) {
       bound += 1;
       // A same-cell step may not ALSO declare a foreign targetArea binding
       // that the validator cannot see — unknown areas stay violations.
       if (areaBound && !knownAreaSet.has(step.targetArea!)) {
         violations.push(
-          `step ${i + 1} ("${step.description.slice(0, 50)}") ` +
-            `targetArea='${step.targetArea}'`,
+          `step ${i + 1} ("${step.description.slice(0, 50)}") ` + `targetArea='${step.targetArea}'`,
         );
       }
       return;
@@ -220,8 +218,7 @@ export function checkPlanBinding(
         return;
       }
       violations.push(
-        `step ${i + 1} ("${step.description.slice(0, 50)}") ` +
-          `targetArea='${step.targetArea}'`,
+        `step ${i + 1} ("${step.description.slice(0, 50)}") ` + `targetArea='${step.targetArea}'`,
       );
       return;
     }

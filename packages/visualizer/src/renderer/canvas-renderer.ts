@@ -214,7 +214,11 @@ export class CanvasRenderer {
   }
 
   /** Is a grid cell inside the fog set for a room? (No fog for a room → false.) */
-  private cellInFog(roomId: string, cell: { x: number; y: number }, fog: { exploredCells: Record<string, string[]> }): boolean {
+  private cellInFog(
+    roomId: string,
+    cell: { x: number; y: number },
+    fog: { exploredCells: Record<string, string[]> },
+  ): boolean {
     const cells = fog.exploredCells[roomId];
     if (cells === undefined) return false;
     return cells.includes(`${cell.x},${cell.y}`);

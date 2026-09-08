@@ -114,7 +114,10 @@ export class NavigationSystemImpl {
    * `'arrived'` once the agent stands at the target (adjacent to the anchor
    * for object targets), `'no-route'` when no open route exists.
    */
-  navigateToArea(agentId: string, targetArea: string): import('@evol-hive/shared').NavigationStepStatus {
+  navigateToArea(
+    agentId: string,
+    targetArea: string,
+  ): import('@evol-hive/shared').NavigationStepStatus {
     const state = this.options.agentManager.getState(agentId);
     if (!state) return 'unknown-area';
 

@@ -157,7 +157,7 @@ export class PlanBuilderImpl implements PlanBuilder {
     if (knownAreas !== undefined && knownAreas.length > 0) {
       dynamicLines.push(`Known areas: ${knownAreas.join(', ')}`);
       dynamicLines.push(
-        "Set targetArea on a step to navigate to a known area first — the engine walks you there and the affordance executes on arrival.",
+        'Set targetArea on a step to navigate to a known area first — the engine walks you there and the affordance executes on arrival.',
       );
     }
     if (unexploredAreas !== undefined) {

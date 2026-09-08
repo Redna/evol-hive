@@ -128,7 +128,7 @@ export function formulatePlanSchemaFor(availableAffordanceIds: string[], knownAr
                   targetArea: {
                     type: 'string',
                     description:
-                      "The KNOWN area (room or object anchor) this step navigates to first. MUST be one of the enum values. Omit for same-room steps — the engine walks the agent there before the affordance executes.",
+                      'The KNOWN area (room or object anchor) this step navigates to first. MUST be one of the enum values. Omit for same-room steps — the engine walks the agent there before the affordance executes.',
                     enum: areaEnum,
                   },
                 }
@@ -149,7 +149,10 @@ export function formulatePlanSchemaFor(availableAffordanceIds: string[], knownAr
  * replacement for the static {@link formulatePlanTool}. Builders MUST use
  * this factory so the plan schema carries the room's affordance enum.
  */
-export function formulatePlanToolFor(availableAffordanceIds: string[], knownAreas?: string[]): ToolDefinition {
+export function formulatePlanToolFor(
+  availableAffordanceIds: string[],
+  knownAreas?: string[],
+): ToolDefinition {
   return {
     type: 'function',
     function: {

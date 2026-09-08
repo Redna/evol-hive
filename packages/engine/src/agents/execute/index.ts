@@ -38,7 +38,10 @@ export interface ExecuteDataProviderOptions {
  * engine's NavigationSystem; wired via {@link setNavigation} after assembly.
  */
 export interface NavigationPort {
-  navigateToArea(agentId: string, targetArea: string): import('@evol-hive/shared').NavigationStepStatus;
+  navigateToArea(
+    agentId: string,
+    targetArea: string,
+  ): import('@evol-hive/shared').NavigationStepStatus;
 }
 
 /**
@@ -176,7 +179,10 @@ export class ExecuteDataProviderImpl implements ExecuteDataProvider {
    * `'unknown-area'` when no navigation port is wired — Execute treats that
    * as a graceful step failure (never a teleport).
    */
-  navigateToArea(agentId: string, targetArea: string): import('@evol-hive/shared').NavigationStepStatus {
+  navigateToArea(
+    agentId: string,
+    targetArea: string,
+  ): import('@evol-hive/shared').NavigationStepStatus {
     return this.navigation?.navigateToArea(agentId, targetArea) ?? 'unknown-area';
   }
 }
