@@ -49,16 +49,18 @@ describe('client bundle (spec 042, AC-3)', () => {
     // format: 'iife', bundle: true → everything inlined, nothing left to resolve.
     expect(js).not.toMatch(/^\s*import[\s(']/m);
     expect(js).not.toMatch(/^\s*export[\s{]/m);
+    // Type-only imports from @evol-hive/shared are erased during bundling —
+    // the module is never resolved (the identifier may survive in a JSDoc
+    // comment, which esbuild keeps in unminified output).
     expect(js).not.toContain('@evol-hive/shared');
-    // `import type` members from @evol-hive/shared are erased during bundling.
-    expect(js).not.toContain('VisualizerState');
-    expect(js).not.toContain('VisualizerAgent');
+    expect(js).not.toMatch(/import[^;]*VisualizerState/);
   });
 
   it('contains the DOM/WebSocket glue from main.ts', () => {
     const js = getClientBundle();
-    expect(js).toContain("getElementById('canvas')");
-    expect(js).toContain('new WebSocket(');
+    expect(js).toContain('document.getElementById('); // DOM lookup
+    expect(js).toContain('getElement("canvas")'); // canvas wiring
+    expect(js).toContain('new WebSocket('); // snapshot transport
   });
 
   it('caches its output — repeated calls do not rebuild', () => {

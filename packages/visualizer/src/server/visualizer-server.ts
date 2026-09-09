@@ -1,11 +1,15 @@
 /**
  * server/ — HTTP + WebSocket server for the visualizer (spec 023, Req 13–16)
- * ─────────────────────────────────────────────────────────────────────
- * Serves a single HTML page (with inline CSS + JS containing the canvas
- * renderer) at `GET /` and upgrades WebSocket connections at the same port.
- * The WebSocket layer is hand-rolled (RFC 6455 frame encoding/decoding using
- * only Node.js built-in `http`, `crypto`, and `Buffer`) — no external `ws`
- * library (spec 023, Constraint: no external dependencies).
+ * ─────────────────────────────────────────────────────────────────────────
+ * Serves a single HTML page (with inline CSS + the bundled renderer JS) at
+ * `GET /` and upgrades WebSocket connections at the same port. The page's JS
+ * is produced by bundling the real renderer module
+ * (`src/renderer/canvas-renderer.ts`) with the DOM/WebSocket glue
+ * (`src/client/main.ts`) via `getClientBundle()` — there is no hand-maintained
+ * inline template (spec 042, issue #155). The WebSocket layer is hand-rolled
+ * (RFC 6455 frame encoding/decoding using only Node.js built-in `http`,
+ * `crypto`, and `Buffer`) — no external `ws` library (spec 023, Constraint:
+ * no external dependencies).
  *
  * The server pushes `VisualizerState` snapshots at a configurable rate
  * (default 10 FPS) by calling `adapter.getSnapshot()` and sending the
@@ -18,6 +22,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import type { Duplex } from 'node:stream';
 import type { VisualizerInterface, VisualizerCommand, SceneDefinition } from '@evol-hive/shared';
+import { getClientBundle } from './client-bundle.js';
 
 /** The WebSocket GUID from RFC 6455. */
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
@@ -307,8 +312,12 @@ export class VisualizerServer {
 
   // ── HTML page (spec 023, Req 15) ──────────────────────────────────────────
 
-  /** Build the single HTML page with inline CSS + JS (no build step, no deps). */
+  /** Build the single HTML page with inline CSS + bundled JS (spec 042). */
   private buildHtmlPage(): string {
+    // The page JS is the esbuild bundle of `src/client/main.ts` +
+    // `src/renderer/canvas-renderer.ts` (spec 042, Design Decision 1) — built
+    // once, cached, and inlined so the browser runs the exact module the test
+    // suite covers (spec-023 contract: single HTML, inline JS, no requests).
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -345,136 +354,10 @@ export class VisualizerServer {
   <select id="sceneSelect"></select>
 </div>
 <script>
-${RENDERER_JS}
-${CLIENT_JS}
+${getClientBundle()}
 </script>
 </body>
 </html>`;
   }
 }
 
-// ── Inline renderer JS (spec 023, Req 12/15) ────────────────────────────────
-// A dependency-free JS port of the CanvasRenderer, embedded as a string so no
-// separate file or build step is needed.
-
-const RENDERER_JS = `\
-var PHASE_COLORS = { perceive: '#4a90d9', plan: '#f1c40f', execute: '#e67e22', reflect: '#9b59b6' };
-var DRIVES = [
-  { key: 'energy', color: '#e74c3c' },
-  { key: 'hunger', color: '#e67e22' },
-  { key: 'social', color: '#3498db' },
-  { key: 'comfort', color: '#2ecc71' },
-  { key: 'curiosity', color: '#9b59b6' }
-];
-function layoutRooms(canvas, rooms) {
-  var map = new Map();
-  var cols = Math.ceil(Math.sqrt(rooms.length)) || 1;
-  var cellW = Math.floor((canvas.width - 40) / cols);
-  var rows = Math.ceil(rooms.length / cols) || 1;
-  var cellH = Math.floor((canvas.height - 80) / rows);
-  rooms.forEach(function (room, i) {
-    var col = i % cols, row = Math.floor(i / cols);
-    map.set(room.id, { x: 20 + col * cellW + 10, y: 40 + row * cellH + 10, w: Math.max(cellW - 20, 200), h: Math.max(cellH - 20, 150) });
-  });
-  return map;
-}
-function CanvasRenderer(ctx, canvas) { this.ctx = ctx; this.canvas = canvas; }
-CanvasRenderer.prototype.render = function (state) {
-  var ctx = this.ctx, c = this.canvas;
-  ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, c.width, c.height);
-  var layout = layoutRooms(c, state.rooms);
-  state.rooms.forEach(function (room) {
-    var p = layout.get(room.id); if (!p) return;
-    ctx.fillStyle = '#16213e'; ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.strokeStyle = '#0f3460'; ctx.lineWidth = 2; ctx.strokeRect(p.x, p.y, p.w, p.h);
-    ctx.fillStyle = '#e0e0e0'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(room.name, p.x + 8, p.y + 6);
-  });
-  ctx.strokeStyle = '#444466'; ctx.lineWidth = 2;
-  state.rooms.forEach(function (room) {
-    var from = layout.get(room.id); if (!from) return;
-    room.connections.forEach(function (cid) {
-      var to = layout.get(cid); if (!to) return;
-      ctx.beginPath(); ctx.moveTo(from.x + from.w/2, from.y + from.h/2); ctx.lineTo(to.x + to.w/2, to.y + to.h/2); ctx.stroke();
-    });
-  });
-  state.rooms.forEach(function (room) {
-    var p = layout.get(room.id); if (!p) return;
-    room.objects.forEach(function (obj, i) {
-      var ox = p.x + 12 + (i % 3) * 70, oy = p.y + 30 + Math.floor(i / 3) * 50;
-      ctx.fillStyle = '#2a2a4a'; ctx.fillRect(ox, oy, 60, 30);
-      ctx.fillStyle = '#c0c0d0'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillText(obj.name.slice(0, 8), ox + 2, oy + 2);
-      var e = Object.entries(obj.state)[0];
-      if (e) {
-        // Issue #105: round numeric values to 1 decimal (state-rule decay used
-        // to render "95.666666674" and overflow the chip) and truncate the KEY
-        // so the value stays visible inside the 60px chip.
-        var k = e[0], v = e[1];
-        var vt = (typeof v === 'number') ? String(Math.round(v * 10) / 10) : String(v);
-        var line = k.slice(0, 10) + ': ' + vt;
-        while (line.length * 5.5 > 56 && k.length > 1) { k = k.slice(0, -1); line = k + ': ' + vt; }
-        ctx.fillText(line, ox + 2, oy + 16);
-      }
-    });
-  });
-  var positions = new Map();
-  state.agents.forEach(function (agent, idx) {
-    var rp = layout.get(agent.location); if (!rp) return;
-    var x = rp.x + 40 + idx * 60, y = rp.y + rp.h - 50;
-    positions.set(agent.agentId, { x: x, y: y });
-    var r = 16;
-    ctx.strokeStyle = PHASE_COLORS[agent.pperPhase] || '#888'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = agent.isThinking ? '#555577' : '#3498db';
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(initials(agent.name), x, y);
-    ctx.fillStyle = '#e0e0e0'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(agent.name, x, y + r + 6);
-    DRIVES.forEach(function (d, i) {
-      var by = y + r + 22 + i * 6, v = agent.drives[d.key];
-      ctx.fillStyle = '#333355'; ctx.fillRect(x - r, by, r * 2, 4);
-      ctx.fillStyle = d.color; ctx.fillRect(x - r, by, r * 2 * Math.max(0, Math.min(100, v)) / 100, 4);
-    });
-    if (agent.currentPlan) { ctx.fillStyle = '#888899'; ctx.font = '9px sans-serif'; ctx.fillText(agent.currentPlan.description.slice(0, 24), x, y + r + 50); }
-  });
-  state.agents.forEach(function (agent) {
-    var from = positions.get(agent.agentId); if (!from) return;
-    agent.relationships.forEach(function (rel) {
-      var to = positions.get(rel.agentId); if (!to) return;
-      var op = 0.1 + (Math.max(0, Math.min(100, rel.trust)) / 100) * 0.6;
-      ctx.strokeStyle = 'rgba(255,255,255,' + op + ')'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); ctx.stroke();
-    });
-  });
-  ctx.fillStyle = '#e0e0e0'; ctx.font = '12px monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-  ctx.fillText('tick ' + state.tickNumber + ' \\u00b7 ' + state.simulationTime.toFixed(1) + 's \\u00b7 ' + (state.isRunning ? 'running' : 'paused') + ' \\u00b7 ' + state.timeScale + 'x', c.width - 12, 8);
-};
-function initials(name) { var p = name.trim().split(/\\s+/); if (p.length === 1) return p[0].slice(0, 2).toUpperCase(); return (p[0][0] + p[1][0]).toUpperCase(); }
-`;
-
-const CLIENT_JS = `\
-(function () {
-  var canvas = document.getElementById('canvas');
-  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-  var ctx = canvas.getContext('2d');
-  var renderer = new CanvasRenderer(ctx, canvas);
-  var ws = new WebSocket('ws://' + location.host + '/');
-  ws.onmessage = function (ev) { try { renderer.render(JSON.parse(ev.data)); } catch (e) { console.error(e); } };
-  function send(cmd) { if (ws.readyState === 1) ws.send(JSON.stringify(cmd)); }
-  document.getElementById('btnPlay').onclick = function () { send({ type: 'play' }); };
-  document.getElementById('btnPause').onclick = function () { send({ type: 'pause' }); };
-  document.querySelectorAll('.speed').forEach(function (b) {
-    b.onclick = function () { send({ type: 'setSpeed', timeScale: Number(b.dataset.speed) }); };
-  });
-  document.getElementById('btnSave').onclick = function () { send({ type: 'save' }); };
-  document.getElementById('btnLoad').onclick = function () {
-    var json = prompt('Paste save state JSON:'); if (json) send({ type: 'load', stateJson: json });
-  };
-  var sel = document.getElementById('sceneSelect');
-  ['minimal', 'morning-routine', 'coffee-shop'].forEach(function (id) { var o = document.createElement('option'); o.value = id; o.text = id; sel.appendChild(o); });
-  sel.onchange = function () { send({ type: 'selectScene', sceneId: sel.value }); };
-  window.addEventListener('resize', function () { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
-})();
-`;

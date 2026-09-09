@@ -98,8 +98,9 @@ describe('served HTML — grid-cell positioning (spec 042, AC-1)', () => {
     expect(html).not.toContain('rp.x + 40 + idx * 60');
     // Decision 4 (spec 042): the module's legacy-slot fallback is inherited,
     // not reimplemented — the only remaining legacy slot arithmetic is the
-    // module's, behind the `position === undefined` guard for old states.
-    expect(html).toContain('agent.position !== undefined');
+    // module's, guarded by the `position === undefined` check for old states
+    // (esbuild prints `undefined` as `void 0`).
+    expect(html).toContain('agent.position !== void 0');
   });
 });
 
