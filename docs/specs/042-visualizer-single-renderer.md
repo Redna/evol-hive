@@ -5,7 +5,7 @@
 - Related specs: [023 — Canvas 2D Visualizer (Req 12/15 inline page)](023-visual-output-canvas-renderer.md), [038 — Spatial Navigation & Fog of War (AC-5)](038-spatial-navigation-fog-of-war.md), [039 — Spatial Phase 2 (R6/R8 fog shading, anchor cells)](039-spatial-phase2-targetarea-fog.md), [033 — conversation chips](033-conversations-identity-evolution.md), [029 — state-line rounding/truncation](029-visualizer-state-text-overflow.md)
 - Package: `visualizer`
 - Issue: [#155](https://github.com/Redna/evol-hive/issues/155)
-- Status: 📝 Drafted
+- Status: 🔍 In Review
 
 ## Problem
 
