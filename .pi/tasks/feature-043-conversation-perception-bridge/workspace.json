@@ -1,0 +1,7 @@
+{
+  "name": "feature-043-conversation-perception-bridge",
+  "description": "Conversation Perception Bridge — surface conversation state (participants, topic, rolling-window turns) in each agent's LLM perception context, with a state-aware talk_to description, per-turn events for multi-turn metrics, and turn-bearing close-time consolidation memories. Perception-side bridge only; no lifecycle changes. Issue #158.",
+  "createdAt": "2026-09-09T14:45:00Z",
+  "specIssue": 158,
+  "specFile": "docs/specs/043-conversation-perception-bridge.md"
+}
