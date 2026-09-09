@@ -31,26 +31,30 @@
 
 ### Phase 4-5 Progress (specs 019-029)
 
-| Spec                                                         | Feature                                                            | Status         | PRs            |
-| ------------------------------------------------------------ | ------------------------------------------------------------------ | -------------- | -------------- |
-| [021](docs/specs/021-kv-cache-prompt-optimization.md)        | KV-Cache Prompt Optimization                                       | ✅ Merged      | #97            |
-| [022](docs/specs/022-scene-authoring-declarative.md)         | Scene Authoring (YAML + CLI)                                       | ✅ Merged      | #96            |
-| [023](docs/specs/023-visual-output-canvas-renderer.md)       | Visual Output (canvas renderer)                                    | ✅ Merged      | #95            |
-| [024](docs/specs/024-social-tool-invocation-fix.md)          | Social Tool Invocation Fix                                         | ✅ Merged      | #102           |
-| [026](docs/specs/026-memory-entry-fix.md)                    | Memory Entry Fix (flatten + fallback)                              | ✅ Merged      | #104           |
-| [027](docs/specs/027-real-llm-visualizer-demo.md)            | Real-LLM Visualizer Demo                                           | ✅ Merged      | #113           |
-| [028](docs/specs/028-compound-action-execution.md)           | Compound Action Execution                                          | ✅ Merged      | #114           |
-| [029](docs/specs/029-visualizer-state-text-overflow.md)      | Visualizer State Text Overflow Fix                                 | ✅ Merged      | (direct)       |
-| [030](docs/specs/030-dynamic-scenes-living-worlds.md)        | Dynamic Scenes — Living Worlds (runtime mutation, event-sourced)   | ✅ Merged      | #120           |
-| [031](docs/specs/031-execute-colocation-guard.md)            | Execute-Time Co-Location Guard                                     | ✅ Merged      | #123           |
-| [032](docs/specs/032-dynamic-world-drive-restoration.md)     | Drive Restoration Affordances (bench/stool)                        | ✅ Merged      | #127           |
-| [033](docs/specs/033-conversations-identity-evolution.md)    | Conversations as Perceivable Objects + Identity Evolution          | ✅ Merged      | #131           |
-| [034](docs/specs/034-drive-affordance-hints-hunger-chain.md) | Drive→Affordance Hints + Hunger Chain                              | ✅ Merged      | #133           |
-| [035](docs/specs/035-system1-trainable-heads.md)             | System 1 — Trainable React/Ignore Gate + Importance Head           | ✅ Merged      | #136           |
-| [036](docs/specs/036-exploration-factor.md)                  | Curiosity-Modulated Exploration Factor                             | ✅ Implemented | (direct, #138) |
-| [037](docs/specs/037-enum-bound-plan-formulation.md)         | Enum-Bound Plan Formulation (+ livelock guard, empty-args repair)  | ✅ Implemented | #141           |
-| [038](docs/specs/038-spatial-navigation-fog-of-war.md)       | Spatial Navigation — Grid, Pathfinding, Fog of War (slice 1)       | ✅ Merged      | 8c38f9b        |
-| [039](docs/specs/039-spatial-phase2-targetarea-fog.md)       | Spatial Phase 2 — targetArea Intents, Cell Fog, Social Fog-Lifting | ✅ Merged      | #148           |
+| Spec                                                         | Feature                                                           | Status         | PRs            |
+| ------------------------------------------------------------ | ----------------------------------------------------------------- | -------------- | -------------- |
+| [021](docs/specs/021-kv-cache-prompt-optimization.md)        | KV-Cache Prompt Optimization                                      | ✅ Merged      | #97            |
+| [022](docs/specs/022-scene-authoring-declarative.md)         | Scene Authoring (YAML + CLI)                                      | ✅ Merged      | #96            |
+| [023](docs/specs/023-visual-output-canvas-renderer.md)       | Visual Output (canvas renderer)                                   | ✅ Merged      | #95            |
+| [024](docs/specs/024-social-tool-invocation-fix.md)          | Social Tool Invocation Fix                                        | ✅ Merged      | #102           |
+| [026](docs/specs/026-memory-entry-fix.md)                    | Memory Entry Fix (flatten + fallback)                             | ✅ Merged      | #104           |
+| [027](docs/specs/027-real-llm-visualizer-demo.md)            | Real-LLM Visualizer Demo                                          | ✅ Merged      | #113           |
+| [028](docs/specs/028-compound-action-execution.md)           | Compound Action Execution                                         | ✅ Merged      | #114           |
+| [029](docs/specs/029-visualizer-state-text-overflow.md)      | Visualizer State Text Overflow Fix                                | ✅ Merged      | (direct)       |
+| [030](docs/specs/030-dynamic-scenes-living-worlds.md)        | Dynamic Scenes — Living Worlds (runtime mutation, event-sourced)  | ✅ Merged      | #120           |
+| [031](docs/specs/031-execute-colocation-guard.md)            | Execute-Time Co-Location Guard                                    | ✅ Merged      | #123           |
+| [032](docs/specs/032-dynamic-world-drive-restoration.md)     | Drive Restoration Affordances (bench/stool)                       | ✅ Merged      | #127           |
+| [033](docs/specs/033-conversations-identity-evolution.md)    | Conversations as Perceivable Objects + Identity Evolution         | ✅ Merged      | #131           |
+| [034](docs/specs/034-drive-affordance-hints-hunger-chain.md) | Drive→Affordance Hints + Hunger Chain                             | ✅ Merged      | #133           |
+| [035](docs/specs/035-system1-trainable-heads.md)             | System 1 — Trainable React/Ignore Gate + Importance Head          | ✅ Merged      | #136           |
+| [036](docs/specs/036-exploration-factor.md)                  | Curiosity-Modulated Exploration Factor                            | ✅ Implemented | (direct, #138) |
+| [037](docs/specs/037-enum-bound-plan-formulation.md)         | Enum-Bound Plan Formulation (+ livelock guard, empty-args repair) | ✅ Implemented | #141           |
+| [038](docs/specs/038-spatial-navigation-fog-of-war.md)       | Spatial Navigation — Grid, Pathfinding, Fog of War (slice 1)      | ✅ Merged      | 8c38f9b        |
+| [040](docs/specs/040-idle-tick-memory-suppression.md)        | Idle-Tick Memory Suppression (label pipeline domino 3)            | ✅ Merged      | #151           |
+| [041](docs/specs/041-applied-drive-changes-label.md)         | Applied-DriveChanges Outcome Labeling (domino 4 — causal labels)  | ✅ Merged      | #154           |
+| [042](docs/specs/042-visualizer-single-renderer.md)          | Visualizer Single Renderer (inline template → bundled module)     | ✅ Merged      | #157           |
+| [043](docs/specs/043-conversation-perception-bridge.md)      | Conversation Perception Bridge (threads reach the LLM)            | ✅ Merged      | #159           |
+| [044](docs/specs/044-social-urge-model.md)                   | Social Urge Model — persona-seeded talk inclination, reciprocity  | ✅ Merged      | #164           |
 
 ## Completed Phases
 
