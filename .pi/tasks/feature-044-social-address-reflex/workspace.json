@@ -1,0 +1,7 @@
+{
+  "name": "feature-044-social-address-reflex",
+  "description": "Social Address Reflex — a pending-address marker on the spoken-to agent (set by ConversationManager.openOrContribute, rendered as a guaranteed + fresh address line via the spec 043 perception bridge), a soft System 1 trigger forcing the target's next scheduler cycle with round-robin priority, marker clearing/decay with the conversation lifecycle, and addressed/reply events for reply-rate measurement. Companion to spec 043; depends on 043 landing first. Issue #160.",
+  "createdAt": "2026-09-09T16:40:00Z",
+  "specIssue": 160,
+  "specFile": "docs/specs/044-social-address-reflex.md"
+}
