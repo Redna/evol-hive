@@ -313,4 +313,46 @@ describe('served renderer integration (spec 042, AC-4)', () => {
     expect(texts).toContain('Planter'); // explored cell — visible
     expect(texts).not.toContain('Shed'); // fogged cell — hidden
   });
+
+  it('keeps the Decision-4 legacy-slot fallback working through the SERVED code', async () => {
+    // Spec 042, Decision 4 / R1: when `agent.position === undefined` (old
+    // saves, legacy states) the served renderer must fall back to the legacy
+    // slot formula — `roomPos.x + 40 + idx * 60`, `roomPos.y + roomPos.h -
+    // 50` — exactly as the module does. This is the branch the grid-cell
+    // test above does not exercise (its fixture carries a position).
+    ctx = new MockContext({ width: 800, height: 600 });
+    const legacyState = makeFogState();
+    delete (legacyState.agents[0] as { position?: unknown }).position;
+    server = new VisualizerServer({
+      adapter: {
+        getSnapshot: () => legacyState,
+        handleCommand: async (_cmd: VisualizerCommand) => {},
+      },
+      port: 0,
+      snapshotRateMs: 50,
+      scenes: new Map<string, SceneDefinition>([['minimal', minimalScene]]),
+    });
+    await server.start();
+    const port = server.getPort();
+
+    const res = await fetch(`http://localhost:${port}/`);
+    const html = await res.text();
+    const match = /<script>([\s\S]*)<\/script>/.exec(html);
+    if (!match) throw new Error('no inline script found in served page');
+    const wsMock = executePageJs(match[1]!);
+    wsMock.onmessage?.({ data: JSON.stringify(legacyState) });
+
+    // Layout for 2 rooms on an 800×600 canvas (see the grid-cell test):
+    // garden at (30, 50, 360×500). Agent idx 0 without position →
+    //   x = 30 + 40 + 0×60 = 70 · y = 50 + 500 − 50 = 500
+    const arcsAt = ctx.calls.filter((c) => c.method === 'arc').map((c) => c.args as number[]);
+    const legacySlot = arcsAt.filter(([x, y]) => x === 70 && y === 500);
+    expect(legacySlot.length).toBeGreaterThanOrEqual(2); // phase ring + avatar
+    // No grid cell was computed — the positionless agent never lands at (11.5
+    // × 360) / 12 + 30 = 375, (4.5 × 500) / 8 + 50 = 331.25.
+    const gridCell = arcsAt.filter(
+      ([x, y]) => Math.abs(x - 375) < 0.01 && Math.abs(y - 331.25) < 0.01,
+    );
+    expect(gridCell.length).toBe(0);
+  });
 });
