@@ -126,28 +126,28 @@ raise the urge.
 - [ ] **AC-1** (R1): In a live validation run (built `dist/` — run `pnpm build` first, spec 037
   Evidence), Tomas (persona seed inferred "energetic") issues `talk_to` at a higher rate than Iris
   ("reserved"); per-agent talk_to counts are computed from `events.jsonl`.
-- [ ] **AC-2** (R2, R3): Unit test on the pure urge function: after N=3 unreplied greetings
+- [x] **AC-2** (R2, R3): Unit test on the pure urge function: after N=3 unreplied greetings
   (`sentCount=3, receivedCount=0`), the reciprocity factor decays the urge toward that target below its
   value at `sentCount=1, receivedCount=0`; a reply (`receivedCount≥1`) restores/raises the factor.
-- [ ] **AC-3** (R4a): Unit test: after A `talk_to`s co-located B, B's next assembled perception contains
+- [x] **AC-3** (R4a): Unit test: after A `talk_to`s co-located B, B's next assembled perception contains
   the pending-address line quoting A's actual message text ("addressed you, awaiting response").
 - [ ] **AC-4** (R1, R2, R3): Live validation run (60 min, ≥3 agents): population-wide reply rate > 0
   (currently 0 across 5 runs — see #158), and per-agent reply/talk rates diverge consistently with the
   persona seed ordering.
-- [ ] **AC-5** (R5): Full suite green; no source changes under `packages/engine/src/systems/`
+- [x] **AC-5** (R5): Full suite green; no source changes under `packages/engine/src/systems/`
   (`pper-scheduler.ts` untouched) and no changes to spec 033 lifecycle tests.
-- [ ] **AC-6** (R1, R3): Unit test on persona-seed derivation: trait "reserved" yields a lower seed than
+- [x] **AC-6** (R1, R3): Unit test on persona-seed derivation: trait "reserved" yields a lower seed than
   "energetic"; an explicit `socialTalkativeness` overrides trait inference; unknown traits yield the
   neutral default.
-- [ ] **AC-7** (R2): Unit test: executing `talk_to` (A→B) increments A's `sentCount` toward B and B's
+- [x] **AC-7** (R2): Unit test: executing `talk_to` (A→B) increments A's `sentCount` toward B and B's
   `receivedCount` toward A exactly once per exchange, alongside the existing trust/familiarity delta.
-- [ ] **AC-8** (R3, R4b): Unit test: high urge toward a present agent renders the "you feel like
+- [x] **AC-8** (R3, R4b): Unit test: high urge toward a present agent renders the "you feel like
   talking to <name>" line in the dynamic section (never in stable lines); a decayed urge renders the
   "rarely answers" line instead.
-- [ ] **AC-9** (R4c): Unit test on the built tool payload: with urge above threshold toward a present
+- [x] **AC-9** (R4c): Unit test on the built tool payload: with urge above threshold toward a present
   agent, `talk_to` appears first in the rendered tool list; below threshold, canonical order is
   unchanged.
-- [ ] **AC-10** (R5): A regression test asserts that a pending-address marker alone does not enqueue a
+- [x] **AC-10** (R5): A regression test asserts that a pending-address marker alone does not enqueue a
   forced cycle — the target's next-cycle behavior is unchanged from spec 040 idle-tick semantics
   (suppression of wait-only ticks still applies).
 
