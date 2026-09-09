@@ -1,0 +1,7 @@
+{
+  "name": "feature-044-social-reflex-pending-address",
+  "description": "Social Reflex — Pending-Address Marker: being addressed marks the target (addressedBy on ConversationParticipant), renders a guaranteed address line via the spec 043 perception bridge, forces + prioritizes the target's next cycle as a soft System 1 trigger (no HardTriggerFlags changes), decays with the conversation lifecycle, and emits address/acknowledge events for reply-rate measurement. Depends on spec 043 landing first. Issue #160.",
+  "createdAt": "2026-09-09T18:40:00Z",
+  "specIssue": 160,
+  "specFile": "docs/specs/044-social-reflex-pending-address.md"
+}
