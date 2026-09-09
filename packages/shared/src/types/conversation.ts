@@ -295,4 +295,12 @@ export interface ConversationBridge {
   getOpenConversationBetween(agentA: string, agentB: string): ConversationObject | null;
   /** The affordance IDs (`join`/`contribute`/`leave`/`observe`) this agent may use. */
   getEligibleAffordances(conversationId: string, agentId: string): string[];
+  /**
+   * Conversations where this agent still owes a reply (spec 044, Decision 4):
+   * open/active conversations where the agent participates and ANOTHER
+   * current participant made the last turn. Pure engine-side scan — the data
+   * behind the pending-address perception line. Never a trigger; the LLM
+   * keeps the decision (R5).
+   */
+  getConversationsAwaitingAgentReply(agentId: string): ConversationObject[];
 }
