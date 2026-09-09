@@ -14,6 +14,10 @@
  * - AC-10 (R5): a pending-address marker alone does NOT enqueue a forced
  *   cycle — the scheduler's gate semantics (spec 035/040) are unchanged;
  *   no scheduler source changes.
+ * - Persistence constraint (QA): the new optional fields (relationship
+ *   sentCount/receivedCount, AgentInternalState.spawnTick) survive a
+ *   save/load round-trip, and a save from before 044 loads with them
+ *   undefined (neutral urge inputs).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type {
@@ -24,16 +28,21 @@ import type {
   ReactGateDecision,
   System1GatePort,
 } from '@evol-hive/shared';
+import type { AgentProfile, EngineConfig } from '@evol-hive/shared';
+import { InMemoryVectorStore } from '@evol-hive/memory';
+import { GameLoopImpl } from '../src/loop/index.js';
 import { AgentManagerImpl } from '../src/agents/state/index.js';
 import { SmartObjectRegistryImpl } from '../src/world/objects/index.js';
 import { SceneManagerImpl } from '../src/world/scenes/index.js';
+import { EnginePersistenceImpl } from '../src/persistence/engine-persistence.js';
+import { SelfModelManager } from '../src/agents/state/self-model-manager.js';
+import { SceneMutationServiceImpl, DormantAgentStore } from '../src/world/mutations/index.js';
 import {
   ConversationManagerImpl,
   defaultConversationManagerConfig,
 } from '../src/social/conversation-manager.js';
 import { SocialManager } from '../src/social/social-manager.js';
 import { PPERScheduler } from '../src/systems/pper-scheduler.js';
-import type { AgentProfile } from '@evol-hive/shared';
 
 const GARDEN = 'garden';
 const KITCHEN = 'kitchen';
@@ -296,5 +305,131 @@ describe('pending-address marker never forces a scheduler cycle (AC-10, R5)', ()
     scheduler.update(TICK);
     await vi.waitFor(() => expect(orchestrator.runCycleCalls).toHaveLength(2), { timeout: 200 });
     expect(orchestrator.runCycleCalls.sort()).toEqual(['agent-a', 'agent-b']);
+  });
+});
+
+// ── Persistence — new optional fields ride the spec-033-proven snapshot path ─
+
+function makePersistenceConfig(): EngineConfig {
+  return {
+    fps: 60,
+    spatialDebounceSeconds: 5,
+    maxConcurrentLLM: 8,
+    guardrailsEnabled: true,
+    guardrails: { affordanceMasking: true, contextualForcing: true, planValidation: true },
+  };
+}
+
+function buildPersistableWorld(): {
+  persistence: EnginePersistenceImpl;
+  agentManager: AgentManagerImpl;
+  socialManager: SocialManager;
+} {
+  const config = makePersistenceConfig();
+  const gameLoop = new GameLoopImpl(config);
+  const agentManager = new AgentManagerImpl();
+  const sceneManager = new SceneManagerImpl(
+    agentManager,
+    new Map([
+      [
+        GARDEN,
+        { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] },
+      ],
+      [
+        KITCHEN,
+        { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] },
+      ],
+    ]),
+  );
+  const registry = new SmartObjectRegistryImpl();
+  const dormantStore = new DormantAgentStore();
+  const mutationService = new SceneMutationServiceImpl({
+    registry,
+    sceneManager,
+    agentManager,
+    dormantStore,
+  });
+  const conversations = new ConversationManagerImpl({
+    agentManager,
+    registry,
+    sceneManager,
+    config: defaultConversationManagerConfig(),
+  });
+  const socialManager = new SocialManager(agentManager);
+  socialManager.setConversationManager(conversations);
+  const persistence = new EnginePersistenceImpl({
+    gameLoop,
+    agentManager,
+    smartObjectRegistry: registry,
+    sceneManager,
+    vectorStore: new InMemoryVectorStore(),
+    mutationService,
+    conversationManager: conversations,
+    selfModelManager: new SelfModelManager(),
+  });
+  for (const id of ['agent-a', 'agent-b']) {
+    agentManager.spawn(makeProfile(id, GARDEN));
+    agentManager.updateState(id, { location: GARDEN });
+  }
+  return { persistence, agentManager, socialManager };
+}
+
+describe('spec 044 fields survive save/load (persistence constraint)', () => {
+  it('relationship sentCount/receivedCount survive a save/load round-trip', async () => {
+    const world = buildPersistableWorld();
+    // Speaker-side counters, exactly as executeTalkTo applies them (AC-7).
+    world.socialManager.updateRelationship('agent-a', 'agent-b', { sentCount: 1 });
+    world.socialManager.updateRelationship('agent-a', 'agent-b', { sentCount: 1 });
+    world.socialManager.updateRelationship('agent-b', 'agent-a', { receivedCount: 1 });
+
+    const state = await world.persistence.save();
+    const fresh = buildPersistableWorld();
+    await fresh.persistence.load(JSON.parse(JSON.stringify(state)));
+
+    const aToB = fresh.agentManager.getState('agent-a')?.relationships?.['agent-b'];
+    const bToA = fresh.agentManager.getState('agent-b')?.relationships?.['agent-a'];
+    expect(aToB?.sentCount).toBe(2);
+    expect(bToA?.receivedCount).toBe(1);
+  });
+
+  it('spawnTick survives a save/load round-trip', async () => {
+    const world = buildPersistableWorld();
+    world.agentManager.spawn(makeProfile('agent-late', GARDEN), 777);
+
+    const state = await world.persistence.save();
+    const fresh = buildPersistableWorld();
+    await fresh.persistence.load(JSON.parse(JSON.stringify(state)));
+
+    expect(fresh.agentManager.getState('agent-late')?.spawnTick).toBe(777);
+  });
+
+  it('a pre-044 save (no new fields) loads with counters/spawnTick undefined', async () => {
+    const world = buildPersistableWorld();
+    // Populate the 044 fields first so the strip below is provably a no-op
+    // guard: if the paths were wrong the assertions would fail loudly.
+    world.agentManager.spawn(makeProfile('agent-late', GARDEN), 777);
+    world.socialManager.updateRelationship('agent-late', 'agent-b', { sentCount: 2 });
+
+    // Simulate a v1/v2-era snapshot: strip everything spec 044 added.
+    const state = JSON.parse(JSON.stringify(await world.persistence.save()));
+    const savedLate = state.agents.find(
+      (a: { profile?: { id?: string } }) => a.profile?.id === 'agent-late',
+    );
+    expect(savedLate?.state?.spawnTick).toBe(777);
+    expect(savedLate?.state?.relationships?.['agent-b']?.sentCount).toBe(2);
+    for (const agent of state.agents) {
+      delete agent.state.spawnTick;
+      for (const rel of Object.values(agent.state.relationships ?? {})) {
+        delete rel.sentCount;
+        delete rel.receivedCount;
+      }
+    }
+
+    const fresh = buildPersistableWorld();
+    await fresh.persistence.load(state);
+    const loaded = fresh.agentManager.getState('agent-late');
+    expect(loaded?.spawnTick).toBeUndefined();
+    expect(loaded?.relationships?.['agent-b']?.sentCount).toBeUndefined();
+    expect(loaded?.relationships?.['agent-b']?.receivedCount).toBeUndefined();
   });
 });
