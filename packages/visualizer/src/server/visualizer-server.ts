@@ -360,4 +360,3 @@ ${getClientBundle()}
 </html>`;
   }
 }
-

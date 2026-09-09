@@ -175,7 +175,14 @@ function makeFogState(): VisualizerState {
         description: '',
         connections: ['garden'],
         objects: [
-          { id: 'workbench-1', name: 'Bench', type: 'furniture', state: {}, cell: { x: 3, y: 3 }, affordances: [] },
+          {
+            id: 'workbench-1',
+            name: 'Bench',
+            type: 'furniture',
+            state: {},
+            cell: { x: 3, y: 3 },
+            affordances: [],
+          },
         ],
       },
     ],
@@ -280,9 +287,7 @@ describe('served renderer integration (spec 042, AC-4)', () => {
     // room 360×500; garden at (30, 50). Grid cell (11, 4) →
     //   x = 30 + (11.5 × 360) / 12 = 375
     //   y = 50 + (4.5 × 500) / 8 = 331.25
-    const arcsAt = ctx.calls
-      .filter((c) => c.method === 'arc')
-      .map((c) => c.args as number[]);
+    const arcsAt = ctx.calls.filter((c) => c.method === 'arc').map((c) => c.args as number[]);
     const agentCenter = arcsAt.filter(
       ([x, y]) => Math.abs(x - 375) < 0.01 && Math.abs(y - 331.25) < 0.01,
     );
@@ -304,9 +309,7 @@ describe('served renderer integration (spec 042, AC-4)', () => {
     expect(fogRects.length).toBe(92 + 96);
 
     // ── Fog hides out-of-fog objects (spec 039, R8) ────────────────────────
-    const texts = ctx.calls
-      .filter((c) => c.method === 'fillText')
-      .map((c) => String(c.args[0]));
+    const texts = ctx.calls.filter((c) => c.method === 'fillText').map((c) => String(c.args[0]));
     expect(texts).toContain('Planter'); // explored cell — visible
     expect(texts).not.toContain('Shed'); // fogged cell — hidden
   });

@@ -40,7 +40,6 @@ let buildCount = 0;
  */
 function packageRoot(): string {
   let dir = dirname(fileURLToPath(import.meta.url));
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (existsSync(resolve(dir, 'package.json'))) return dir;
     const parent = dirname(dir);

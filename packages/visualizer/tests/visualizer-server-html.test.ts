@@ -27,9 +27,7 @@ function makeMockAdapter(): MockAdapter {
     simulationTime: 0.05,
     isRunning: true,
     timeScale: 1,
-    rooms: [
-      { id: 'kitchen', name: 'Kitchen', description: '', connections: [], objects: [] },
-    ],
+    rooms: [{ id: 'kitchen', name: 'Kitchen', description: '', connections: [], objects: [] }],
     agents: [],
   };
   return {
@@ -136,9 +134,7 @@ describe('served HTML — no duplicated drawing logic (spec 042, AC-3)', () => {
       if (file.endsWith('renderer/canvas-renderer.ts')) continue; // the one source
       const content = readFileSync(new URL(file, srcRoot), 'utf8');
       expect(drawingCall.test(content), `${file} contains drawing calls`).toBe(false);
-      expect(content.includes('idx * 60'), `${file} contains the legacy slot formula`).toBe(
-        false,
-      );
+      expect(content.includes('idx * 60'), `${file} contains the legacy slot formula`).toBe(false);
     }
   });
 
