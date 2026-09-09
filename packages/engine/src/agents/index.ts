@@ -12,6 +12,12 @@ export interface AgentManager {
   /** Spawn a new agent from a profile. */
   spawn(
     profile: import('@evol-hive/shared').AgentProfile,
+    /**
+     * The engine tick at spawn (spec 044, Decision 6) — stored as
+     * `spawnTick` for the social urge model's scene-novelty factor. When
+     * omitted, `spawnTick` stays `undefined` (legacy/neutral behavior).
+     */
+    spawnTick?: number,
   ): import('@evol-hive/shared').AgentInternalState;
   /** Get an agent's current internal state. */
   getState(agentId: string): import('@evol-hive/shared').AgentInternalState | null;

@@ -136,6 +136,8 @@ export class SocialManager implements SocialActionBridge, ConversationBridge {
       trust: existing.trust,
       familiarity: existing.familiarity,
       lastInteraction: existing.lastInteraction,
+      ...(existing.sentCount !== undefined ? { sentCount: existing.sentCount } : {}),
+      ...(existing.receivedCount !== undefined ? { receivedCount: existing.receivedCount } : {}),
     };
 
     if (updates.trust !== undefined) {
@@ -146,6 +148,16 @@ export class SocialManager implements SocialActionBridge, ConversationBridge {
     }
     if (updates.lastInteraction !== undefined) {
       merged.lastInteraction = updates.lastInteraction;
+    }
+    // Spec 044 (R2/AC-7): reciprocity counters are ADDITIVE deltas on the
+    // same bridge method — the cognition executor passes {sentCount: 1} for
+    // the speaker and {receivedCount: 1} for the target, once per exchange,
+    // next to the trust/familiarity deltas (no new write path, Decision 3).
+    if (updates.sentCount !== undefined) {
+      merged.sentCount = Math.max(0, (existing.sentCount ?? 0) + updates.sentCount);
+    }
+    if (updates.receivedCount !== undefined) {
+      merged.receivedCount = Math.max(0, (existing.receivedCount ?? 0) + updates.receivedCount);
     }
 
     relationships[otherAgentId] = merged;
@@ -280,6 +292,11 @@ export class SocialManager implements SocialActionBridge, ConversationBridge {
 
   getEligibleAffordances(conversationId: string, agentId: string): string[] {
     return this.conversationManager?.getEligibleAffordances(conversationId, agentId) ?? [];
+  }
+
+  /** Conversations where the agent owes a reply (spec 044, Decision 4). */
+  getConversationsAwaitingAgentReply(agentId: string): ConversationObject[] {
+    return this.conversationManager?.getConversationsAwaitingAgentReply(agentId) ?? [];
   }
 }
 

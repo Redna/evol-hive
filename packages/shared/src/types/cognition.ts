@@ -18,7 +18,8 @@ import type {
   CompoundAction,
   ObjectDependency,
 } from './affordance.js';
-import type { ConversationSentiment } from './conversation.js';
+import type { ConversationObject, ConversationSentiment } from './conversation.js';
+import type { PendingAddressInfo, SocialUrgeAssessment } from './social-urge.js';
 import type { SelfModel, IdentityChangeDelta, IdentityChangeAudit } from './identity.js';
 import type { ModifySceneToolResult, AffordanceGuard } from './mutations.js';
 import type {
@@ -107,6 +108,20 @@ export interface PerceptionResult {
    * never as full perception of the unknown side.
    */
   unexploredAreas?: string[];
+  /**
+   * Conversations where the agent still owes a reply (spec 044, R4a):
+   * another participant made the last turn of an open/active conversation.
+   * Rendered as INFORMATION lines in the dynamic section — per-agent dynamic
+   * state, never stable lines (spec 021). `undefined` for legacy providers.
+   */
+  pendingAddresses?: PendingAddressInfo[];
+  /**
+   * Per-present-agent social urge assessments (spec 044, R4b/R4c), computed
+   * by the pure shared urge function. Rendered as dynamic hint lines and
+   * used for the `talk_to` ranking shift. `undefined` for legacy providers
+   * or when no agents are present.
+   */
+  socialUrges?: SocialUrgeAssessment[];
 }
 
 /** Active observation result (Section 6.2) — deep JSON state of a target object. */
@@ -578,6 +593,18 @@ export interface PerceptionDataProvider {
    * has seen but never crossed. Optional — when absent, no markers are rendered.
    */
   getUnexploredAreas?(agentId: string): string[];
+  /**
+   * Conversations where the agent still owes a reply (spec 044, R4a,
+   * Decision 4). Optional so existing implementations compile unchanged —
+   * when absent, no pending-address lines are rendered.
+   */
+  getConversationsAwaitingAgentReply?(agentId: string): ConversationObject[];
+  /**
+   * The current engine tick (spec 044, Decision 6) — scene-novelty input for
+   * the social urge computation. Optional — when absent, scene novelty is
+   * neutral (pair novelty from counters still applies).
+   */
+  getCurrentTick?(): number | undefined;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

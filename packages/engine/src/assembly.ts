@@ -283,6 +283,10 @@ export function createEngineCore(
   const gameLoop = new GameLoopImpl(config);
   clock.bind(gameLoop);
 
+  // Spec 044: the perception provider reads the engine tick for the social
+  // urge model's scene-novelty factor (lambda — the loop now exists).
+  bridges.perception.setTickSource(() => gameLoop.currentTick().tickNumber);
+
   // Persistence (spec 017, Req 17) — constructed when a VectorStore is provided.
   const persistence =
     vectorStore !== undefined
@@ -661,7 +665,7 @@ export function loadScene(core: EngineCore, scene: SceneDefinition): void {
   // Agents — spawn at their startRoomId when present, else the first room (spec 013, Req 2).
   const defaultStartRoom = scene.rooms[0]?.id ?? '';
   for (const profile of scene.agents) {
-    core.agentManager.spawn(profile);
+    core.agentManager.spawn(profile, 0);
     const startRoom = profile.startRoomId ?? defaultStartRoom;
     core.agentManager.updateState(profile.id, {
       location: startRoom,

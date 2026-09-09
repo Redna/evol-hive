@@ -241,11 +241,17 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         familiarity: delta.familiarity,
         trust: delta.trust,
         lastInteraction: this.currentTick,
+        // Spec 044 (R2/AC-7): the speaker's reciprocity counter toward the
+        // target — an additive delta on the same bridge call (Decision 3).
+        sentCount: 1,
       });
       this.socialBridge.updateRelationship(targetAgentId, agentId, {
         familiarity: delta.familiarity,
         trust: delta.trust,
         lastInteraction: this.currentTick,
+        // Spec 044 (R2/AC-7): the target's received counter — exactly once
+        // per exchange, next to the trust/familiarity delta.
+        receivedCount: 1,
       });
       if (this.stateDataProvider !== undefined) {
         this.stateDataProvider.applyDriveChanges(agentId, { social: 10 });

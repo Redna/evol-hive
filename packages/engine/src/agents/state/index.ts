@@ -22,7 +22,7 @@ export class AgentManagerImpl implements AgentManager {
   /** Stored agent profiles (spec 012, Req 13) — immutable after spawn. */
   private readonly profiles = new Map<string, AgentProfile>();
 
-  spawn(profile: AgentProfile): AgentInternalState {
+  spawn(profile: AgentProfile, spawnTick?: number): AgentInternalState {
     const state: AgentInternalState = {
       agentId: profile.id,
       drives: { ...DEFAULT_DRIVES, ...profile.initialDrives },
@@ -31,6 +31,7 @@ export class AgentManagerImpl implements AgentManager {
       isThinking: false,
       location: '',
       lastPerceptionTick: 0,
+      ...(spawnTick !== undefined ? { spawnTick } : {}),
     };
 
     // Seed structured relationships from profile.relationships (spec 018, Req 22).

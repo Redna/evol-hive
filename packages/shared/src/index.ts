@@ -17,6 +17,7 @@ export * from './types/performance.js';
 export * from './types/conversation.js';
 export * from './types/identity.js';
 export * from './types/system1.js';
+export * from './types/social-urge.js';
 
 // Schemas
 export * from './schemas/llm-schemas.js';

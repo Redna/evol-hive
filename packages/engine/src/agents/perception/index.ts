@@ -49,6 +49,8 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
   private conversationManager: ConversationManagerImpl | undefined;
   /** Guarded identity self-model store (spec 033) — prompt injection source. */
   private selfModelManager: SelfModelManager | undefined;
+  /** Tick source (spec 044) — scene-novelty input for the social urge model. */
+  private tickSource: (() => number | undefined) | undefined;
 
   constructor(
     agentManager: AgentManager,
@@ -290,6 +292,29 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
   /** The agent's evolved self-model, or `null` (persona fallback) — R11/AC-13. */
   getSelfModel(agentId: string): SelfModel | null {
     return this.selfModelManager?.getSelfModel(agentId) ?? null;
+  }
+
+  // ── Social urge perception (spec 044, R4a / Decision 4) ─────────────────
+
+  /**
+   * Conversations where the agent still owes a reply — the data behind the
+   * pending-address perception line. Delegates to the conversation manager
+   * via the SocialManager ConversationBridge.
+   */
+  getConversationsAwaitingAgentReply(
+    agentId: string,
+  ): import('@evol-hive/shared').ConversationObject[] {
+    return this.socialManager?.getConversationsAwaitingAgentReply(agentId) ?? [];
+  }
+
+  /** Wire the tick source (spec 044) — lazily captures the game loop. */
+  setTickSource(tickSource: () => number | undefined): void {
+    this.tickSource = tickSource;
+  }
+
+  /** The current engine tick, or `undefined` when no source is wired. */
+  getCurrentTick(): number | undefined {
+    return this.tickSource?.();
   }
 }
 

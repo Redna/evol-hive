@@ -467,7 +467,8 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
         break;
       }
       case 'spawn_agent': {
-        this.applySpawn(payload as import('@evol-hive/shared').SpawnAgentPayload);
+        // Spec 044: the event tick becomes the agent's spawnTick (Decision 6).
+        this.applySpawn(payload as import('@evol-hive/shared').SpawnAgentPayload, event.tick);
         break;
       }
       case 'despawn_agent': {
@@ -484,13 +485,13 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
   }
 
   /** Spawn from a fresh profile or from dormancy (Req 6 / Req 8). */
-  private applySpawn(payload: import('@evol-hive/shared').SpawnAgentPayload): void {
+  private applySpawn(payload: import('@evol-hive/shared').SpawnAgentPayload, tick: number): void {
     // Dormant restore path (Req 8): drives, goal, plan, location, and memory
     // bootstrap come from the DormantAgentStore instead of defaults.
     if (payload.dormantAgentId !== undefined) {
       const dormant = this.dormantStore.take(payload.dormantAgentId);
       if (dormant === null) return; // unreachable — validated at propose
-      const state = this.agentManager.spawn(dormant.profile);
+      const state = this.agentManager.spawn(dormant.profile, tick);
       // Overwrite the fresh-spawn defaults with the dormant state; never
       // restore a stale isThinking flag.
       this.agentManager.updateState(dormant.profile.id, {
@@ -525,7 +526,7 @@ export class SceneMutationServiceImpl implements SceneMutationPort {
 
     const profile = payload.profile;
     if (!profile) return; // unreachable — validated at propose
-    this.agentManager.spawn(profile);
+    this.agentManager.spawn(profile, tick);
     // Seed location: profile.startRoomId, default: the first valid room (Req 6).
     const startRoom = profile.startRoomId ?? this.sceneManager.getAllRooms()[0]?.id ?? '';
     this.agentManager.updateState(profile.id, {

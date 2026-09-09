@@ -59,6 +59,12 @@ export interface AgentInternalState {
    */
   relationships?: Record<string, Relationship>;
   /**
+   * The engine tick at which the agent spawned (spec 044, Decision 6). Set by
+   * `AgentManager` at spawn time. `undefined` for legacy saves — the scene
+   * novelty factor of the social urge model is then neutral 1.0.
+   */
+  spawnTick?: number;
+  /**
    * The agent's grid cell within the current room (spec 038, R1). `undefined`
    * for legacy saves / scenes without grid layout — the agent is then rendered
    * in its room slot as before.
@@ -99,6 +105,17 @@ export interface Relationship {
   familiarity: number;
   /** Simulation timestamp of the most recent social interaction. */
   lastInteraction: number;
+  /**
+   * Messages this agent has sent to the other agent (spec 044, R2 —
+   * reciprocity counter). Optional so pre-044 relationships load unchanged;
+   * the social urge model's reciprocity factor consumes it.
+   */
+  sentCount?: number;
+  /**
+   * Replies this agent has received from the other agent (spec 044, R2 —
+   * reciprocity counter). Optional so pre-044 relationships load unchanged.
+   */
+  receivedCount?: number;
 }
 
 /** Metadata describing an agent's identity and personality. */
@@ -124,6 +141,13 @@ export interface AgentProfile {
   // ── Scene placement (spec 013, Req 1) ──
   /** Optional room ID where the agent spawns. When absent, `loadScene` uses the first room. */
   startRoomId?: string;
+  /**
+   * Explicit social-urge persona seed (spec 044, R1), 0–1. When present it
+   * overrides trait/backstory inference in
+   * {@link deriveSocialTalkativenessSeed}. Optional for backward compat —
+   * the profile stays the immutable spawn seed (spec 044 Constraints).
+   */
+  socialTalkativeness?: number;
 }
 
 /** A formatted persona description string suitable for injection into LLM system prompts. */
