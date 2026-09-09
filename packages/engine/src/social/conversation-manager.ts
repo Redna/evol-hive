@@ -282,6 +282,28 @@ export class ConversationManagerImpl implements ConversationBridge {
     return ['observe'];
   }
 
+  /**
+   * Conversations where the agent still owes a reply (spec 044, Decision 4):
+   * open/active conversations where the agent participates and ANOTHER
+   * CURRENT participant made the last turn. Pure scan of the conversation
+   * map, deterministic order (insertion order) — no LLM, no triggers (R5).
+   */
+  getConversationsAwaitingAgentReply(agentId: string): ConversationObject[] {
+    const awaiting: ConversationObject[] = [];
+    for (const conversation of this.conversations.values()) {
+      if (conversation.status === 'closed') continue;
+      if (!conversation.participants.some((p) => p.agentId === agentId)) continue;
+      const last = conversation.turns[conversation.turns.length - 1];
+      if (last === undefined) continue;
+      if (last.agentId === agentId) continue;
+      // The addressee owes the reply to a CURRENT participant — if the
+      // addresser left the conversation, the marker no longer binds.
+      if (!conversation.participants.some((p) => p.agentId === last.agentId)) continue;
+      awaiting.push(conversation);
+    }
+    return awaiting;
+  }
+
   // ── Lifecycle (spec 033, R2) ──────────────────────────────────────────────
 
   /** Open a new conversation between two agents (A's turn is the first). */
