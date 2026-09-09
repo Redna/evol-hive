@@ -23,6 +23,8 @@ import {
   selfModelToPromptText,
   GUARDRAIL_FORCING_DIRECTIVE,
   affordancesToToolDefinitions,
+  SOCIAL_URGE_SURFACE_THRESHOLD,
+  SOCIAL_URGE_RECIPROCITY_DECAYED,
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
@@ -108,6 +110,36 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       }
     }
 
+    // Pending-address INFORMATION lines (spec 044, R4a): an agent who owes a
+    // reply sees who addressed them and the actual message. Per-agent
+    // dynamic state → dynamic section only (spec 021 KV-cache rules). Never
+    // a trigger; the LLM keeps the decision (R5).
+    if (perceptionResult.pendingAddresses !== undefined) {
+      for (const pending of perceptionResult.pendingAddresses) {
+        const name = resolvePresentName(passive.agentsPresent, pending.fromAgentId);
+        dynamicLines.push(`INFORMATION: ${name} addressed you, awaiting response: "${pending.content}"`);
+      }
+    }
+
+    // Social urge hint lines (spec 044, R4b): a high urge toward a present
+    // agent renders the approach hint; a decayed urge (learned non-responsiveness)
+    // renders the let-them-be hint instead. Dynamic section only (spec 021).
+    let urgeSurfaced = false;
+    if (perceptionResult.socialUrges !== undefined) {
+      for (const urge of perceptionResult.socialUrges) {
+        const name = resolvePresentName(passive.agentsPresent, urge.targetAgentId);
+        if (urge.result.urge >= SOCIAL_URGE_SURFACE_THRESHOLD) {
+          urgeSurfaced = true;
+          dynamicLines.push(`You feel like talking to ${name}.`);
+        } else if (
+          urge.sentCount > 0 &&
+          urge.result.factors.reciprocityFactor < SOCIAL_URGE_RECIPROCITY_DECAYED
+        ) {
+          dynamicLines.push(`${name} rarely answers — maybe let them be.`);
+        }
+      }
+    }
+
     // Social drive prompt hint (spec 018, Req 39).
     if (hasAgentsPresent && primaryDriveLabel.toLowerCase().includes('social')) {
       dynamicLines.push(
@@ -179,6 +211,14 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       tools = [talkToTool, observeAgentTool, helpTool, ignoreTool, ...tools];
     }
 
+    // talk_to ranking shift (spec 044, R4c / Decision 5): when the urge
+    // toward a present agent is at or above the surface threshold, talk_to
+    // moves to the front of the tool list (stable order otherwise) — the
+    // cheapest deterministic attention shift without new ranking machinery.
+    if (urgeSurfaced) {
+      tools = moveTalkToFirst(tools);
+    }
+
     // Phase-aware tool pruning (spec 022, Req 11, AC-10): the formulate_plan
     // tool is only relevant when the agent has no plan. Exclude it
     // defensively when the agent already has an active plan to reduce tool
@@ -243,6 +283,30 @@ function formatDrives(drives: Record<string, number>): string {
   return Object.entries(drives)
     .map(([name, value]) => `${name}=${Math.round(value)}`)
     .join(', ');
+}
+
+/**
+ * Resolve a present agent's display name by ID; falls back to the raw ID
+ * when the addressee is not co-present (the line still renders — the reply
+ * is owed regardless of the addresser's current room).
+ */
+function resolvePresentName(
+  agentsPresent: import('@evol-hive/shared').AgentSummary[] | undefined,
+  agentId: string,
+): string {
+  return agentsPresent?.find((a) => a.agentId === agentId)?.name ?? agentId;
+}
+
+/**
+ * Move the `talk_to` tool definition to the front of the list, preserving
+ * the relative order of everything else (stable — spec 044 Decision 5). A
+ * no-op when talk_to is absent (no agents present).
+ */
+function moveTalkToFirst(tools: LLMContextPayload['tools']): LLMContextPayload['tools'] {
+  const index = tools.findIndex((t) => t.function.name === 'talk_to');
+  if (index <= 0) return tools;
+  const talkTo = tools[index]!;
+  return [talkTo, ...tools.slice(0, index), ...tools.slice(index + 1)];
 }
 
 /**

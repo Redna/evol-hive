@@ -13,6 +13,13 @@ import type {
   PerceptionDataProvider,
   CompoundAction,
   ObjectDependency,
+  PendingAddressInfo,
+  SocialUrgeAssessment,
+} from '@evol-hive/shared';
+import {
+  computeSocialUrge,
+  DEFAULT_SOCIAL_TALKATIVENESS,
+  deriveSocialTalkativenessSeed,
 } from '@evol-hive/shared';
 import type { AffordanceClassifier } from '../classifier/index.js';
 import type { GuardrailEngine } from '../index.js';
@@ -185,6 +192,77 @@ export class PerceptionServiceImpl {
       unexploredAreas = undefined;
     }
 
+    // Social urge model (spec 044, R3/R4). Both surfaces are optional
+    // provider extensions — legacy providers keep `undefined` (no lines
+    // rendered, no ranking shift) and never break the perceive path.
+    let pendingAddresses: PendingAddressInfo[] | undefined;
+    let socialUrges: SocialUrgeAssessment[] | undefined;
+    try {
+      const provider = this.options.provider;
+      // R4a: conversations where the agent owes a reply (Decision 4 query).
+      if (typeof provider.getConversationsAwaitingAgentReply === 'function') {
+        const awaiting = provider.getConversationsAwaitingAgentReply(agentId);
+        if (awaiting.length > 0) {
+          pendingAddresses = awaiting.map((conversation) => {
+            const last = conversation.turns[conversation.turns.length - 1];
+            return {
+              conversationId: conversation.id,
+              fromAgentId: last!.agentId,
+              content: last!.content,
+            };
+          });
+        }
+      }
+
+      // R4b/R4c: per-present-agent urge assessment via the pure shared
+      // computation (no LLM, no async — same standard as the spec-034 matcher).
+      const agentsPresent = passive.agentsPresent;
+      if (agentsPresent !== undefined && agentsPresent.length > 0) {
+        const personaSeed =
+          persona !== undefined && persona !== null
+            ? deriveSocialTalkativenessSeed(persona)
+            : DEFAULT_SOCIAL_TALKATIVENESS;
+        const socialDrive = passive.drives['social'];
+        const spawnTick =
+          typeof provider.getAgentState === 'function'
+            ? provider.getAgentState(agentId)?.spawnTick
+            : undefined;
+        const currentTick =
+          typeof provider.getCurrentTick === 'function' ? provider.getCurrentTick() : undefined;
+        socialUrges = agentsPresent.map((agent) => {
+          const rel = relationships?.[agent.agentId];
+          const result = computeSocialUrge({
+            personaSeed,
+            socialDrive,
+            ...(spawnTick !== undefined ? { spawnTick } : {}),
+            ...(currentTick !== undefined ? { currentTick } : {}),
+            ...(rel !== undefined
+              ? {
+                  relationship: {
+                    ...(rel.sentCount !== undefined ? { sentCount: rel.sentCount } : {}),
+                    ...(rel.receivedCount !== undefined
+                      ? { receivedCount: rel.receivedCount }
+                      : {}),
+                    trust: rel.trust,
+                    familiarity: rel.familiarity,
+                  },
+                }
+              : {}),
+          });
+          return {
+            targetAgentId: agent.agentId,
+            result,
+            sentCount: rel?.sentCount ?? 0,
+            receivedCount: rel?.receivedCount ?? 0,
+          };
+        });
+      }
+    } catch {
+      // The urge path must never break perception (influence, not force).
+      pendingAddresses = undefined;
+      socialUrges = undefined;
+    }
+
     return {
       passive,
       prunedAffordances,
@@ -197,6 +275,8 @@ export class PerceptionServiceImpl {
       ...(objectDependencies ? { objectDependencies } : {}),
       ...(knownAreas !== undefined ? { knownAreas } : {}),
       ...(unexploredAreas !== undefined ? { unexploredAreas } : {}),
+      ...(pendingAddresses !== undefined ? { pendingAddresses } : {}),
+      ...(socialUrges !== undefined ? { socialUrges } : {}),
     };
   }
 }
