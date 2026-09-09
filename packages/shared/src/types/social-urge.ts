@@ -293,9 +293,7 @@ export function noveltyFactor(
  *
  * No counters at all → neutral 1.0 (pre-spec-044 relationships stay neutral).
  */
-export function computeReciprocityFactor(
-  relationship?: SocialUrgeRelationshipSnapshot,
-): number {
+export function computeReciprocityFactor(relationship?: SocialUrgeRelationshipSnapshot): number {
   if (relationship === undefined) return 1;
   const sent = relationship.sentCount;
   const received = relationship.receivedCount;

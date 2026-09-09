@@ -16,11 +16,21 @@
  *   no scheduler source changes.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GameTick, HardTriggerFlags, PPEROrchestratorPort, PPERSchedulerConfig, ReactGateDecision, System1GatePort } from '@evol-hive/shared';
+import type {
+  GameTick,
+  HardTriggerFlags,
+  PPEROrchestratorPort,
+  PPERSchedulerConfig,
+  ReactGateDecision,
+  System1GatePort,
+} from '@evol-hive/shared';
 import { AgentManagerImpl } from '../src/agents/state/index.js';
 import { SmartObjectRegistryImpl } from '../src/world/objects/index.js';
 import { SceneManagerImpl } from '../src/world/scenes/index.js';
-import { ConversationManagerImpl, defaultConversationManagerConfig } from '../src/social/conversation-manager.js';
+import {
+  ConversationManagerImpl,
+  defaultConversationManagerConfig,
+} from '../src/social/conversation-manager.js';
 import { SocialManager } from '../src/social/social-manager.js';
 import { PPERScheduler } from '../src/systems/pper-scheduler.js';
 import type { AgentProfile } from '@evol-hive/shared';
@@ -51,8 +61,14 @@ function buildWorld(): {
   const sceneManager = new SceneManagerImpl(
     agentManager,
     new Map([
-      [GARDEN, { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] }],
-      [KITCHEN, { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] }],
+      [
+        GARDEN,
+        { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] },
+      ],
+      [
+        KITCHEN,
+        { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] },
+      ],
     ]),
   );
   const conversationManager = new ConversationManagerImpl({
@@ -166,7 +182,9 @@ describe('reciprocity counters via SocialManager.updateRelationship (AC-7 engine
 
   it('a receivedCount delta of 1 increments the target-side counter', () => {
     world.socialManager.updateRelationship('agent-b', 'agent-a', { receivedCount: 1 });
-    expect(world.agentManager.getState('agent-b')?.relationships?.['agent-a']?.receivedCount).toBe(1);
+    expect(world.agentManager.getState('agent-b')?.relationships?.['agent-a']?.receivedCount).toBe(
+      1,
+    );
   });
 
   it('counters accumulate additively across exchanges (exactly-once per call)', () => {
@@ -219,7 +237,11 @@ class FakeOrchestrator implements PPEROrchestratorPort {
 
 class ScriptedGate implements System1GatePort {
   decisions: ReactGateDecision[] = [];
-  decide(_agentId: string, _tickNumber: number, _hardTriggers: HardTriggerFlags): ReactGateDecision {
+  decide(
+    _agentId: string,
+    _tickNumber: number,
+    _hardTriggers: HardTriggerFlags,
+  ): ReactGateDecision {
     const next = this.decisions.shift();
     if (next) return next;
     return { pReact: 0, react: false, hardTrigger: false, headVersion: 1, failOpen: false };

@@ -117,7 +117,9 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     if (perceptionResult.pendingAddresses !== undefined) {
       for (const pending of perceptionResult.pendingAddresses) {
         const name = resolvePresentName(passive.agentsPresent, pending.fromAgentId);
-        dynamicLines.push(`INFORMATION: ${name} addressed you, awaiting response: "${pending.content}"`);
+        dynamicLines.push(
+          `INFORMATION: ${name} addressed you, awaiting response: "${pending.content}"`,
+        );
       }
     }
 

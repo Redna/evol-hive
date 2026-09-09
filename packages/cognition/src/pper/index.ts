@@ -233,7 +233,7 @@ export class PerceptionServiceImpl {
           const rel = relationships?.[agent.agentId];
           const result = computeSocialUrge({
             personaSeed,
-            socialDrive,
+            ...(socialDrive !== undefined ? { socialDrive } : {}),
             ...(spawnTick !== undefined ? { spawnTick } : {}),
             ...(currentTick !== undefined ? { currentTick } : {}),
             ...(rel !== undefined

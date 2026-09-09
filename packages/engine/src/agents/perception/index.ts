@@ -301,7 +301,9 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
    * pending-address perception line. Delegates to the conversation manager
    * via the SocialManager ConversationBridge.
    */
-  getConversationsAwaitingAgentReply(agentId: string): import('@evol-hive/shared').ConversationObject[] {
+  getConversationsAwaitingAgentReply(
+    agentId: string,
+  ): import('@evol-hive/shared').ConversationObject[] {
     return this.socialManager?.getConversationsAwaitingAgentReply(agentId) ?? [];
   }
 

@@ -116,10 +116,14 @@ describe('deriveSocialTalkativenessSeed (AC-6, R1)', () => {
 describe('computeSocialUrge — reciprocity factor (AC-2, R2/R3)', () => {
   it('after 3 unreplied greetings the urge is below its value after 1', () => {
     const afterOne = computeSocialUrge(
-      makeUrgeInput({ relationship: { sentCount: 1, receivedCount: 0, trust: 50, familiarity: 0 } }),
+      makeUrgeInput({
+        relationship: { sentCount: 1, receivedCount: 0, trust: 50, familiarity: 0 },
+      }),
     );
     const afterThree = computeSocialUrge(
-      makeUrgeInput({ relationship: { sentCount: 3, receivedCount: 0, trust: 50, familiarity: 0 } }),
+      makeUrgeInput({
+        relationship: { sentCount: 3, receivedCount: 0, trust: 50, familiarity: 0 },
+      }),
     );
     expect(afterThree.factors.reciprocityFactor).toBeLessThan(afterOne.factors.reciprocityFactor);
     expect(afterThree.urge).toBeLessThan(afterOne.urge);
@@ -127,10 +131,14 @@ describe('computeSocialUrge — reciprocity factor (AC-2, R2/R3)', () => {
 
   it('a reply (receivedCount ≥ 1) restores/raises the factor above the unreplied state', () => {
     const unreplied = computeSocialUrge(
-      makeUrgeInput({ relationship: { sentCount: 1, receivedCount: 0, trust: 50, familiarity: 0 } }),
+      makeUrgeInput({
+        relationship: { sentCount: 1, receivedCount: 0, trust: 50, familiarity: 0 },
+      }),
     );
     const replied = computeSocialUrge(
-      makeUrgeInput({ relationship: { sentCount: 1, receivedCount: 1, trust: 50, familiarity: 0 } }),
+      makeUrgeInput({
+        relationship: { sentCount: 1, receivedCount: 1, trust: 50, familiarity: 0 },
+      }),
     );
     expect(replied.factors.reciprocityFactor).toBeGreaterThan(unreplied.factors.reciprocityFactor);
   });
@@ -149,17 +157,23 @@ describe('computeSocialUrge — reciprocity factor (AC-2, R2/R3)', () => {
 
   it('mutual exchanges (sent == received) do not decay the factor', () => {
     const balanced = computeSocialUrge(
-      makeUrgeInput({ relationship: { sentCount: 4, receivedCount: 4, trust: 50, familiarity: 0 } }),
+      makeUrgeInput({
+        relationship: { sentCount: 4, receivedCount: 4, trust: 50, familiarity: 0 },
+      }),
     );
     expect(balanced.factors.reciprocityFactor).toBeGreaterThanOrEqual(1);
   });
 
   it('trust modulates the factor — higher trust never lowers it for the same counters', () => {
     const lowTrust = computeSocialUrge(
-      makeUrgeInput({ relationship: { sentCount: 3, receivedCount: 0, trust: 20, familiarity: 0 } }),
+      makeUrgeInput({
+        relationship: { sentCount: 3, receivedCount: 0, trust: 20, familiarity: 0 },
+      }),
     );
     const highTrust = computeSocialUrge(
-      makeUrgeInput({ relationship: { sentCount: 3, receivedCount: 0, trust: 80, familiarity: 0 } }),
+      makeUrgeInput({
+        relationship: { sentCount: 3, receivedCount: 0, trust: 80, familiarity: 0 },
+      }),
     );
     expect(highTrust.factors.reciprocityFactor).toBeGreaterThanOrEqual(
       lowTrust.factors.reciprocityFactor,
@@ -217,10 +231,14 @@ describe('computeSocialUrge — factor model (R3)', () => {
 
   it('few interactions with a target raise pair novelty (dual-source novelty)', () => {
     const stranger = computeSocialUrge(
-      makeUrgeInput({ relationship: { sentCount: 0, receivedCount: 0, trust: 50, familiarity: 0 } }),
+      makeUrgeInput({
+        relationship: { sentCount: 0, receivedCount: 0, trust: 50, familiarity: 0 },
+      }),
     );
     const familiar = computeSocialUrge(
-      makeUrgeInput({ relationship: { sentCount: 9, receivedCount: 9, trust: 50, familiarity: 0 } }),
+      makeUrgeInput({
+        relationship: { sentCount: 9, receivedCount: 9, trust: 50, familiarity: 0 },
+      }),
     );
     expect(stranger.factors.noveltyFactor).toBeGreaterThan(familiar.factors.noveltyFactor);
   });

@@ -26,10 +26,7 @@ import type {
   PerceptionResult,
   Relationship,
 } from '@evol-hive/shared';
-import {
-  SOCIAL_URGE_SURFACE_THRESHOLD,
-  computeSocialUrge,
-} from '@evol-hive/shared';
+import { SOCIAL_URGE_SURFACE_THRESHOLD, computeSocialUrge } from '@evol-hive/shared';
 import { CognitiveToolExecutorImpl } from '../src/tools/cognitive-tool-executor.js';
 import type { CognitiveToolExecutorOptions } from '../src/tools/cognitive-tool-executor.js';
 import { PerceptionBuilderImpl } from '../src/pper/perception-builder.js';
@@ -295,7 +292,13 @@ describe('talk_to ranking shift (AC-9, R4c)', () => {
       relationship: { trust: 50, familiarity: 0 },
     });
     const affordances: Affordance[] = [
-      { id: 'sit_outside', label: 'Sit', engineEffect: 'sit_outside', preconditions: [], effects: {} },
+      {
+        id: 'sit_outside',
+        label: 'Sit',
+        engineEffect: 'sit_outside',
+        preconditions: [],
+        effects: {},
+      },
     ];
     const payload = builder.build(
       makePerceptionResult({ socialUrges: [high], maskedAffordances: affordances }),
@@ -316,7 +319,13 @@ describe('PerceptionServiceImpl — urge population (R3/R4 wiring)', () => {
   function makeProvider(overrides: Partial<PerceptionDataProvider> = {}): PerceptionDataProvider {
     const relationships: Record<string, Relationship> = {
       'agent-iris': { trust: 50, familiarity: 0, lastInteraction: 0 },
-      'agent-maren': { trust: 50, familiarity: 0, lastInteraction: 0, sentCount: 3, receivedCount: 0 },
+      'agent-maren': {
+        trust: 50,
+        familiarity: 0,
+        lastInteraction: 0,
+        sentCount: 3,
+        receivedCount: 0,
+      },
     };
     return {
       getAgentLocation: () => 'garden',
