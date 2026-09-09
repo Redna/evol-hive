@@ -1,0 +1,7 @@
+{
+  "name": "feature-042-visualizer-single-renderer",
+  "description": "Single-source-of-truth visualizer rendering — buildHtmlPage() stops serving the hand-copied legacy RENDERER_JS and instead bundles the real canvas-renderer.ts (grid positions, fog shading, anchor-cell objects) into the served page via esbuild. Issue #155.",
+  "createdAt": "2026-09-09T00:00:00Z",
+  "specIssue": 155,
+  "specFile": "docs/specs/042-visualizer-single-renderer.md"
+}
