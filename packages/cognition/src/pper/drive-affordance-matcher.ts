@@ -60,6 +60,11 @@ export interface DriveAffordanceRef {
   readonly affordanceId: string;
   readonly objectId?: string;
   readonly objectName?: string;
+  /**
+   * The chain note from `Affordance.progresses.note` (spec 048, Req 3) —
+   * set only on chain-progress refs, never on direct-restoration refs.
+   */
+  readonly note?: string;
 }
 
 /** The drives→affordances match for a single urgent drive. */
@@ -70,6 +75,17 @@ export interface DriveAffordanceMatch {
   readonly driveValue: number;
   /** Restoring affordances in perception order, capped at {@link MAX_DRIVE_HINT_AFFORDANCES}. */
   readonly affordances: readonly DriveAffordanceRef[];
+  /**
+   * Chain-progress affordances in perception order (spec 048, Req 3):
+   * affordances whose declared `progresses.drive` matches this urgent drive —
+   * the next steps toward eventual restoration, surfaced when the direct
+   * restorer is gated invisible. Optional for backward compatibility with
+   * pre-048 fixtures (absent = no chain refs); capped at
+   * {@link MAX_DRIVE_HINT_AFFORDANCES} like the direct refs. Chain hints
+   * render as a secondary line AFTER the direct-restoration hints and never
+   * suppress them; `social` is never matched (not in {@link HINTABLE_DRIVES}).
+   */
+  readonly chainProgress?: readonly DriveAffordanceRef[];
 }
 
 /**
@@ -101,22 +117,52 @@ export function matchDrivesToAffordances(
     if (value === undefined || !(value < DRIVE_URGENCY_THRESHOLD)) continue;
 
     const restoring: DriveAffordanceRef[] = [];
+    // Chain-progress refs (spec 048, Req 3): affordances that declare the
+    // next step toward this drive's eventual restoration. Collected from the
+    // declared `progresses` field only — scene data, never a hardcoded table.
+    const chain: DriveAffordanceRef[] = [];
     for (const affordance of affordances) {
-      if (restoring.length >= MAX_DRIVE_HINT_AFFORDANCES) break;
+      const attributed = affordance as AttributedAffordance;
       // Some legacy Affordance fixtures omit `effects` entirely — treat as no
       // declared impact (spec 034 Req 3: only declared `effects` bind).
       const delta = affordance.effects?.[drive];
-      if (delta === undefined || !(delta > 0)) continue;
-      const attributed = affordance as AttributedAffordance;
-      restoring.push({
-        affordanceId: affordance.id,
-        ...(attributed.objectId !== undefined ? { objectId: attributed.objectId } : {}),
-        ...(attributed.objectName !== undefined ? { objectName: attributed.objectName } : {}),
-      });
+      if (delta !== undefined && delta > 0 && restoring.length < MAX_DRIVE_HINT_AFFORDANCES) {
+        restoring.push({
+          affordanceId: affordance.id,
+          ...(attributed.objectId !== undefined ? { objectId: attributed.objectId } : {}),
+          ...(attributed.objectName !== undefined ? { objectName: attributed.objectName } : {}),
+        });
+        continue;
+      }
+      // A chain declaration binds only when it names THIS urgent drive; an
+      // affordance may restore one drive and progress another, so chain
+      // collection is checked independently of the direct-effects branch.
+      const progresses = affordance.progresses;
+      if (
+        progresses !== undefined &&
+        progresses.drive === drive &&
+        chain.length < MAX_DRIVE_HINT_AFFORDANCES
+      ) {
+        chain.push({
+          affordanceId: affordance.id,
+          ...(attributed.objectId !== undefined ? { objectId: attributed.objectId } : {}),
+          ...(attributed.objectName !== undefined ? { objectName: attributed.objectName } : {}),
+          ...(progresses.note !== undefined ? { note: progresses.note } : {}),
+        });
+      }
     }
 
-    if (restoring.length > 0) {
-      matches.push({ drive, driveValue: value, affordances: restoring });
+    // A match is emitted when the drive has direct restoration OR visible
+    // chain progress (spec 048 Req 3 — the hunger-chain stall fix: the mid-
+    // chain step must surface exactly when the direct restorer is gated
+    // invisible). Drives with neither are omitted (Req 4, no phantom remedies).
+    if (restoring.length > 0 || chain.length > 0) {
+      matches.push({
+        drive,
+        driveValue: value,
+        affordances: restoring,
+        ...(chain.length > 0 ? { chainProgress: chain } : {}),
+      });
     }
   }
   return matches;
@@ -159,4 +205,44 @@ export function formatPlanDriveHint(match: DriveAffordanceMatch): string {
       ? `${first.affordanceId} at the ${first.objectName}`
       : first.affordanceId;
   return `Your ${match.drive} is low (${Math.round(match.driveValue)}). The affordances in your tool list restore it directly (e.g., ${example}). Call such an affordance NOW — do not formulate a search plan.`;
+}
+
+/**
+ * Render the suggestion-form chain-progress hint line for one urgent drive
+ * (Perception builder, spec 048, Req 3) — the secondary line emitted AFTER the
+ * direct-restoration hints:
+ *
+ *   `Your hunger is low (23). planter-1 "plant_seeds" progresses the hunger chain (harvest → eat restores hunger), planter-1 "harvest" progresses the hunger chain (eat restores hunger once a vegetable is ripe).`
+ *
+ * Attribution follows the spec-034 pattern: attributed affordances render as
+ * `objectId "affordanceId"`, unattributed ones degrade to `"affordanceId"` —
+ * the spec's example form (`plant_seeds progresses the hunger chain (…)`).
+ * Affordances without a `note` render without the parenthetical.
+ */
+export function formatPerceptionChainHint(match: DriveAffordanceMatch): string {
+  const mentions = (match.chainProgress ?? [])
+    .map((a) => renderChainRef(a, match.drive))
+    .join(', ');
+  return `Your ${match.drive} is low (${Math.round(match.driveValue)}). ${mentions}.`;
+}
+
+/**
+ * Render the imperative-form chain-progress hint line for one urgent drive
+ * (Plan builder, spec 048, Req 3 — the spec-034/spec-024 imperative pattern),
+ * emitted AFTER the direct-restoration imperative. The example is the first
+ * chain ref in perception order — the NEXT step of the chain:
+ *
+ *   `Your hunger is low (23). planter-1 "plant_seeds" progresses the hunger chain (harvest → eat restores hunger) — call the next chain step NOW; the restoration lands at the chain's end.`
+ */
+export function formatPlanChainHint(match: DriveAffordanceMatch): string {
+  const first = (match.chainProgress ?? [])[0]!;
+  return `Your ${match.drive} is low (${Math.round(match.driveValue)}). ${renderChainRef(first, match.drive)} — call the next chain step NOW; the restoration lands at the chain's end.`;
+}
+
+/** One `… progresses the <drive> chain` clause (shared by both renderers). */
+function renderChainRef(ref: DriveAffordanceRef, drive: string): string {
+  const id =
+    ref.objectId !== undefined ? `${ref.objectId} "${ref.affordanceId}"` : `"${ref.affordanceId}"`;
+  const note = ref.note !== undefined ? ` (${ref.note})` : '';
+  return `${id} progresses the ${drive} chain${note}`;
 }

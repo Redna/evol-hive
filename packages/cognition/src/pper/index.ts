@@ -287,6 +287,8 @@ export {
   matchDrivesToAffordances,
   formatPerceptionDriveHint,
   formatPlanDriveHint,
+  formatPerceptionChainHint,
+  formatPlanChainHint,
   DRIVE_URGENCY_THRESHOLD,
   MAX_DRIVE_HINT_AFFORDANCES,
   HINTABLE_DRIVES,

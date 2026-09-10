@@ -83,6 +83,24 @@ export interface CrossObjectStateChange {
   statePatch: Record<string, unknown>;
 }
 
+/**
+ * Declares that executing an affordance progresses a multi-step chain whose
+ * final step restores a drive (spec 048, Req 3). Scene-declared data — the
+ * cognition matcher surfaces the next chain step as a secondary hint while
+ * `drive` is urgent, even when the chain's restoring affordance is gated
+ * invisible (e.g. `eat` behind `vegetables >= 1`). There is NO hardcoded
+ * drive→chain table in cognition (spec 034, Req 3's data-driven rule).
+ */
+export interface AffordanceChainProgress {
+  /** The drive the chain ultimately restores (e.g. "hunger"). */
+  drive: string;
+  /**
+   * Optional human/LLM-readable description of the remaining chain, rendered
+   * in the chain-progress hint (e.g. "harvest → eat restores hunger").
+   */
+  note?: string;
+}
+
 /** A discrete action that a smart object supports. */
 export interface Affordance {
   /** Semantic name passed to the LLM (e.g., "brew_coffee"). */
@@ -107,6 +125,16 @@ export interface Affordance {
    * actions are cognitive tools, not physical affordances.
    */
   targetAgentId?: string;
+  /**
+   * Optional declaration that this affordance progresses the chain that
+   * ultimately restores `drive` (spec 048, Req 3). Additive and optional —
+   * legacy fixtures omitting it behave exactly as before (no chain hints).
+   * A mid-chain step (e.g. `harvest`) may declare it too: the matcher surfaces
+   * every visible step toward the eventual restoration. Never declared for
+   * `social` — spec 018/024/047 own that drive and chain hints never apply
+   * to it.
+   */
+  progresses?: AffordanceChainProgress;
 }
 
 /** A smart object in the game world that exposes affordances. */

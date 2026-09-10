@@ -24,7 +24,11 @@ import {
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PlanBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
-import { matchDrivesToAffordances, formatPlanDriveHint } from './drive-affordance-matcher.js';
+import {
+  matchDrivesToAffordances,
+  formatPlanDriveHint,
+  formatPlanChainHint,
+} from './drive-affordance-matcher.js';
 
 /** Options for contextual forcing in the Plan builder (spec 016, Req 9). */
 export interface PlanBuilderGuardrailOptions {
@@ -147,7 +151,15 @@ export class PlanBuilderImpl implements PlanBuilder {
     // excluded from matching (spec 018/024 own it). Dynamic section only
     // (KV-cache safety, spec 021); no matching affordance → no hint (Req 4).
     for (const match of matchDrivesToAffordances(passive.drives, prunedAffordances)) {
-      dynamicLines.push(formatPlanDriveHint(match));
+      if (match.affordances.length > 0) {
+        dynamicLines.push(formatPlanDriveHint(match));
+      }
+      // Chain-progress hints (spec 048, Req 3): imperative secondary line
+      // AFTER the direct-restoration imperative for the same drive; emitted
+      // for chain-only matches too (the gated-restorer case).
+      if ((match.chainProgress ?? []).length > 0) {
+        dynamicLines.push(formatPlanChainHint(match));
+      }
     }
 
     // Known-map summary + unknown markers (spec 039, R1/R4). DYNAMIC section

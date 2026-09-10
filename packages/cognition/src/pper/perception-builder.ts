@@ -35,7 +35,11 @@ import {
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
-import { matchDrivesToAffordances, formatPerceptionDriveHint } from './drive-affordance-matcher.js';
+import {
+  matchDrivesToAffordances,
+  formatPerceptionDriveHint,
+  formatPerceptionChainHint,
+} from './drive-affordance-matcher.js';
 
 const GENERIC_SYSTEM_PROMPT = [
   'You are an autonomous NPC in a deterministic simulation.',
@@ -207,7 +211,16 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     const sourceAffordancesForHints =
       perceptionResult.maskedAffordances ?? perceptionResult.prunedAffordances;
     for (const match of matchDrivesToAffordances(passive.drives, sourceAffordancesForHints)) {
-      dynamicLines.push(formatPerceptionDriveHint(match));
+      if (match.affordances.length > 0) {
+        dynamicLines.push(formatPerceptionDriveHint(match));
+      }
+      // Chain-progress hints (spec 048, Req 3): secondary line AFTER the
+      // direct-restoration hint for the same drive. Emitted even when the
+      // direct list is empty (chain-only match — the hunger-chain stall fix:
+      // the mid-chain step surfaces while the gated restorer is invisible).
+      if ((match.chainProgress ?? []).length > 0) {
+        dynamicLines.push(formatPerceptionChainHint(match));
+      }
     }
 
     const contextLines = [...stableLines, '---', ...dynamicLines];
