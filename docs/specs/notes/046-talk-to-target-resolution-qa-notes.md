@@ -78,3 +78,28 @@ and pinned every AC with tests. Result: implementation PR **#175** (branch
    a real LLM once #175 merges; record evidence on #173/#167.
 4. QA report posted on PR #174 (coverage map + verdict); implementation PR
    #175 carries the code, tests, and INDEX row.
+
+## Verification pass — PR #175 re-run (2026-09-10, QA)
+
+Independent re-verification of PR #175 from a clean checkout of its head
+(`440f797`, confirmed == `headRefOid`):
+
+- **Gates re-run**: `pnpm build` ✅ (required first in a fresh env —
+  `@evol-hive/shared` entry unresolvable until built; workspace artifact,
+  not a PR defect) · `pnpm test` **2,364 passed / 0 failed** (170 files —
+  matches the claim exactly) · `pnpm typecheck` ✅ · `pnpm lint` ✅.
+- **38 spec-046 tests confirmed passing**: engine 15 / cognition 13 /
+  examples 10, matching the PR body.
+- **AC-1..AC-10 all mapped** — full coverage table posted as a QA report on
+  PR #175 (comment 5617243449). AC-10's "033/044/045 unmodified" verified via
+  `git diff --stat 8c66f2a..HEAD`: no spec-033/044/045 test files touched;
+  only the AC-6-mandated pin updates (`spec-018-social` ×2, `coffee-shop` ×1).
+- **R5 spot-check**: sentiment enum-validation + `'neutral'` default confirmed
+  at `openai-client.ts:663–669`.
+- **Issue #173**: `Status: In Review/QA` label already present (re-added
+  idempotently); stale `Status: Ready for Dev` remains on the closed issue —
+  still pending the next label sweep.
+- **YAAM**: daemon exposes `search` only (`note_write`/`rpc.methods` →
+  `Method not found`, consistent with the 045/040 findings); `search` works —
+  this file is indexed and discoverable. Findings recorded here per the
+  notes-directory convention.
