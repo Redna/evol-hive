@@ -57,7 +57,7 @@ exchange differs, +1/+0).
 
 **Live-run AC-1/2/3/4 remain open — two cognition-layer gaps discovered by
 this validation, both outside this spec's `examples/assembly.ts` package
-boundary** (filed as issue — see #165 comment):
+boundary** — filed as [#173](https://github.com/Redna/evol-hive/issues/173)):
 
 1. **Name-keyed targeting**: the perception renders `Agents present: Bob (…)`
    (names only, `perception-builder.ts:82`) while the tool schema asks for

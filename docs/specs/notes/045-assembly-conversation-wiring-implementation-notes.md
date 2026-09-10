@@ -136,7 +136,7 @@ Resumed with PR #172 open and all commits pushed. This session:
    only negative-dominant exchanges differ, +1/+0 — so live delta variation
    additionally requires a negative-tagged turn.)
 5. Both gaps are in `packages/cognition`/`packages/shared` — outside spec
-   045's package boundary (`examples/assembly.ts` only). Filed as a follow-up
+   045's package boundary (`examples/assembly.ts` only). Filed as issue #173
    issue; referenced from #165 and #167. AC-1..4 left unchecked in the spec
    with a Live-validation evidence section added; AC-5/AC-6 checked (AC-6 with
    one noted deviation: the spec-018 INDEX regex uncap, commit 4c391de — the
@@ -154,3 +154,14 @@ Resumed with PR #172 open and all commits pushed. This session:
   Threads persist across LLM cycles; what kills them is the R7 co-location
   sweep removing phantom participants. Worth knowing before anyone "fixes"
   the tick mismatch.
+### Final state (session 2, recorded as the YAAM breadcrumb)
+
+- PR #172 OPEN, branch `feature/165-assembly-conversation-wiring` pushed
+  through `0c2cd2c`+ (live-evidence docs). CI: GitGuardian pass; no other
+  checks configured on this repo.
+- Follow-up issue for the two live-run blockers: **#173** (name-keyed
+  targeting + dropped sentiment arg; cross-referenced #165/#167).
+- Spec 045 row: 🔍 In Review in INDEX.md. AC-5/AC-6 checked; AC-1..4 open on
+  #173.
+- YAAM daemon (TCP 43535, JSON-RPC `search` with `{"text": …}`) indexes the
+  spec + this note — verified reachable this session.
