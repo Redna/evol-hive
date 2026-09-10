@@ -137,11 +137,16 @@ describe('urge-gated urgency directive (R1, AC-3, AC-8)', () => {
 
   it('all present urges decayed → the 024 directive is replaced by the no-outlet line', () => {
     const payload = builder.build(
-      makePerceptionResult({ socialUrges: [decayedIris(), assessment('agent-maren', {
-        personaSeed: 0.5,
-        socialDrive: 80,
-        relationship: { sentCount: 3, receivedCount: 0, trust: 50, familiarity: 0 },
-      })] }),
+      makePerceptionResult({
+        socialUrges: [
+          decayedIris(),
+          assessment('agent-maren', {
+            personaSeed: 0.5,
+            socialDrive: 80,
+            relationship: { sentCount: 3, receivedCount: 0, trust: 50, familiarity: 0 },
+          }),
+        ],
+      }),
     );
     const { stable, dynamic } = splitSections(payload.perceptionContext);
     expect(payload.perceptionContext).not.toContain(DIRECTIVE);
@@ -157,7 +162,9 @@ describe('urge-gated urgency directive (R1, AC-3, AC-8)', () => {
   });
 
   it('a healthy urge toward one present target (mixed room) keeps the directive', () => {
-    const payload = builder.build(makePerceptionResult({ socialUrges: [decayedIris(), healthyMaren()] }));
+    const payload = builder.build(
+      makePerceptionResult({ socialUrges: [decayedIris(), healthyMaren()] }),
+    );
     expect(payload.perceptionContext).toContain(DIRECTIVE);
     expect(payload.perceptionContext).not.toContain(NO_OUTLET);
   });
@@ -185,7 +192,9 @@ describe('urge-gated social-drive hint (R2, AC-3, AC-8)', () => {
       socialDrive: 80,
       relationship: { sentCount: 3, receivedCount: 0, trust: 50, familiarity: 0 },
     });
-    const payload = builder.build(makePerceptionResult({ socialUrges: [decayedIris(), decayedMaren] }));
+    const payload = builder.build(
+      makePerceptionResult({ socialUrges: [decayedIris(), decayedMaren] }),
+    );
     const { dynamic } = splitSections(payload.perceptionContext);
     expect(dynamic).not.toContain(SOCIAL_HINT);
     expect(dynamic).toContain(NO_OUTLET);
@@ -200,7 +209,9 @@ describe('urge-gated social-drive hint (R2, AC-3, AC-8)', () => {
   });
 
   it('mixed room → the 018 social hint renders (gate is all-decayed)', () => {
-    const payload = builder.build(makePerceptionResult({ socialUrges: [decayedIris(), healthyMaren()] }));
+    const payload = builder.build(
+      makePerceptionResult({ socialUrges: [decayedIris(), healthyMaren()] }),
+    );
     expect(payload.perceptionContext).toContain(SOCIAL_HINT);
     expect(payload.perceptionContext).not.toContain(NO_OUTLET);
   });
@@ -325,7 +336,13 @@ describe('asymmetric social reward (R5, AC-4)', () => {
         },
       ],
       turns: [
-        { agentId: 'agent-a', role: 'initiator', content: 'hello', sentiment: 'neutral', tick: 100 },
+        {
+          agentId: 'agent-a',
+          role: 'initiator',
+          content: 'hello',
+          sentiment: 'neutral',
+          tick: 100,
+        },
       ],
       openedAt: 100,
       lastActivity: 100,

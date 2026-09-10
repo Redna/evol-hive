@@ -24,7 +24,11 @@ import type {
   Room,
   SceneDefinition,
 } from '@evol-hive/shared';
-import { defaultPPERSchedulerConfig, defaultMemoryDecayConfig, SOCIAL_EXCHANGE_BONUS } from '@evol-hive/shared';
+import {
+  defaultPPERSchedulerConfig,
+  defaultMemoryDecayConfig,
+  SOCIAL_EXCHANGE_BONUS,
+} from '@evol-hive/shared';
 import type {
   MemoryStore,
   MemoryDecayService,

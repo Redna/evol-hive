@@ -102,8 +102,7 @@ export class ConversationManagerImpl implements ConversationBridge {
   private readonly config: ConversationConfig;
   private readonly sink: ConversationConsolidationSink | undefined;
   private readonly onExchangeRestore:
-    | ((agentId: string, conversationId: string, amount: number) => void)
-    | undefined;
+    ((agentId: string, conversationId: string, amount: number) => void) | undefined;
   /**
    * Granted deferred restores, keyed `${conversationId}:${senderId}` (spec 047,
    * R6 idempotency — at most one top-up per (sender, conversation) pair).

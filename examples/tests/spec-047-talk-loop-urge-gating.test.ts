@@ -31,7 +31,6 @@ import { SOCIAL_MONOLOGUE_REWARD, SOCIAL_EXCHANGE_BONUS } from '@evol-hive/share
 import { createEngineCore } from '@evol-hive/engine';
 import type { EngineCore } from '@evol-hive/engine';
 import {
-  CognitiveToolExecutorImpl,
   PerceptionBuilderImpl,
   PerceptionServiceImpl,
 } from '@evol-hive/cognition';
