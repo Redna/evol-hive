@@ -288,7 +288,15 @@ fi  # end SPEC_PR_OVERRIDE skip (SPEC_PR resolved in both branches)
 if [ -n "$SPEC_PR_OVERRIDE" ]; then
   SPEC_PR_NUM="$SPEC_PR_OVERRIDE"
 else
-SPEC_PR=$(find_pr "spec/" "$ISSUE_NUMBER" || true)
+# The Architect posts "Spec drafted" and may end its session moments before
+# the PR creation API call lands — a single find_pr raced exactly that way
+# (run 34523014371, aborted 2 min after the draft comment). Poll for 5 min.
+SPEC_PR=""
+for _ in $(seq 1 10); do
+  SPEC_PR=$(find_pr "spec/" "$ISSUE_NUMBER" || true)
+  [ -n "$SPEC_PR" ] && break
+  sleep 30
+done
 if [ -z "$SPEC_PR" ]; then
   # Protocol fallback: the spec for this issue may ALREADY be merged (the
   # Architect correctly skips duplicates when the design is on main). Look
