@@ -43,6 +43,7 @@ import {
   PlanBuilderImpl,
   ReflectBuilderImpl,
 } from './index.js';
+import { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
 import type { BatchPlanService } from './batch-plan-service.js';
 
 /** Dependencies for {@link PPEROrchestratorImpl}. */
@@ -86,6 +87,8 @@ export class PPEROrchestratorImpl {
   private readonly planService: PlanServiceImpl;
   private readonly executeService: ExecuteServiceImpl;
   private readonly reflectService: ReflectServiceImpl;
+  /** The perceive data provider (spec 049 R1) — tick source for the diagnostic. */
+  private readonly perceptionProvider: PerceptionDataProvider;
   private readonly errorConfig: PPERErrorConfig;
   /** Optional batch plan service (spec 022, Req 9). `undefined` when not wired in. */
   private readonly batchPlanService: BatchPlanService | undefined;
@@ -104,6 +107,7 @@ export class PPEROrchestratorImpl {
 
   constructor(options: PPEROrchestratorOptions) {
     const guardrail = options.guardrail;
+    this.perceptionProvider = options.perceptionProvider;
     this.perceptionService = new PerceptionServiceImpl({
       provider: options.perceptionProvider,
       classifier: options.classifier,
@@ -169,6 +173,21 @@ export class PPEROrchestratorImpl {
       perception = await this.perceptionService.perceive(agentId);
     } finally {
       // Perceive has no success flag; clear phase to idle if we abort below.
+    }
+
+    // Spec 049 (R1 — issue #167): the per-cycle urge/pending diagnostic at
+    // the perceive→plan seam. Exactly one `[social-urge]` line whenever the
+    // perception includes at least one present agent — even when nothing
+    // renders — so "hint never rendered" is distinguishable from "hint
+    // rendered and the LLM chose silence". Zero LLM calls, one line, and
+    // wrapped so a logging failure can never break the cycle (R1/AC-2).
+    try {
+      const provider = this.perceptionProvider;
+      const currentTick =
+        typeof provider.getCurrentTick === 'function' ? provider.getCurrentTick() : undefined;
+      logSocialUrgeDiagnostic(agentId, perception, currentTick);
+    } catch {
+      // Diagnostics must never break a cycle (spec 049 Constraints).
     }
 
     // (2) Plan — LLM formulates a plan.

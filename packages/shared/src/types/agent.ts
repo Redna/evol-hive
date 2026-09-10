@@ -65,6 +65,23 @@ export interface AgentInternalState {
    */
   spawnTick?: number;
   /**
+   * The engine tick at which the agent's most recent PPER cycle started
+   * (spec 049, R4 — issue #167). Written by `PPEScheduler.startCycle` (pure
+   * tick arithmetic, no wall clock). `undefined` for legacy saves and agents
+   * that have never cycled — the own-cycle reply window then falls back to
+   * {@link DEFAULT_CYCLE_INTERVAL_TICKS} (fail-open).
+   */
+  lastCycleTick?: number;
+  /**
+   * Exponential moving average of the agent's own-cycle interval in ticks
+   * (spec 049, R4): the first observed interval seeds the EMA directly;
+   * subsequent intervals update it with the fixed
+   * {@link CYCLE_INTERVAL_EMA_ALPHA} coefficient. `undefined` until the
+   * agent's second observed cycle — the reply window then treats the cadence
+   * as {@link DEFAULT_CYCLE_INTERVAL_TICKS}.
+   */
+  meanCycleIntervalTicks?: number;
+  /**
    * The agent's grid cell within the current room (spec 038, R1). `undefined`
    * for legacy saves / scenes without grid layout — the agent is then rendered
    * in its room slot as before.

@@ -122,8 +122,12 @@ class NoopOrchestrator implements PPEROrchestratorPort {
   }
 }
 
-/** The apprentice profile, spawned mid-run (spec 030, Req 6). */
-function apprenticeProfile(): AgentProfile {
+/** The apprentice profile, spawned mid-run (spec 030, Req 6).
+ *
+ * Exported for the spec 049 seed-audit test (issue #167): the AC-3 seed pins
+ * run against the SHIPPED persona texts, and Tomas is the sim's apprentice.
+ */
+export function apprenticeProfile(): AgentProfile {
   return {
     id: 'apprentice-1',
     name: 'Tomas Lind',

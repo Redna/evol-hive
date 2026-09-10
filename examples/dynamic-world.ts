@@ -278,6 +278,15 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
         'Make the garden fully self-sufficient',
         'Teach someone else to grow food from seed to table',
       ],
+      // Spec 049 (R2 — issue #167): explicit persona seed. Maren's traits
+      // ('patient', 'methodical') and her backstory hit NO keyword lists in
+      // `deriveSocialTalkativenessSeed` — inference returns the neutral 0.5,
+      // contradicting both her characterization ("measures success in
+      // harvests rather than words") and the expected Tomas > Iris > Maren
+      // reply-rate ordering. Chosen below Iris's inferred 0.25 (spec 049
+      // Decision 5: explicit seeds only where inference is wrong or
+      // ambiguous — Tomas and Iris stay on inference).
+      socialTalkativeness: 0.15,
       // Mid-level starting drives (spec 032 AC-5 validation design): urgency
       // exists from tick 1 — decay 0.1/s reaches the hint threshold (<40)
       // within ~60s instead of ~600s, so the drive→affordance loop is

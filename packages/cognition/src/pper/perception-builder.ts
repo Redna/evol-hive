@@ -32,6 +32,7 @@ import {
   SOCIAL_URGE_SURFACE_THRESHOLD,
   SOCIAL_URGE_RECIPROCITY_DECAYED,
   SOCIAL_TALK_CAP,
+  isPendingAddressFresh,
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
@@ -129,8 +130,32 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     // reply sees who addressed them and the actual message. Per-agent
     // dynamic state → dynamic section only (spec 021 KV-cache rules). Never
     // a trigger; the LLM keeps the decision (R5).
+    //
+    // Spec 049 (R3 — issue #167) fresh-address salience: a pending address
+    // whose addressing turn is younger than SOCIAL_PENDING_FRESH_TICKS is
+    // promoted to the FIRST dynamic line with a `FRESH:` prefix — the line
+    // otherwise competes with farming drives in a long context. Still
+    // information, never a trigger (spec 044 R5); the promotion is a pure
+    // reordering INSIDE the dynamic section (spec 021 discipline untouched).
+    // Entries without tick data (legacy providers) or past the freshness
+    // window render today's line in today's position.
     if (perceptionResult.pendingAddresses !== undefined) {
+      const freshLines: string[] = [];
+      const positionedEntries: typeof perceptionResult.pendingAddresses = [];
       for (const pending of perceptionResult.pendingAddresses) {
+        if (isPendingAddressFresh(pending)) {
+          const freshName = resolvePresentName(passive.agentsPresent, pending.fromAgentId);
+          freshLines.push(
+            `FRESH: INFORMATION: ${freshName} addressed you, awaiting response: "${pending.content}"`,
+          );
+        } else {
+          positionedEntries.push(pending);
+        }
+      }
+      // Fresh lines render first, ahead of the drive lines (dynamic-section
+      // reordering only — nothing above the `---` separator changes).
+      if (freshLines.length > 0) dynamicLines.unshift(...freshLines);
+      for (const pending of positionedEntries) {
         const name = resolvePresentName(passive.agentsPresent, pending.fromAgentId);
         dynamicLines.push(
           `INFORMATION: ${name} addressed you, awaiting response: "${pending.content}"`,
@@ -373,6 +398,30 @@ export function isSocialUrgeDecayed(assessment: SocialUrgeAssessment): boolean {
  */
 export function isSocialTalkCapped(assessment: SocialUrgeAssessment): boolean {
   return assessment.sentCount - assessment.receivedCount >= SOCIAL_TALK_CAP;
+}
+
+/**
+ * The rendered-line classification of one urge assessment (spec 049, R1 —
+ * issue #167): exactly what the perception-builder rendered for that target,
+ * as one of `surfaced` (the approach hint), `decayed-hint` (the
+ * let-them-be hint — including when a capped target still renders it),
+ * `capped` (urge at/above the surface threshold but excluded by the spec 047
+ * SOCIAL_TALK_CAP — nothing rendered), or `none` (nothing rendered, no
+ * pending diagnosis). Pure mirror of the builder's hint branch order —
+ * consumed by the orchestrator's `[social-urge]` diagnostic so run logs
+ * carry the same classification the LLM context actually showed.
+ */
+export function classifySocialUrgeLine(
+  assessment: SocialUrgeAssessment,
+): 'surfaced' | 'decayed-hint' | 'capped' | 'none' {
+  if (assessment.result.urge >= SOCIAL_URGE_SURFACE_THRESHOLD && !isSocialTalkCapped(assessment)) {
+    return 'surfaced';
+  }
+  if (isSocialUrgeDecayed(assessment)) return 'decayed-hint';
+  if (assessment.result.urge >= SOCIAL_URGE_SURFACE_THRESHOLD && isSocialTalkCapped(assessment)) {
+    return 'capped';
+  }
+  return 'none';
 }
 
 /**
