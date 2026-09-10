@@ -165,3 +165,41 @@ Resumed with PR #172 open and all commits pushed. This session:
   #173.
 - YAAM daemon (TCP 43535, JSON-RPC `search` with `{"text": …}`) indexes the
   spec + this note — verified reachable this session.
+
+---
+
+## Session 3 (2026-09-10, resumed) — full re-verification green; PR body refreshed
+
+Nothing structural remained: branch up to date with origin, working tree
+ clean, PR #172 OPEN/MERGEABLE (GitGuardian SUCCESS — the only CI configured
+on this repo), INDEX row 045 already 🔍 In Review, YAAM final-state breadcrumb
+from session 2 intact.
+
+Re-verified from a cold checkout this session (all fresh runs):
+- `pnpm build` ✅ → `pnpm typecheck` ✅ → `pnpm lint` ✅ → `pnpm format:check` ✅
+  (examples resolve built `dist/`, so build-first order matters).
+- `pnpm test`: **2,323 passed / 0 failed / 1 skipped** (shared 342, visualizer
+  48, memory 101, cognition 883, engine 783, examples 151, cli 15) — matches
+  the AC-5 evidence recorded in the spec.
+- Implementation diff re-inspected: 12 added lines in `examples/assembly.ts`
+  (R1 `conversationBridge: core.conversationManager` on the executor + R2
+  `social.setConversationManager(core.conversationManager)`), exactly per spec
+  R1–R4; spec-018 regex uncap is the only other code change (documented AC-6
+  deviation).
+
+Actions taken this session:
+- **PR #172 body refreshed** — the old body predated the live-validation
+  session; it now includes the live-validation summary (3 conversations,
+  Carol→Bob sentCount=2), the AC status (AC-5/6 ✅, AC-1..4 open on #173 with
+  the two named cognition gaps), and the #173 reference. Title unchanged.
+- No code changes → no new commit needed beyond this notes commit; spec and
+  INDEX untouched (statuses were already correct).
+
+### Handoff
+
+Work is fully done pending review/merge of PR #172. The only open thread is
+**#173** (name-keyed targeting + dropped sentiment arg) — that is where
+AC-1..4 live-run evidence will land, per the spec's Live-validation section.
+Next session on this feature should check PR #172 review state / merge, then
+flip the INDEX row 045 to ✅ Done (and verify the spec checkbox states once
+#173 lands).
