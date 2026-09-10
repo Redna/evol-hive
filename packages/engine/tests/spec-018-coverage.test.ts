@@ -116,9 +116,13 @@ describe('Spec 018 — INDEX.md update', () => {
   it('INDEX.md updates spec count summary to at least 19', () => {
     const content = readFile(INDEX_PATH);
     expect(content).toContain('Total specs:');
-    // "At least 19" — the workspace keeps growing (spec 035 made it 30), so
-    // accept any 2-digit or 3-digit count ≥ 19.
-    expect(content).toMatch(/Total specs:\s+(1[9]|2[0-9]|3[0-9])/);
+    // "At least 19" — the workspace keeps growing (spec 035 made it 30, the
+    // 2026-09 recount made it 61), so parse the count and assert numerically.
+    // The old bounded pattern (1[9]|2[0-9]|3[0-9]) silently capped at 39 and
+    // broke on any honest recount past it.
+    const match = content.match(/Total specs:\s+(\d+)/);
+    expect(match).not.toBeNull();
+    expect(Number(match![1])).toBeGreaterThanOrEqual(19);
   });
 });
 
