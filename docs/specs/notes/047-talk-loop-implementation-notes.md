@@ -88,3 +88,29 @@ holds). PR [#178](https://github.com/Redna/evol-hive/pull/178) OPEN, GitGuardian
 (`REVIEW_REQUIRED`) — no agent action can or should clear it. INDEX.md row 047 already
 `🔍 In Review` with PR #178; PR title/body reference this spec + issue #176. No code changes
 were needed — feature remains complete and green. Next actor unchanged: review + merge #178.
+
+## QA verification record — PR #178 coverage audit (issue #176)
+
+Independent test-coverage verification of PR #178 against the spec's 8 ACs. **Verdict: PASS —
+coverage complete; no missing tests; no new tests required.**
+
+- **Gates re-run from a clean tree @ `35f7ab6`**: `pnpm -r run build` ✓ → `pnpm test` ✓ 7/7
+  packages (shared 347; cognition 913 passed/1 skipped/26 todo; engine 807 passed/141 todo;
+  examples 169 passed/3 todo; cli 15; visualizer + memory files green) → `pnpm typecheck` ✓,
+  `pnpm lint` ✓, `pnpm format:check` ✓.
+- **AC matrix (all green)**: AC-1 → examples obedient-LLM spam bound (≤ 10 talk events/pair,
+  asserts >0); AC-2 → shared constants sum + engine 40→42→50 + examples E2E + updated spec-032
+  AC-4; AC-3/AC-8 → cognition R1/R2 prompt suites + examples AC-8 snapshot with KV-cache
+  stable-prefix assertions; AC-4 → cognition +2 precision incl. the "cognition never grants the
+  +8" negative; AC-5 → cognition cap math/per-target exclusion; AC-6 → engine idempotency
+  (1..N, rejoin, multi-sender, silent-participant, self-reply negatives) + examples AC-2b;
+  AC-7 → full suite + targeted spec-044 (17/17), spec-046 (13/13), spec-018 (41/41).
+- **36 new spec-047 tests** across 4 suites. Constraints pinned too: influence-not-force,
+  thread-scoped grants, no second reciprocity computation, KV-cache dynamic-only lines.
+- **Environment note**: the 4 shared test files importing the `@evol-hive/shared` package entry
+  require a prior `pnpm -r run build` (vite package-entry resolution) — bootstrap detail, not a
+  defect.
+- **QA report posted on PR #178** (comment 5622706980); label `Status: In Review/QA` added to
+  issue #176 (keeping `Status: Ready for Dev`, matching issues #160/#173 convention).
+- **YAAM**: daemon confirmed search-only from this session (JSON-RPC TCP :44835; no write
+  methods) — this file is the indexed record. Next actor unchanged: human review + merge #178.
