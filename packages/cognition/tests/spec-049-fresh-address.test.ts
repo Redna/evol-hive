@@ -63,8 +63,7 @@ function splitSections(context: string): { stable: string[]; dynamic: string[] }
   return { stable: lines.slice(0, sep), dynamic: lines.slice(sep + 1) };
 }
 
-const FRESH_LINE =
-  'FRESH: INFORMATION: Alice addressed you, awaiting response: "Hello there!"';
+const FRESH_LINE = 'FRESH: INFORMATION: Alice addressed you, awaiting response: "Hello there!"';
 const STALE_LINE = 'INFORMATION: Alice addressed you, awaiting response: "Hello there!"';
 
 // ── AC-4 — fresh vs stale rendering ──────────────────────────────────────────
@@ -74,7 +73,9 @@ describe('spec 049 R3 — fresh-address salience (AC-4)', () => {
 
   it('a fresh pending address renders the FRESH line as the FIRST dynamic line', () => {
     const fresh = makePending(SOCIAL_PENDING_FRESH_TICKS - 1, 5000);
-    const { dynamic } = splitSections(builder.build(makePerceptionResult([fresh])).perceptionContext);
+    const { dynamic } = splitSections(
+      builder.build(makePerceptionResult([fresh])).perceptionContext,
+    );
 
     expect(dynamic[0]).toBe(FRESH_LINE);
     // The other dynamic lines follow unchanged behind the promotion.

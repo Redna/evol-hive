@@ -19,7 +19,10 @@ import type { AgentProfile } from '@evol-hive/shared';
 import { DYNAMIC_WORLD_SCENE } from '../dynamic-world.ts';
 import { apprenticeProfile } from '../dynamic-world-sim.ts';
 
-const NOTES_PATH = resolve(__dirname, '../../docs/specs/notes/049-dialogue-completion-design-notes.md');
+const NOTES_PATH = resolve(
+  __dirname,
+  '../../docs/specs/notes/049-dialogue-completion-design-notes.md',
+);
 
 function shippedProfileByName(name: string): AgentProfile {
   const agent = DYNAMIC_WORLD_SCENE.agents.find((a) => a.name === name);
@@ -59,7 +62,8 @@ describe('spec 049 R2 — seed-inference audit (AC-3)', () => {
     // With the explicit field removed, traits ('patient', 'methodical') and
     // the backstory hit NO keyword lists → the neutral 0.5. This proves the
     // shipped seed is explicit, not inferred.
-    const withoutExplicit: AgentProfile = { ...maren, socialTalkativeness: undefined };
+    const withoutExplicit: AgentProfile = { ...maren };
+    delete withoutExplicit.socialTalkativeness;
     expect(deriveSocialTalkativenessSeed(withoutExplicit)).toBe(DEFAULT_SOCIAL_TALKATIVENESS);
     expect(deriveSocialTalkativenessSeed(withoutExplicit)).toBe(0.5);
   });

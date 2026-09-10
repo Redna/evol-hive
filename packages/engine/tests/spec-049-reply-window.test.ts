@@ -59,8 +59,14 @@ function buildWorld(config?: { idleTimeoutTicks: number }): {
   const sceneManager = new SceneManagerImpl(
     agentManager,
     new Map([
-      [GARDEN, { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] }],
-      [KITCHEN, { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] }],
+      [
+        GARDEN,
+        { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] },
+      ],
+      [
+        KITCHEN,
+        { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] },
+      ],
     ]),
   );
   const stored: InteractionRecord[] = [];
@@ -165,7 +171,9 @@ describe('spec 049 R4 — legacy fail-open window (AC-7)', () => {
       registry: new SmartObjectRegistryImpl(),
       sceneManager: new SceneManagerImpl(
         world.agentManager,
-        new Map([[GARDEN, { id: GARDEN, name: GARDEN, description: '', connections: [], objectIds: [] }]]),
+        new Map([
+          [GARDEN, { id: GARDEN, name: GARDEN, description: '', connections: [], objectIds: [] }],
+        ]),
       ),
       config: { idleTimeoutTicks: 120, turnWindow: 8 },
     });
