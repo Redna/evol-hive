@@ -136,12 +136,22 @@ for r in json.load(sys.stdin)['workflow_runs']:
 
 # Find the latest open PR from a branch prefix
 find_pr() {
+  # Match by ISSUE REFERENCE, not branch prefix: the Architect names spec
+  # branches inconsistently (spec/NNN-..., feature/NNN-...), which aborted
+  # the pipeline three times in one session (#170 item 1). A PR belongs to
+  # this issue when its title or body references "#N". Branch prefix kept
+  # as a last-resort fallback for legacy callers.
   local branch_prefix=$1
-  api "https://api.github.com/repos/$REPO/pulls?state=open&per_page=10" 2>/dev/null | python3 -c "
+  local issue_number=$2
+  api "https://api.github.com/repos/$REPO/pulls?state=open&per_page=20" 2>/dev/null | python3 -c "
 import sys, json
+issue = '$issue_number'
+prefix = '$branch_prefix'
 for pr in json.load(sys.stdin):
-    if pr['head']['ref'].startswith('$branch_prefix'):
-        print(f'{pr[\"number\"]}|{pr[\"head\"][\"ref\"]}')
+    ref = '#' + issue
+    linked = (ref in (pr.get('title') or '')) or (ref in (pr.get('body') or ''))
+    if linked or pr['head']['ref'].startswith(prefix):
+        print(f'{pr["number"]}|{pr["head"]["ref"]}')
         break
 " 2>/dev/null
 }
@@ -278,7 +288,7 @@ fi  # end SPEC_PR_OVERRIDE skip (SPEC_PR resolved in both branches)
 if [ -n "$SPEC_PR_OVERRIDE" ]; then
   SPEC_PR_NUM="$SPEC_PR_OVERRIDE"
 else
-SPEC_PR=$(find_pr "spec/" || true)
+SPEC_PR=$(find_pr "spec/" "$ISSUE_NUMBER" || true)
 if [ -z "$SPEC_PR" ]; then
   # Protocol fallback: the spec for this issue may ALREADY be merged (the
   # Architect correctly skips duplicates when the design is on main). Look
