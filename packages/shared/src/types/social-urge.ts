@@ -46,6 +46,37 @@ export const SOCIAL_URGE_SURFACE_THRESHOLD = 0.45;
 export const SOCIAL_URGE_RECIPROCITY_DECAYED = 0.7;
 
 /**
+ * Consecutive-unanswered `talk_to` cap per target (spec 047, R4 — issue #176):
+ * when an agent's `sentCount − receivedCount` toward a specific target reaches
+ * this cap, `talk_to` toward THAT target is no longer urgency-promoted nor
+ * recommended by the social-urgency hint (per-target; a fresh target with a
+ * healthy urge is still rankable). Reuses the same `sentCount`/`receivedCount`
+ * counters the urge model's reciprocity factor consumes — no second
+ * reciprocity computation. Influence, not force: `talk_to` is never removed
+ * or hard-blocked; only the urgency ranking and hint recommendations yield.
+ */
+export const SOCIAL_TALK_CAP = 3;
+
+/**
+ * Own-social granted on the `talk_to` send itself (spec 047, R5 — issue #176):
+ * a potential monologue is worth only this token amount. The drive
+ * semantically means *need for exchange*, not need for emission — the full
+ * restore completes only when the target contributes to the same thread
+ * (see {@link SOCIAL_EXCHANGE_BONUS}).
+ */
+export const SOCIAL_MONOLOGUE_REWARD = 2;
+
+/**
+ * Deferred own-social top-up (spec 047, R5/R6 — issue #176): when a target
+ * contributes ≥ 1 turn to the same conversation thread, the earlier
+ * monologue-only sender is topped up by this remainder (once per (sender,
+ * conversation) pair, engine-side via the exchange-completion hook), for a
+ * total of {@link SOCIAL_MONOLOGUE_REWARD} + 8 = 10 — matching the historical
+ * full exchange restore.
+ */
+export const SOCIAL_EXCHANGE_BONUS = 8;
+
+/**
  * Neutral persona seed: no talkativeness signals anywhere (R1, AC-6). Also
  * the neutral urge factor baseline — all factors equal 1 when their inputs
  * carry no signal.

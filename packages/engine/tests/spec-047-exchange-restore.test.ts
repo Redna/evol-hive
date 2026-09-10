@@ -100,6 +100,7 @@ beforeEach(() => {
 
 describe('exchange-completion detection (R6)', () => {
   it('a target contributing to a thread where the sender previously monologued grants the +8 to the sender', () => {
+    world.agentManager.getState('agent-a')!.drives.social = 40; // below the clamp
     const before = world.agentManager.getState('agent-a')!.drives.social;
     const conversationId = monologue(world, 'agent-a', 'agent-b', 10);
     expect(world.restores).toEqual([]); // the monologue itself restores nothing engine-side

@@ -24,7 +24,7 @@ import type {
   Room,
   SceneDefinition,
 } from '@evol-hive/shared';
-import { defaultPPERSchedulerConfig, defaultMemoryDecayConfig } from '@evol-hive/shared';
+import { defaultPPERSchedulerConfig, defaultMemoryDecayConfig, SOCIAL_EXCHANGE_BONUS } from '@evol-hive/shared';
 import type {
   MemoryStore,
   MemoryDecayService,
@@ -222,6 +222,13 @@ export function createEngineCore(
     sceneManager,
     config: defaultConversationManagerConfig(),
     consolidationSink,
+    // Spec 047 (R6 — issue #176): the deferred exchange restore flows through
+    // the existing AgentManager drive path — no new drive plumbing. The
+    // manager detects exchange completions (idempotent per (sender,
+    // conversation)); the applier pays the SOCIAL_EXCHANGE_BONUS remainder.
+    onExchangeRestore: (agentId) => {
+      driveSystem.applyChanges(agentId, { social: SOCIAL_EXCHANGE_BONUS });
+    },
   });
   socialManager.setConversationManager(conversationManager);
 

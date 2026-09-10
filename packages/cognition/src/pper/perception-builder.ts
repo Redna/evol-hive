@@ -11,7 +11,13 @@
  * agent's name and behavioral tendencies.
  */
 
-import type { AgentProfile, PerceptionResult, Relationship, SelfModel } from '@evol-hive/shared';
+import type {
+  AgentProfile,
+  PerceptionResult,
+  Relationship,
+  SelfModel,
+  SocialUrgeAssessment,
+} from '@evol-hive/shared';
 import {
   queryMemoryTool,
   updateInternalStateTool,
@@ -25,6 +31,7 @@ import {
   affordancesToToolDefinitions,
   SOCIAL_URGE_SURFACE_THRESHOLD,
   SOCIAL_URGE_RECIPROCITY_DECAYED,
+  SOCIAL_TALK_CAP,
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
@@ -130,12 +137,13 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     // Social urge hint lines (spec 044, R4b): a high urge toward a present
     // agent renders the approach hint; a decayed urge (learned non-responsiveness)
     // renders the let-them-be hint instead. Dynamic section only (spec 021).
-    let urgeSurfaced = false;
+    // Spec 047 (R4 — issue #176): a target past the consecutive-unanswered cap
+    // (SOCIAL_TALK_CAP) is excluded from the social-urgency hint — per-target;
+    // other targets are unaffected (influence, not force).
     if (perceptionResult.socialUrges !== undefined) {
       for (const urge of perceptionResult.socialUrges) {
         const name = resolvePresentName(passive.agentsPresent, urge.targetAgentId);
-        if (urge.result.urge >= SOCIAL_URGE_SURFACE_THRESHOLD) {
-          urgeSurfaced = true;
+        if (urge.result.urge >= SOCIAL_URGE_SURFACE_THRESHOLD && !isSocialTalkCapped(urge)) {
           dynamicLines.push(`You feel like talking to ${name}.`);
         } else if (
           urge.sentCount > 0 &&
@@ -146,8 +154,27 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       }
     }
 
-    // Social drive prompt hint (spec 018, Req 39).
-    if (hasAgentsPresent && primaryDriveLabel.toLowerCase().includes('social')) {
+    // Spec 047 (R1/R2 — issue #176): when the urge model has computed urges
+    // for EVERY present agent and every such urge is reciprocity-decayed
+    // (below the surface threshold specifically because of learned
+    // non-responsiveness), the social urgency has no outlet here: the 024
+    // directive and the 018 social-drive hint are suppressed in favor of the
+    // no-outlet line (rendered in the directive's dynamic position below —
+    // KV-cache, spec 021). No urges computed → today's behavior (feature-off
+    // backward compat); a mixed room keeps the directive.
+    const urgesAllDecayed = allPresentUrgesDecayed(
+      passive.agentsPresent,
+      perceptionResult.socialUrges,
+    );
+
+    // Social drive prompt hint (spec 018, Req 39). Spec 047 (R2): governed by
+    // the same all-decayed gate as the 024 directive — suppressed when no
+    // present target is responsive (the no-outlet line stands in).
+    if (
+      hasAgentsPresent &&
+      primaryDriveLabel.toLowerCase().includes('social') &&
+      !urgesAllDecayed
+    ) {
       dynamicLines.push(
         'You feel a strong need for social interaction. Consider using talk_to or help to engage with other agents in the room.',
       );
@@ -158,10 +185,17 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     // not include formulate_plan by default, so this directive omits the
     // "do not use formulate_plan" clause and focuses on encouraging direct
     // social tool use.
+    // Spec 047 (R1 — issue #176): when the urge toward every present agent is
+    // reciprocity-decayed, the imperative is replaced by the no-outlet line —
+    // the urgency path finally consults the urge model.
     if (hasAgentsPresent) {
-      dynamicLines.push(
-        'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them.',
-      );
+      if (urgesAllDecayed) {
+        dynamicLines.push(NO_SOCIAL_OUTLET_LINE);
+      } else {
+        dynamicLines.push(
+          'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them.',
+        );
+      }
     }
 
     // Drive→affordance matching hints (spec 034, Req 1): when a drive is below
@@ -221,7 +255,12 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     // toward a present agent is at or above the surface threshold, talk_to
     // moves to the front of the tool list (stable order otherwise) — the
     // cheapest deterministic attention shift without new ranking machinery.
-    if (urgeSurfaced) {
+    // Spec 047 (R3/R4 — issue #176): the shift fires only when some present
+    // target actually requests the promotion (urge surfaced and not past the
+    // consecutive-unanswered cap) AND not every present urge is decayed — the
+    // social-urgency answer has no outlet in an all-decayed room. talk_to
+    // itself is never removed (influence, not force).
+    if (talkToPromotionRequested(perceptionResult.socialUrges ?? []) && !urgesAllDecayed) {
       tools = moveTalkToFirst(tools);
     }
 
@@ -289,6 +328,69 @@ function formatDrives(drives: Record<string, number>): string {
   return Object.entries(drives)
     .map(([name, value]) => `${name}=${Math.round(value)}`)
     .join(', ');
+}
+
+/**
+ * The no-outlet perception line (spec 047, R1/R2 — issue #176): rendered in
+ * place of the spec 024 directive (and in place of the spec 018 social-drive
+ * hint's urgency) when the urge toward every present agent is reciprocity-
+ * decayed. Dynamic section only (KV-cache, spec 021).
+ */
+export const NO_SOCIAL_OUTLET_LINE =
+  'No one in the room is responsive — consider another activity or help.';
+
+/**
+ * One urge assessment is reciprocity-decayed (spec 047, R1 gate unit):
+ * at least one message sent and the reciprocity factor below the spec 044
+ * decayed threshold — i.e. the urge is low specifically because of learned
+ * non-responsiveness, not because the pair is fresh.
+ */
+export function isSocialUrgeDecayed(assessment: SocialUrgeAssessment): boolean {
+  return (
+    assessment.sentCount > 0 &&
+    assessment.result.factors.reciprocityFactor < SOCIAL_URGE_RECIPROCITY_DECAYED
+  );
+}
+
+/**
+ * One (agent, target) pair is past the consecutive-unanswered cap (spec 047,
+ * R4 / AC-5): `sentCount − receivedCount ≥ SOCIAL_TALK_CAP` for that
+ * relationship — the same counters the urge model consumes (single source of
+ * truth, no second reciprocity computation).
+ */
+export function isSocialTalkCapped(assessment: SocialUrgeAssessment): boolean {
+  return assessment.sentCount - assessment.receivedCount >= SOCIAL_TALK_CAP;
+}
+
+/**
+ * The full R1 gate (spec 047, R1): agents are present AND the urge model has
+ * computed an assessment for EVERY present agent AND every such urge is
+ * reciprocity-decayed. `undefined` assessments (feature unwired, legacy
+ * providers, perceptive failure) or partial coverage → false — the directive
+ * and hint render exactly as before (feature-off backward compat).
+ */
+export function allPresentUrgesDecayed(
+  agentsPresent: import('@evol-hive/shared').AgentSummary[] | undefined,
+  assessments: SocialUrgeAssessment[] | undefined,
+): boolean {
+  if (agentsPresent === undefined || agentsPresent.length === 0) return false;
+  if (assessments === undefined || assessments.length === 0) return false;
+  return agentsPresent.every((agent) => {
+    const assessment = assessments.find((u) => u.targetAgentId === agent.agentId);
+    return assessment !== undefined && isSocialUrgeDecayed(assessment);
+  });
+}
+
+/**
+ * Whether any present target requests the spec 044 `talk_to` promotion
+ * (Decision 5), under the spec 047 R4 cap: urge at/above the surface
+ * threshold AND the pair not past the consecutive-unanswered cap. Pure —
+ * the all-decayed room gate (R3) is applied by the caller.
+ */
+export function talkToPromotionRequested(assessments: SocialUrgeAssessment[]): boolean {
+  return assessments.some(
+    (u) => u.result.urge >= SOCIAL_URGE_SURFACE_THRESHOLD && !isSocialTalkCapped(u),
+  );
 }
 
 /**

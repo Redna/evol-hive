@@ -26,6 +26,7 @@ import {
   queryMemoryTool,
   updateInternalStateTool,
   formulatePlanTool,
+  SOCIAL_MONOLOGUE_REWARD,
 } from '@evol-hive/shared';
 import type { LLMContextPayload } from '../src/index.js';
 import { OpenAICompatibleLLMClient, LLMError } from '../src/llm/openai-client.js';
@@ -160,8 +161,12 @@ describe('AC-26: executeTalkTo with socialBridge', () => {
       'agent-alice',
       expect.objectContaining({ familiarity: 5, trust: 2 }),
     );
-    // Social drive boost
-    expect(stateProvider.applyDriveChanges).toHaveBeenCalledWith('agent-alice', { social: 10 });
+    // Social drive boost — spec 047 (R5, issue #176): the send itself is a
+    // potential monologue and grants the token amount; the full restore
+    // completes engine-side (+8) when the target contributes to the thread.
+    expect(stateProvider.applyDriveChanges).toHaveBeenCalledWith('agent-alice', {
+      social: SOCIAL_MONOLOGUE_REWARD,
+    });
   });
 });
 
