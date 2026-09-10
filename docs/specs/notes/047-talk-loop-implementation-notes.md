@@ -59,3 +59,18 @@
 3. `feat(spec-047)` — the implementation (R1–R7) + spec-018 +10 assertion update.
 4. `test(spec-032)` — AC-4 updated for the asymmetric reward.
 5. `style(spec-047)` — prettier + unused-import cleanup.
+6. `docs(spec-047)` — these notes + INDEX status → In Review.
+7. `docs(spec-047)` — record PR #178 in the INDEX.
+
+## Resume-verification record (final state)
+
+A later session resumed after the interruption and **re-verified every gate from a clean
+working tree** on `feature/176-talk-loop-urge-gating-asymmetric-reward` (nothing was left
+uncommitted): `pnpm typecheck` ✓, `pnpm lint` ✓, `pnpm format:check` ✓, `pnpm -r run test`
+exit 0 across all 7 packages ✓ (spec-044 + spec-046 suites re-run in isolation: 30/30 ✓),
+`pnpm -r run build` ✓. PR [#178](https://github.com/Redna/evol-hive/pull/178) is OPEN and
+MERGEABLE with GitGuardian checks passing; body references this spec + issue #176
+(`Closes #176`). `docs/specs/INDEX.md` row 047: status `🔍 In Review`, PR #178 recorded.
+Spec AC checkboxes left unticked per the in-review convention of specs 044/046. No code
+changes were needed on resume — the feature was already complete and green. Spec 047 is
+**done pending review**; next actor: merge PR #178 (or address review comments).
