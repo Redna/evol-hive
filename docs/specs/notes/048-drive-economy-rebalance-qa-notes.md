@@ -21,7 +21,9 @@ lines in the perception/plan builders. Therefore **zero of AC-4..AC-7 mapped
 to existing tests** at audit time (AC-1/2/3 are live-run evidence ACs — see
 below). Following the repo's own precedent (spec 045/046 QA sessions), the QA
 pass implemented R1–R3 per the spec and pinned every deterministic AC with
-tests. All work is committed to this PR branch.
+tests. #179 merged mid-audit (18:53:23Z, before the QA commits landed), so
+the implementation + tests + this record ride the follow-up QA PR **#180**
+(branch `feature/168-drive-economy-rebalance-spec`, commits `0709bb1` / `4399da9`).
 
 ## AC → test coverage map
 
@@ -35,7 +37,7 @@ tests. All work is committed to this PR branch.
 | AC-6 (matcher: chain hints for hunger<40; none ≥40; none for social; absent `progresses` → no hint) | ✅ COVERED | `packages/cognition/tests/spec-048-drive-chain-hints.test.ts` (14 tests): hunger 23 + eat visible → direct [eat] first, chain [plant_seeds, harvest] after (perception order, notes + attribution preserved); **chain-only match** surfaces when `eat` is gated invisible (affordances=[], chainProgress non-empty — the stall fix); no match at hunger=40 or 80; `progresses: {drive:'social'}` NEVER hints (social not hintable); `progresses` naming a non-urgent drive → no hint; legacy fixtures without `progresses` → byte-identical matches + hints (`chainProgress` absent, pre-048 shape); cap = MAX_DRIVE_HINT_AFFORDANCES in perception order; PerceptionBuilder: chain line AFTER direct line, dynamic section only (KV-cache, spec 021); chain-only match renders NO "restore it" line; PlanBuilder: imperative chain line AFTER the direct imperative, names the first (next) chain ref; unattributed refs render the spec example form verbatim; no-note refs render without parens. |
 | AC-7 (`pnpm -r test && typecheck && lint`; spec-019/032/034 unmodified; coffee-shop/morning-routine untouched) | ✅ COVERED | Full run: **2,439 tests passed, 0 failed** (shared 347, engine 821, cognition 927, examples 180, memory 101, visualizer 48, cli 15); `pnpm typecheck` green (all packages); `pnpm lint` green; prettier `format:check` green on all touched files. Spec-019 (drive-decay-rate + coverage), spec-032 (drive-restoration), spec-034 (drive-affordance-hints + hunger-chain) suites pass **unmodified**. Only non-048 test edit: `packages/engine/tests/multi-agent.test.ts` ×2 — the spec-008 AC-7 decay tests pinned to `decayScaling: 'none'` (+ comment): they assert the RAW per-agent rate at N=2, which is precisely the 'none' mode under spec 048's default; intent preserved. Coffee-shop / morning-routine scenes untouched. |
 
-## Implementation summary (R1–R3, committed to this PR branch)
+## Implementation summary (R1–R3, PR #180)
 
 - **R1** `shared`: `DecayScaling = 'per-agent' | 'none'`, `EngineConfig.decayScaling?`,
   `defaultDecayScaling()` (reads `ENGINE_DECAY_SCALING`, default `'per-agent'`,
