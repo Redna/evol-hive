@@ -74,3 +74,17 @@ MERGEABLE with GitGuardian checks passing; body references this spec + issue #17
 Spec AC checkboxes left unticked per the in-review convention of specs 044/046. No code
 changes were needed on resume — the feature was already complete and green. Spec 047 is
 **done pending review**; next actor: merge PR #178 (or address review comments).
+
+## Resume-verification record #2 (second session, clean re-check)
+
+A third session resumed and **re-verified every gate again from the clean working tree**
+(nothing uncommitted; branch up to date with origin): `pnpm typecheck` ✓, `pnpm lint` ✓,
+`pnpm format:check` ✓, `pnpm -r run test` exit 0 across all 7 packages ✓ (shared 27,
+visualizer 9, memory 13, cognition 49, engine 62, examples 10, cli 4 test files — all
+passed), `pnpm -r run build` ✓. Targeted regression re-run: shared spec-044 + spec-047
+constants 33/33 ✓; cognition spec-044 + spec-046 + spec-047 suites 47/47 ✓ (AC-7 no-regression
+holds). PR [#178](https://github.com/Redna/evol-hive/pull/178) OPEN, GitGuardian check
+**SUCCESS**, mergeable; `mergeState: BLOCKED` is solely the required human review
+(`REVIEW_REQUIRED`) — no agent action can or should clear it. INDEX.md row 047 already
+`🔍 In Review` with PR #178; PR title/body reference this spec + issue #176. No code changes
+were needed — feature remains complete and green. Next actor unchanged: review + merge #178.
