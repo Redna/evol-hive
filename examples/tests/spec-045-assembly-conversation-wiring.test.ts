@@ -25,10 +25,17 @@
  *    perception query) exercised with the spec 045 wiring applied MANUALLY.
  *    These tests document the post-fix contract and stay green after the fix
  *    lands (the manual wiring line is exactly what the fix adds).
- * 5. Production wiring (it.todo) — the assembly-level assertions that only
- *    become true once the implementation PR wires `conversationBridge` and the
- *    SocialManager delegate in `examples/assembly.ts` itself. Convert these to
- *    active tests in the fix PR.
+ * 5. Production wiring (active) — the assembly-level assertions that only
+ *    became true once the fix PR wired `conversationBridge` and the
+ *    SocialManager delegate in `examples/assembly.ts` itself: talk_to through
+ *    the PRODUCTION-constructed `stack.cognitiveToolExecutor` opens a real
+ *    conversation in the core's manager with no manual wiring (R1 + instance
+ *    identity), and the sim's SocialManager carries the conversation delegate
+ *    with no manual wiring (R2).
+ * 6. Live-run evidence (it.todo) — the real-LLM / events.jsonl clauses of
+ *    AC-1/AC-3/AC-4 are manual live-run evidence (tracked on issue #165); the
+ *    deterministic proxies for those clauses are the section-4 machinery tests
+ *    plus the section-5 production-wiring tests.
  *
  * Deterministic throughout — no LLM anywhere (spec 033 AC-14). The live-run
  * evidence clauses of AC-1/AC-2/AC-3/AC-4 (real LLM, events.jsonl) are
@@ -135,6 +142,14 @@ describe('AC-6 (R3) — examples assembly static invariants', () => {
     expect(source).not.toMatch(/perception\.setConversationManager/);
     expect(source).not.toMatch(/perception\.setTickSource/);
     expect((source.match(/bridges\.perception\.setSocialManager/g) ?? []).length).toBe(1);
+  });
+
+  it('wires the spec 045 bridges (R1: conversationBridge into the executor; R2: SocialManager delegate)', () => {
+    // R1 — the executor receives the core's conversation manager (spec 033
+    // openOrContribute path). R2 — the sim's SocialManager (the socialBridge
+    // instance) delegates conversation queries to the SAME core manager.
+    expect(source).toContain('conversationBridge: core.conversationManager');
+    expect(source).toContain('social.setConversationManager(core.conversationManager)');
   });
 });
 
@@ -324,20 +339,94 @@ describe('conversation machinery via assembleCognitionStack (manual R2 wiring = 
   });
 });
 
-// ── 5. Production wiring (implementation pending — convert in the fix PR) ────
+// ── 5. Production wiring (the fix PR's assertions) ──────────────────────
+//
+// The PRODUCTION-constructed executor (`stack.cognitiveToolExecutor`) and the
+// sim's SocialManager, with NO manual wiring anywhere in the test — every wire
+// under test comes from `assembleCognitionStack` itself. These are the
+// assembly-level assertions that were it.todo scaffolds in the QA audit of the
+// spec-only PR and became true when the fix wired R1/R2 in
+// examples/assembly.ts.
 
-describe('spec 045 production wiring (todo — the spec-only PR does not implement these)', () => {
-  it.todo(
+describe('spec 045 production wiring — assembled stack needs no manual wiring', () => {
+  let core: EngineCore;
+  let stack: CognitionStack;
+
+  beforeEach(() => {
+    delete process.env['USE_REAL_EMBEDDINGS'];
+    process.env['USE_REAL_LLM'] = 'true'; // the executor is only constructed on the real-LLM path
+    const memory = buildMemorySubsystem();
+    core = createEngineCore(makeEngineConfig(), memory.memoryStore, memory.vectorStore);
+    stack = assembleCognitionStack(core, undefined, { memory, wireMemoryMaintenance: false });
+    spawnCoLocatedPair(core);
+    // No manual wiring here — that is the point. R1/R2 must come from the
+    // assembly itself.
+    expect(stack.cognitiveToolExecutor).toBeDefined();
+  });
+
+  afterEach(() => {
+    delete process.env['USE_REAL_LLM'];
+  });
+
+  it(
     'AC-1 (R1): CognitiveToolExecutorImpl is constructed with conversationBridge === core.conversationManager ' +
       '(instance identity — no second manager) and talk_to via the assembled executor needs no manual wiring',
+    async () => {
+      const result = await stack.cognitiveToolExecutor!.executeTalkTo(
+        'agent-a',
+        'agent-b',
+        'hello there',
+        'neutral',
+      );
+      expect(result.success).toBe(true);
+      // R1: the conversation path ran — a real thread was opened (this is
+      // false when the executor carries no conversationBridge, the spec 045
+      // root cause).
+      expect(result.conversationUpdated).toBe(true);
+      // Instance identity: the thread exists in the CORE's conversation
+      // manager (the exact instance createEngineCore built) — a second
+      // manager would leave this empty.
+      const convs = core.conversationManager.listConversationsInRoom(ROOM);
+      expect(convs).toHaveLength(1);
+      expect(convs[0]!.turns[0]!.content).toBe('hello there');
+      // The sim's SocialManager sees the same single thread (same graph of
+      // state — no forked manager).
+      const viaSocial = stack.socialManager.getOpenConversationBetween('agent-a', 'agent-b');
+      expect(viaSocial).not.toBeNull();
+      expect(viaSocial!.id).toBe(convs[0]!.id);
+    },
   );
-  it.todo(
-    'AC-1 (R1): live-run evidence — [social] telemetry lines show non-legacy deltas on every talk_to ' +
-      '(real-LLM run; deterministic proxy covered by the AC-1 machinery test above)',
-  );
-  it.todo(
+
+  it(
     'AC-2 (R2): stack.socialManager carries the conversation delegate WITHOUT manual wiring — ' +
       'assembleCognitionStack calls social.setConversationManager(core.conversationManager) on the socialBridge instance',
+    () => {
+      core.conversationManager.openOrContribute('agent-a', 'agent-b', 'hello there', 'neutral', 11);
+      // The delegate query through the sim's SocialManager works (spec 045
+      // root cause: this returned [] before the fix).
+      expect(stack.socialManager.getConversationsAwaitingAgentReply('agent-b')).toHaveLength(1);
+      // …and through the perception bridge, which consumes the SAME
+      // socialBridge instance (spec 043's pending-address line source).
+      const awaiting = core.bridges.perception.getConversationsAwaitingAgentReply('agent-b');
+      expect(awaiting).toHaveLength(1);
+      expect(awaiting[0]!.turns[awaiting[0]!.turns.length - 1]!.agentId).toBe('agent-a');
+      expect(awaiting[0]!.turns[awaiting[0]!.turns.length - 1]!.content).toBe('hello there');
+      // The speaker does not owe a reply to themselves.
+      expect(core.bridges.perception.getConversationsAwaitingAgentReply('agent-a')).toHaveLength(0);
+    },
+  );
+});
+
+// ── 6. Live-run evidence (it.todo — manual real-LLM run, tracked on #165) ────
+// The deterministic proxies for these clauses are the section-4 machinery
+// tests and the section-5 production-wiring tests; the live artifacts (real
+// LLM telemetry across a whole run, events.jsonl) require a live sim run and
+// stay tracked here.
+
+describe('spec 045 live-run evidence (todo — requires a real-LLM live run)', () => {
+  it.todo(
+    'AC-1 (R1): live-run evidence — [social] telemetry lines show non-legacy deltas on every talk_to ' +
+      '(real-LLM run; deterministic proxy covered by the AC-1 machinery + production-wiring tests above)',
   );
   it.todo(
     'AC-3 (R1): live-run evidence — the exchange is visible in events.jsonl (live artifact; ' +
