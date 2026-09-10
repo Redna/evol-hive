@@ -58,10 +58,10 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      61
+Total specs:      62
 ✅ Done:          36
 🔨 In Development: 0
-🔍 In Review:      17
+🔍 In Review:      18
 📝 Drafted:        6
 🚫 Blocked:        0
 ⛔ Superseded:     2
@@ -97,3 +97,4 @@ Architecture sections fully implemented: 11/11
 | [043](043-conversation-perception-bridge.md) | Conversation Perception Bridge — Surface Conversation State to the LLM's Perception (Active-Conversations Section, State-Aware `talk_to`, Multi-Turn Metrics) | §6, §8, §10 | 📝 Drafted | [#158](https://github.com/Redna/evol-hive/issues/158) | — | shared, engine, cognition |
 | [044](044-social-urge-model.md) | Social Urge Model — Influence, Not Force (Persona-Seeded Talk Inclination, Reciprocity Learning, Pending-Address Marker) | §3, §5, §6, §8 | 🔍 In Review | [#160](https://github.com/Redna/evol-hive/issues/160) | [#164](https://github.com/Redna/evol-hive/pull/164) | shared, engine, cognition |
 | [045](045-assembly-conversation-wiring.md) | Assembly Conversation Wiring — Connect the Conversation Bridge in `examples/assembly.ts` So Live Sims Run `talk_to` on the Conversation Path | §2, §6, §8 | 🔍 In Review | [#165](https://github.com/Redna/evol-hive/issues/165) | [#172](https://github.com/Redna/evol-hive/pull/172) | examples |
+| [046](046-talk-to-target-resolution-sentiment-passthrough.md) | talk_to Target Resolution — Display Names Must Never Create Phantom Participants; `sentiment` Must Reach the Executor | §2, §6, §8 | 🔍 In Review | [#173](https://github.com/Redna/evol-hive/issues/173) | [#174](https://github.com/Redna/evol-hive/pull/174), [#175](https://github.com/Redna/evol-hive/pull/175) | shared, engine, cognition |
