@@ -749,7 +749,8 @@ describe('AC-22: CoffeeShopMockLLMClient selects drive-appropriate affordances',
   it('social drive in living_room with other agents → relax (social-aware)', () => {
     const mock = new CoffeeShopMockLLMClient();
     const plan = mock.completePlanSync(
-      'Room: living_room\nObjects: Sofa, Bookshelf\nPrimary drive: low social, need to restore social\nDrives: social=15\nAgents present: Alice (idle)',
+      // Spec 046 (R4/AC-6): the fed perception line carries the real agent ID.
+      'Room: living_room\nObjects: Sofa, Bookshelf\nPrimary drive: low social, need to restore social\nDrives: social=15\nAgents present: Alice (agent-alice) (idle)',
     );
     expect(plan.steps[0]?.targetAffordance).toBe('relax');
   });

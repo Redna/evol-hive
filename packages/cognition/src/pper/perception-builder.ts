@@ -78,8 +78,12 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       passive.agentsPresent !== undefined && passive.agentsPresent.length > 0;
 
     if (hasAgentsPresent) {
+      // Spec 046 (R4): agent IDs are rendered alongside display names so the
+      // LLM can pass real IDs to talk_to and duplicate display names stay
+      // unambiguous. The line remains a pure function of room membership +
+      // activity, in the stable (above `---`) section (spec 021 rules).
       const agentsStr = passive
-        .agentsPresent!.map((a) => `${a.name} (${a.currentActivity})`)
+        .agentsPresent!.map((a) => `${a.name} (${a.agentId}) (${a.currentActivity})`)
         .join(', ');
       stableLines.push(`Agents present: ${agentsStr}`);
       stableLines.push(

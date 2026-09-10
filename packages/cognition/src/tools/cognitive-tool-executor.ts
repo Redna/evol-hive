@@ -190,6 +190,71 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
 
   // ── Social cognitive tool methods (spec 018, Req 25–28; spec 033, R1/R3/R6) ──
 
+  /**
+   * Spec 046 (R2): normalize a display-name target to the real agent ID via
+   * the social bridge's `resolveAgentId` — the single choke point before any
+   * dispatch, so conversation participants, the message queue, relationship
+   * maps, and the `[social]` telemetry line are all keyed to real IDs.
+   * Returns `null` when the target is unresolvable (callers must fail loudly
+   * without writing anything). Bridges predating spec 046 may not carry
+   * `resolveAgentId` — for those, the raw string passes through so exact-ID
+   * behavior is preserved bit-for-bit (AC-10).
+   */
+  private resolveSocialTarget(agentId: string, targetAgentId: string): string | null {
+    const bridge = this.socialBridge;
+    if (bridge === undefined) return targetAgentId;
+    if (typeof bridge.resolveAgentId !== 'function') return targetAgentId;
+    return bridge.resolveAgentId(agentId, targetAgentId);
+  }
+
+  /**
+   * Spec 046 (AC-8): structured failure for an unresolvable talk_to target —
+   * the message is actionable (Req 17 self-correction) and NOTHING is written
+   * under any key. When a conversation bridge is wired, its `openOrContribute`
+   * refusal is surfaced verbatim: the engine-side manager builds the message
+   * where the present-agent data lives (the same pattern as modify_scene
+   * rejections) and, hardened per spec 046 R3, writes nothing for
+   * unresolvable keys. Without a conversation bridge, the failure points at
+   * the perception 'Agents present' line.
+   */
+  private unresolvableTalkToResult(
+    agentId: string,
+    targetAgentId: string,
+    message: string,
+    sentiment: ConversationSentiment,
+  ): SocialToolResult {
+    if (this.conversationBridge !== undefined) {
+      const refusal = this.conversationBridge.openOrContribute(
+        agentId,
+        targetAgentId,
+        message,
+        sentiment,
+        this.currentTick,
+      );
+      if (!refusal.success) {
+        return { success: false, message: refusal.message, relationshipUpdated: false };
+      }
+    }
+    return {
+      success: false,
+      message:
+        `No agent matches '${targetAgentId}' — no message was sent. ` +
+        `Target one of the agents from the 'Agents present' line of your perception by their agent ID.`,
+      relationshipUpdated: false,
+    };
+  }
+
+  /** Structured failure for an unresolvable observe_agent/help/ignore target (AC-7/AC-8). */
+  private unresolvableSocialResult(targetAgentId: string): SocialToolResult {
+    return {
+      success: false,
+      message:
+        `No agent matches '${targetAgentId}' — nothing was done. ` +
+        `Target one of the agents from the 'Agents present' line of your perception by their agent ID.`,
+      relationshipUpdated: false,
+    };
+  }
+
   async executeTalkTo(
     agentId: string,
     targetAgentId: string,
@@ -204,6 +269,14 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       };
     }
     const taggedSentiment: ConversationSentiment = sentiment ?? 'neutral';
+    // Spec 046 (R2): normalize the target BEFORE any dispatch — a display
+    // name must never key participants, the queue, relationships, or
+    // telemetry; an unresolvable target fails without writing anything.
+    const resolvedTarget = this.resolveSocialTarget(agentId, targetAgentId);
+    if (resolvedTarget === null) {
+      return this.unresolvableTalkToResult(agentId, targetAgentId, message, taggedSentiment);
+    }
+    const target = resolvedTarget;
     try {
       // Spec 033 (R1/R3): talk_to maps to open-or-contribute — the exchange
       // joins the ongoing conversation thread (or opens one).
@@ -211,7 +284,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       if (this.conversationBridge !== undefined) {
         const result = this.conversationBridge.openOrContribute(
           agentId,
-          targetAgentId,
+          target,
           message,
           taggedSentiment,
           this.currentTick,
@@ -225,7 +298,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         }
       }
 
-      this.socialBridge.queueMessage(agentId, targetAgentId, message);
+      this.socialBridge.queueMessage(agentId, target, message);
       // Spec 033 (R6): sentiment-gated deltas when a conversation is wired;
       // legacy blind +5/+2 deltas otherwise (backward compat, AC-14).
       const delta = conversationDelta ?? { familiarity: 5, trust: 2 };
@@ -233,11 +306,11 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       // execute cognition-side), so live runs showed a +49 social jump with
       // no visible cause. Surface every exchange.
       console.log(
-        `[social] ${agentId} talk_to→${targetAgentId} ` +
+        `[social] ${agentId} talk_to→${target} ` +
           `(${JSON.stringify(message.slice(0, 80))}) trust=${delta.trust >= 0 ? '+' : ''}${delta.trust} ` +
           `familiarity=${delta.familiarity >= 0 ? '+' : ''}${delta.familiarity}`,
       );
-      this.socialBridge.updateRelationship(agentId, targetAgentId, {
+      this.socialBridge.updateRelationship(agentId, target, {
         familiarity: delta.familiarity,
         trust: delta.trust,
         lastInteraction: this.currentTick,
@@ -245,7 +318,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         // target — an additive delta on the same bridge call (Decision 3).
         sentCount: 1,
       });
-      this.socialBridge.updateRelationship(targetAgentId, agentId, {
+      this.socialBridge.updateRelationship(target, agentId, {
         familiarity: delta.familiarity,
         trust: delta.trust,
         lastInteraction: this.currentTick,
@@ -256,7 +329,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       if (this.stateDataProvider !== undefined) {
         this.stateDataProvider.applyDriveChanges(agentId, { social: 10 });
       }
-      const targetName = this.socialBridge.getAgentSummary(targetAgentId)?.name ?? targetAgentId;
+      const targetName = this.socialBridge.getAgentSummary(target)?.name ?? target;
       return {
         success: true,
         message: `Message sent to ${targetName}.`,
@@ -331,13 +404,20 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         relationshipUpdated: false,
       };
     }
+    // Spec 046 (R2): display names resolve to real IDs — an unresolvable
+    // target fails without writing any relationship key.
+    const resolvedTarget = this.resolveSocialTarget(agentId, targetAgentId);
+    if (resolvedTarget === null) {
+      return this.unresolvableSocialResult(targetAgentId);
+    }
+    const target = resolvedTarget;
     try {
-      const summary = this.socialBridge.getAgentSummary(targetAgentId);
+      const summary = this.socialBridge.getAgentSummary(target);
       if (summary === null) {
         return { success: false, message: 'Agent not found.', relationshipUpdated: false };
       }
-      const drives = this.socialBridge.getAgentDrives(targetAgentId);
-      this.socialBridge.updateRelationship(agentId, targetAgentId, {
+      const drives = this.socialBridge.getAgentDrives(target);
+      this.socialBridge.updateRelationship(agentId, target, {
         familiarity: 1,
         lastInteraction: this.currentTick,
       });
@@ -370,13 +450,20 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         relationshipUpdated: false,
       };
     }
+    // Spec 046 (R2): display names resolve to real IDs — an unresolvable
+    // target fails without writing any relationship key.
+    const resolvedTarget = this.resolveSocialTarget(agentId, targetAgentId);
+    if (resolvedTarget === null) {
+      return this.unresolvableSocialResult(targetAgentId);
+    }
+    const target = resolvedTarget;
     try {
-      this.socialBridge.updateRelationship(agentId, targetAgentId, {
+      this.socialBridge.updateRelationship(agentId, target, {
         familiarity: 10,
         trust: 5,
         lastInteraction: this.currentTick,
       });
-      this.socialBridge.updateRelationship(targetAgentId, agentId, {
+      this.socialBridge.updateRelationship(target, agentId, {
         familiarity: 10,
         trust: 5,
         lastInteraction: this.currentTick,
@@ -385,7 +472,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         this.stateDataProvider.applyDriveChanges(agentId, { social: 15 });
       }
       // Determine target's primary drive (lowest value) and boost it by 10.
-      const targetDrives = this.socialBridge.getAgentDrives(targetAgentId);
+      const targetDrives = this.socialBridge.getAgentDrives(target);
       let primaryDrive: string | undefined;
       let lowestValue = Infinity;
       for (const [name, value] of Object.entries(targetDrives)) {
@@ -397,10 +484,10 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       if (primaryDrive !== undefined && this.stateDataProvider !== undefined) {
         this.stateDataProvider.applyDriveChanges(targetAgentId, { [primaryDrive]: 10 });
       }
-      const targetName = this.socialBridge.getAgentSummary(targetAgentId)?.name ?? targetAgentId;
+      const targetName = this.socialBridge.getAgentSummary(target)?.name ?? target;
       const driveLabel = primaryDrive ?? 'primary';
       console.log(
-        `[social] ${agentId} help→${targetAgentId} (${targetName}) — ${driveLabel} +10, social +15`,
+        `[social] ${agentId} help→${target} (${targetName}) — ${driveLabel} +10, social +15`,
       );
       return {
         success: true,
@@ -425,8 +512,15 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         relationshipUpdated: false,
       };
     }
+    // Spec 046 (R2): display names resolve to real IDs — an unresolvable
+    // target fails without writing any relationship key.
+    const resolvedTarget = this.resolveSocialTarget(agentId, targetAgentId);
+    if (resolvedTarget === null) {
+      return this.unresolvableSocialResult(targetAgentId);
+    }
+    const target = resolvedTarget;
     try {
-      this.socialBridge.updateRelationship(agentId, targetAgentId, {
+      this.socialBridge.updateRelationship(agentId, target, {
         familiarity: -2,
         trust: -1,
         lastInteraction: this.currentTick,
@@ -434,7 +528,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       if (this.stateDataProvider !== undefined) {
         this.stateDataProvider.applyDriveChanges(agentId, { social: -5 });
       }
-      const targetName = this.socialBridge.getAgentSummary(targetAgentId)?.name ?? targetAgentId;
+      const targetName = this.socialBridge.getAgentSummary(target)?.name ?? target;
       return {
         success: true,
         message: `You chose to ignore ${targetName}.`,

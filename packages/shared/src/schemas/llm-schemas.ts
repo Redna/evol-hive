@@ -474,7 +474,11 @@ export const talkToSchema = {
   properties: {
     targetAgentId: {
       type: 'string',
-      description: 'The ID of the agent to send the message to.',
+      // Spec 046 (doc-only tweak, schema shape unchanged): display names are
+      // tolerated — the executor resolves them to real IDs — but the ID from
+      // the 'Agents present' line is always unambiguous.
+      description:
+        'The ID of the agent to send the message to (an agent ID from the Agents present line; a display name is resolved to the real agent).',
     },
     message: {
       type: 'string',

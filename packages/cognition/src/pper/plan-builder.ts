@@ -73,8 +73,10 @@ export class PlanBuilderImpl implements PlanBuilder {
     ];
 
     if (hasAgentsPresent) {
+      // Spec 046 (R4): agent IDs rendered alongside display names (see
+      // perception-builder) so plan-phase tool calls can target real IDs.
       const agentsStr = passive
-        .agentsPresent!.map((a) => `${a.name} (${a.currentActivity})`)
+        .agentsPresent!.map((a) => `${a.name} (${a.agentId}) (${a.currentActivity})`)
         .join(', ');
       stableLines.push(`Agents present: ${agentsStr}`);
       stableLines.push(
