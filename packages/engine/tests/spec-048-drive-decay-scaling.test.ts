@@ -296,4 +296,24 @@ describe('AC-4g: decayScaling plumbs through createEngineCore → assembleGameLo
     // Per-agent scaling: 0.1 × 3 / 2 = 0.15 per agent.
     expect(core.agentManager.getState('agent-1')!.drives.energy).toBeCloseTo(99.85, 6);
   });
+
+  it("the assembled loop's DriveDecaySystem at N = 3 — the AC-4 headline arithmetic through a real loop", () => {
+    // AC-4 pins the SYSTEM-level arithmetic at 3 agents (AC-4a); this closes
+    // the loop-level gap: 3 agents through assembleGameLoop at the per-agent
+    // default each lose decayRate × elapsed / 3 = 0.1 × 3 / 3 = 0.1.
+    const core: EngineCore = createEngineCore({
+      fps: 60,
+      spatialDebounceSeconds: 5,
+      maxConcurrentLLM: 8,
+      guardrailsEnabled: true,
+      guardrails: { affordanceMasking: true, contextualForcing: true, planValidation: true },
+    });
+    spawn(core.agentManager, 3, 100);
+    assembleGameLoop(core, new NoopOrchestrator());
+
+    core.gameLoop.injectElapsed(3);
+    for (const id of ['agent-1', 'agent-2', 'agent-3']) {
+      expect(core.agentManager.getState(id)!.drives.energy).toBeCloseTo(99.9, 6);
+    }
+  });
 });
