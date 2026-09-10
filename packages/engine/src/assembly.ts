@@ -16,6 +16,7 @@
  */
 
 import type {
+  DecayScaling,
   EngineConfig,
   MemoryDecayConfig,
   AutoSaveConfig,
@@ -156,6 +157,14 @@ export interface EngineCore {
    * `schedulerConfig` argument is passed.
    */
   sceneSchedulerConfig?: PPERSchedulerConfig;
+  /**
+   * Resolved drive-decay scaling (spec 048, Req 1). Set by
+   * {@link createEngineCore} from `EngineConfig.decayScaling` (`'per-agent'
+   * when absent). Consumed by {@link assembleGameLoop} when registering
+   * `DriveDecaySystem` — the same config→core→system plumbing
+   * `sceneSchedulerConfig` uses.
+   */
+  decayScaling?: DecayScaling;
   /** System 1 tracker (spec 035) — set when System 1 ports are wired. */
   system1Tracker?: System1AgentTracker;
   /** System 1 trigger source (spec 035) — set when System 1 ports are wired. */
@@ -183,6 +192,9 @@ export function createEngineCore(
 ): EngineCore {
   const agentManager = new AgentManagerImpl();
   const driveSystem = new DriveSystemImpl(agentManager, config.driveDecayRate ?? 0.1);
+  // Decay scaling (spec 048, Req 1): resolved once here, consumed by
+  // assembleGameLoop when it registers DriveDecaySystem.
+  const decayScaling: DecayScaling = config.decayScaling ?? 'per-agent';
   const clock = new GameLoopClock();
   const clockFn = (): number => clock.get();
   const planManager = new PlanManagerImpl(agentManager, clockFn);
@@ -326,6 +338,7 @@ export function createEngineCore(
     feedbackStore,
     bridges,
     clock: clock,
+    decayScaling,
     ...(persistence !== undefined ? { persistence } : {}),
     socialManager,
     conversationManager,
@@ -437,7 +450,17 @@ export function assembleGameLoop(
     );
   }
   core.gameLoop.registerSystem(core.spatial); // (1) SpatialSystem
-  core.gameLoop.registerSystem(new DriveDecaySystem(core.agentManager, core.driveSystem)); // (2) DriveDecaySystem
+  core.gameLoop.registerSystem(
+    // (2) DriveDecaySystem — per-agent decay scaling (spec 048, Req 1): the
+    // resolved EngineConfig.decayScaling flows core→system exactly like the
+    // scene scheduler config does.
+    new DriveDecaySystem(
+      core.agentManager,
+      core.driveSystem,
+      // exactOptionalPropertyTypes: spread the optional field (repo pattern).
+      ...(core.decayScaling !== undefined ? [{ decayScaling: core.decayScaling }] : []),
+    ),
+  );
   core.gameLoop.registerSystem(new ObjectStateSystem(core.smartObjectRegistry)); // (3) ObjectStateSystem (spec 018)
   core.gameLoop.registerSystem(new ConversationLifecycleSystem(core.conversationManager)); // (3.5) ConversationLifecycleSystem (spec 033)
   const scheduler = new PPERScheduler(

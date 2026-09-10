@@ -22,6 +22,27 @@ export interface PendingAction {
 
 import type { GuardrailConfig } from './cognition.js';
 
+/**
+ * Drive-decay scaling mode (spec 048, Req 1). At concurrency 3 the PPER
+ * scheduler spreads cycles across agents, stretching each agent's effective
+ * cycle interval while ambient decay accrues per wall sim-second — the economy
+ * becomes structurally net-negative. `per-agent` (default) makes decay a
+ * scene-level constant: each agent decays at `decayRate / N` per wall
+ * sim-second (N = live agent count), so per-agent decay tracks the agent's own
+ * cycle cadence. `none` restores the legacy per-agent wall-time rate.
+ */
+export type DecayScaling = 'per-agent' | 'none';
+
+/**
+ * Default decay scaling — `'per-agent'` unless `ENGINE_DECAY_SCALING` is set
+ * to `'none'` (spec 048, Req 1; surfaced from env the same way
+ * `ENGINE_MAX_CONCURRENT_LLM` is, spec 022). Any other value falls back to the
+ * default so typos cannot silently disable scaling.
+ */
+export function defaultDecayScaling(): DecayScaling {
+  return process.env['ENGINE_DECAY_SCALING'] === 'none' ? 'none' : 'per-agent';
+}
+
 /** Engine configuration. */
 export interface EngineConfig {
   fps: number;
@@ -36,6 +57,13 @@ export interface EngineConfig {
    * can tune urgency (spec 019, Req 1, AC-1).
    */
   driveDecayRate?: number;
+  /**
+   * How ambient decay scales with the live agent population (spec 048, Req 1).
+   * `'per-agent'` (default) applies `decayRate / N` per wall sim-second to each
+   * agent — a no-op at N = 1, so cc=1 behavior is unchanged. `'none'` keeps the
+   * legacy raw rate regardless of N. Surfaced from `ENGINE_DECAY_SCALING`.
+   */
+  decayScaling?: DecayScaling;
 }
 
 /** A single game loop tick. */
@@ -80,6 +108,7 @@ export function defaultEngineConfig(): EngineConfig {
     guardrailsEnabled: true,
     guardrails: defaultGuardrailConfig(),
     driveDecayRate: 0.1,
+    decayScaling: defaultDecayScaling(),
   };
 }
 

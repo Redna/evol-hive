@@ -35,6 +35,27 @@
  *               chain (spec 034, Req 6) closes the loop; hunger previously
  *               had NO restoration path and pinned at 0 in runs ≳ 16 min
  *
+ * cc=3 rebalance (spec 048 — issue #168): at ENGINE_MAX_CONCURRENT_LLM=3 the
+ *   scheduler spreads cycles across agents, stretching each agent's effective
+ *   cycle interval to 60–90s of sim time while ambient decay accrued per wall
+ *   sim-second — per-interval decay 6–9 points vs a best +5 restoration made
+ *   the economy structurally net-negative (every run ended all-zeros). Two
+ *   fixes, both audit-backed (no hand-tuning):
+ *   1. Per-agent decay scaling (Req 1): DriveDecaySystem applies an effective
+ *      rate of decayRate / N per wall sim-second (N = live agents; no-op at
+ *      N=1; ENGINE_DECAY_SCALING=none escapes). At cc=3 per-interval decay
+ *      drops to ≈ decayRate/3 × interval = 0.1/3 × 90s ≈ 3 points (worst-case
+ *      documented interval, issue evidence).
+ *   2. Restoration audit (Req 2, examples/tests/spec-048-economy-audit.test.ts):
+ *      for every drive, the largest declared restoring delta must exceed that
+ *      per-interval decay — energy 5 > 3, hunger 25 > 3, comfort 20 > 3,
+ *      curiosity 12 > 3, social 10 (talk_to, spec 018) > 3. Magnitudes move
+ *      only where the audit fails (none do), protecting the #139 oscillation
+ *      (Req 4 — restoration stays just above decay, never an order above).
+ *   Hunger-chain surfacing (Req 3): planter-1 `plant_seeds`/`harvest` declare
+ *   `progresses: { drive: 'hunger' }` so the spec-034 matcher surfaces the
+ *   next chain step while hunger is urgent — the 2/3-seeds stall fix.
+ *
  * The visualizer serves the live canvas at http://localhost:3100/ so every
  * structural change is observable in the browser as it happens.
  *
@@ -52,6 +73,7 @@ import type {
   PPERPhase,
   SmartObject,
 } from '@evol-hive/shared';
+import { defaultDecayScaling } from '@evol-hive/shared';
 import {
   createEngineCore,
   loadScene,
@@ -82,6 +104,10 @@ function makeConfig(): EngineConfig {
     maxConcurrentLLM: Number(process.env['ENGINE_MAX_CONCURRENT_LLM'] ?? '1'),
     guardrailsEnabled: true,
     guardrails: { affordanceMasking: true, contextualForcing: true, planValidation: true },
+    // Spec 048, Req 1: per-agent decay scaling, surfaced from
+    // ENGINE_DECAY_SCALING ('per-agent' default | 'none') exactly like
+    // ENGINE_MAX_CONCURRENT_LLM above.
+    decayScaling: defaultDecayScaling(),
   };
 }
 

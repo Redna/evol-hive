@@ -340,7 +340,9 @@ describe('Multi-Agent — independent drive decay (AC-7)', () => {
     agents.spawn(makeAgent('a1', 50));
     agents.spawn(makeAgent('a2', 80));
     const driveSystem = new DriveSystemImpl(agents);
-    const decaySystem = new DriveDecaySystem(agents, driveSystem);
+    // Spec 048 defaulted DriveDecaySystem to per-agent scaling (rate / N);
+    // this spec-008 AC pins the RAW per-agent rate (decayScaling: 'none').
+    const decaySystem = new DriveDecaySystem(agents, driveSystem, { decayScaling: 'none' });
 
     // Tick 1: deltaSeconds = 5.
     decaySystem.update({ tickNumber: 1, simulationTime: 5, deltaSeconds: 5 });
@@ -380,7 +382,9 @@ describe('Multi-Agent — independent drive decay (AC-7)', () => {
     agents.spawn(makeAgent('a1', 60));
     agents.spawn(makeAgent('a2', 60));
     const driveSystem = new DriveSystemImpl(agents);
-    const decaySystem = new DriveDecaySystem(agents, driveSystem);
+    // Spec 048 defaulted DriveDecaySystem to per-agent scaling (rate / N);
+    // this assertion pins the RAW rate (decayScaling: 'none').
+    const decaySystem = new DriveDecaySystem(agents, driveSystem, { decayScaling: 'none' });
 
     decaySystem.update({ tickNumber: 1, simulationTime: 2, deltaSeconds: 2 });
 

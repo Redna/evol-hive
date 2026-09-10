@@ -41,6 +41,15 @@
  * (spec 034, Req 1–4). `makeObject` stamps each affordance with its owning
  * object (`objectId`/`objectName`) so the spec-034 hints name the object
  * that offers each affordance.
+ *
+ * Hunger-chain surfacing (spec 048, Req 3 — issue #168): `plant_seeds` and
+ * `harvest` declare `progresses: { drive: 'hunger' }` so the spec-034 matcher
+ * surfaces the NEXT chain step as a secondary hint while hunger is urgent —
+ * even when `eat` (the actual +25 restoration) is gated invisible
+ * (`vegetables >= 1`). `plant_seeds` declares no restorable drive effect, so
+ * without the chain declaration the mid-chain step was invisible exactly when
+ * hunger was critical (the 2/3-seeds stall). Chain hints render after direct
+ * restoration hints and never apply to `social` (spec 018/024/047 own it).
  */
 
 import type { AffordanceResult, SceneDefinition, SmartObject } from '@evol-hive/shared';
@@ -70,6 +79,10 @@ function aff(
   preconditions: string[] = [],
   effects: Partial<Record<string, number>> = {},
   conditions?: AffordanceCondition[],
+  // Spec 048, Req 3: optional chain-progress declaration — scene data the
+  // cognition matcher reads to surface the next step of a restoration chain
+  // while the target drive is urgent (no hardcoded drive→chain table).
+  progresses?: { drive: string; note?: string },
 ) {
   return {
     id,
@@ -78,6 +91,7 @@ function aff(
     preconditions,
     effects,
     ...(conditions !== undefined ? { conditions } : {}),
+    ...(progresses !== undefined ? { progresses } : {}),
   };
 }
 
@@ -108,7 +122,14 @@ const garden: SceneDefinition['rooms'][number] = {
   // `go_to_<dest>` only when hasConnection(room, dest) — a door OBJECT alone
   // is not enough; the topology edge must exist from THIS room's side too.
   connections: ['workshop', 'greenhouse'],
-  objectIds: ['planter-1', 'gate-1', 'toolbox-1', 'garden-bench-1', 'doorway-garden', 'doorway-garden-greenhouse'],
+  objectIds: [
+    'planter-1',
+    'gate-1',
+    'toolbox-1',
+    'garden-bench-1',
+    'doorway-garden',
+    'doorway-garden-greenhouse',
+  ],
 };
 
 const workshop: SceneDefinition['rooms'][number] = {
@@ -151,13 +172,31 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
       // from tool descriptions alone, because harvest/eat stay invisible
       // (declarative conditions) until 3 seeds are planted. Without the
       // label hints the model rationally plants once and waits forever.
-      aff('plant_seeds', 'Plant seeds (after 3 plantings, vegetables ripen for harvest)'),
+      // Spec 048, Req 3: `plant_seeds` declares hunger-chain progress — it
+      // restores NO drive the matcher can bind (its +12 curiosity is handler
+      // driveChanges, and hunger has no declared effect), so without
+      // `progresses` the mid-chain step was invisible to the hint system
+      // exactly when hunger was critical (the 2/3-seeds stall, issue #168).
+      aff(
+        'plant_seeds',
+        'Plant seeds (after 3 plantings, vegetables ripen for harvest)',
+        [],
+        {},
+        undefined,
+        {
+          drive: 'hunger',
+          note: 'harvest → eat restores hunger',
+        },
+      ),
       aff(
         'harvest',
         'Harvest vegetables (requires 3 seeds planted)',
         [],
         { curiosity: 10, comfort: 5 },
         [{ field: 'seeds_planted', operator: '>=', value: 3 }],
+        // Spec 048, Req 3: harvest is ALSO a mid-chain step — `eat` (the
+        // actual restoration) is gated on `vegetables >= 1`.
+        { drive: 'hunger', note: 'eat restores hunger once a vegetable is ripe' },
       ),
       aff('eat', 'Eat a vegetable', [], { hunger: 25 }, [
         { field: 'vegetables', operator: '>=', value: 1 },
