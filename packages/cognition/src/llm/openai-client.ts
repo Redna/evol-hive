@@ -25,6 +25,7 @@ import type {
   MemoryType,
   ToolDefinition,
   CognitiveToolExecutor,
+  ConversationSentiment,
   MultiAgentPlanResponse,
   MultiAgentPlanEntry,
 } from '@evol-hive/shared';
@@ -659,7 +660,13 @@ export class OpenAICompatibleLLMClient {
           const targetAgentId =
             typeof args['targetAgentId'] === 'string' ? (args['targetAgentId'] as string) : '';
           const message = typeof args['message'] === 'string' ? (args['message'] as string) : '';
-          result = await executor.executeTalkTo(agentId, targetAgentId, message);
+          // Spec 046 (R5): the LLM's sentiment tool arg (spec 033) must reach
+          // the executor — validated against the spec 033 enum, defaulting to
+          // 'neutral' on absence/invalid values instead of being dropped.
+          const rawSentiment = args['sentiment'];
+          const sentiment: ConversationSentiment =
+            rawSentiment === 'positive' || rawSentiment === 'negative' ? rawSentiment : 'neutral';
+          result = await executor.executeTalkTo(agentId, targetAgentId, message, sentiment);
         } else if (toolName === 'observe_agent') {
           const targetAgentId =
             typeof args['targetAgentId'] === 'string' ? (args['targetAgentId'] as string) : '';

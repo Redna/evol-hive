@@ -194,6 +194,45 @@ export class SocialManager implements SocialActionBridge, ConversationBridge {
     return { ...state.drives };
   }
 
+  /**
+   * Resolve a display name (or ID) to the REAL active agent ID (spec 046, R1).
+   *
+   * Exact agent-ID passthrough first (an active agent state exists with that
+   * ID — despawned agents hold no state, so stale IDs fail). Otherwise a
+   * case-insensitive match on `profile.name` over active agents, preferring
+   * agents co-located with the requester (co-location is what the perception
+   * `Agents present` line describes, so a room-local match is almost always
+   * the intended target). Returns `null` when nothing matches or the name is
+   * ambiguous (duplicate matches even after the co-location preference) —
+   * never silent guessing. Deterministic: pure TypeScript over profiles and
+   * states, no LLM anywhere.
+   */
+  resolveAgentId(requesterAgentId: string, nameOrId: string): string | null {
+    if (nameOrId.length === 0) return null;
+    // Exact agent-ID passthrough — active state only.
+    if (this.agentManager.getState(nameOrId) !== null) return nameOrId;
+    // Case-insensitive profile-name match over active agents.
+    const needle = nameOrId.toLowerCase();
+    const requesterState = this.agentManager.getState(requesterAgentId);
+    const requesterRoom = requesterState?.location;
+    const coLocated: string[] = [];
+    const elsewhere: string[] = [];
+    for (const agent of this.agentManager.getActiveAgents()) {
+      const name = this.agentManager.getProfile(agent.agentId)?.name;
+      if (name === undefined || name.toLowerCase() !== needle) continue;
+      if (requesterRoom !== undefined && requesterRoom !== '' && agent.location === requesterRoom) {
+        coLocated.push(agent.agentId);
+      } else {
+        elsewhere.push(agent.agentId);
+      }
+    }
+    // Prefer the requester's room; ambiguous duplicates resolve to nothing.
+    if (coLocated.length === 1) return coLocated[0]!;
+    if (coLocated.length > 1) return null;
+    if (elsewhere.length === 1) return elsewhere[0]!;
+    return null;
+  }
+
   // ── Perception query methods (spec 018, Req 18–20) ──────────────────────────
 
   /** Get summaries of all agents in a room except the excluding agent. */

@@ -99,6 +99,48 @@ export class ConversationManagerImpl implements ConversationBridge {
 
   // ── ConversationBridge (spec 033, R3) ─────────────────────────────────────
 
+  /**
+   * Spec 046 (R3): resolve a participant key that matches no active agent ID
+   * by case-insensitive profile name via this manager's own `agentManager` —
+   * phantom participants are impossible even for direct bridge consumers
+   * (tests, future callers). Exact-ID passthrough first; a UNIQUE name match
+   * resolves; ambiguous duplicates or no match return `null`.
+   */
+  private resolveParticipantKey(key: string): string | null {
+    if (key.length === 0) return null;
+    if (this.agentManager.getState(key) !== null) return key;
+    const needle = key.toLowerCase();
+    const matches = this.agentManager
+      .getActiveAgents()
+      .filter((a) => (this.agentManager.getProfile(a.agentId)?.name ?? '').toLowerCase() === needle)
+      .map((a) => a.agentId);
+    return matches.length === 1 ? matches[0]! : null;
+  }
+
+  /**
+   * Spec 046 (AC-8/AC-9): actionable refusal for an unresolvable target —
+   * names the present agents (Req 17 self-correction pattern) so the LLM can
+   * retry with a real ID. Never creates anything.
+   */
+  private unresolvableTargetMessage(key: string, requesterAgentId: string): string {
+    const room = this.agentManager.getState(requesterAgentId)?.location;
+    const present =
+      room !== undefined && room !== ''
+        ? this.agentManager
+            .getActiveAgents()
+            .filter((a) => a.agentId !== requesterAgentId && a.location === room)
+        : [];
+    const listing =
+      present.length > 0
+        ? present
+            .map(
+              (a) => `${this.agentManager.getProfile(a.agentId)?.name ?? a.agentId} (${a.agentId})`,
+            )
+            .join(', ')
+        : 'none';
+    return `No agent matches '${key}' — no conversation was started. Present agents: ${listing}.`;
+  }
+
   openOrContribute(
     agentId: string,
     targetAgentId: string,
@@ -107,14 +149,28 @@ export class ConversationManagerImpl implements ConversationBridge {
     tick: number,
     topic?: string,
   ): ConversationActionResult {
-    if (agentId === targetAgentId) {
+    // Spec 046 (R3): both keys resolve before anything else — a display name
+    // reaches the real agent; an unresolvable key fails WITHOUT creating a
+    // phantom participant.
+    const speakerId = this.resolveParticipantKey(agentId);
+    if (speakerId === null) {
+      return {
+        success: false,
+        message: `No agent matches '${agentId}' — you are not part of this world.`,
+      };
+    }
+    const resolvedTarget = this.resolveParticipantKey(targetAgentId);
+    if (resolvedTarget === null) {
+      return { success: false, message: this.unresolvableTargetMessage(targetAgentId, speakerId) };
+    }
+    if (speakerId === resolvedTarget) {
       return { success: false, message: 'You cannot talk to yourself.' };
     }
-    const existing = this.getOpenConversationBetween(agentId, targetAgentId);
+    const existing = this.getOpenConversationBetween(speakerId, resolvedTarget);
     if (existing !== null) {
-      return this.contribute(agentId, existing.id, content, sentiment, tick);
+      return this.contribute(speakerId, existing.id, content, sentiment, tick);
     }
-    return this.open(agentId, targetAgentId, content, sentiment, tick, topic);
+    return this.open(speakerId, resolvedTarget, content, sentiment, tick, topic);
   }
 
   join(agentId: string, conversationId: string, tick: number): ConversationActionResult {
@@ -192,6 +248,17 @@ export class ConversationManagerImpl implements ConversationBridge {
     sentiment: ConversationSentiment,
     tick: number,
   ): ConversationActionResult {
+    // Spec 046 (R3): the speaker key resolves before the participant check —
+    // a display name finds the real participant; an unresolvable key fails
+    // (a contribution never creates a phantom participant).
+    const speakerId = this.resolveParticipantKey(agentId);
+    if (speakerId === null) {
+      return {
+        success: false,
+        conversationId,
+        message: `No agent matches '${agentId}' — you are not part of this conversation.`,
+      };
+    }
     const conversation = this.conversations.get(conversationId);
     if (conversation === undefined) {
       return { success: false, message: `Conversation '${conversationId}' does not exist.` };
@@ -199,7 +266,7 @@ export class ConversationManagerImpl implements ConversationBridge {
     if (conversation.status === 'closed') {
       return { success: false, conversationId, message: 'That conversation has already ended.' };
     }
-    if (!conversation.participants.some((p) => p.agentId === agentId)) {
+    if (!conversation.participants.some((p) => p.agentId === speakerId)) {
       return {
         success: false,
         conversationId,
@@ -210,7 +277,7 @@ export class ConversationManagerImpl implements ConversationBridge {
     // Co-location integration (R7 / AC-5): an agent that is no longer in the
     // conversation's room fails `contribute` gracefully and is removed from
     // participants. The last participant leaving closes the conversation.
-    if (this.agentManager.getState(agentId)?.location !== conversation.roomId) {
+    if (this.agentManager.getState(speakerId)?.location !== conversation.roomId) {
       const updated = removeParticipant(conversation, agentId);
       if (updated.participants.length === 0) {
         this.close(conversationId, 'last participant left the room');
@@ -228,10 +295,10 @@ export class ConversationManagerImpl implements ConversationBridge {
       };
     }
 
-    const isInitiator = conversation.participants[0]?.agentId === agentId;
-    const speaker = conversation.participants.find((p) => p.agentId === agentId);
+    const isInitiator = conversation.participants[0]?.agentId === speakerId;
+    const speaker = conversation.participants.find((p) => p.agentId === speakerId);
     const turn = {
-      agentId,
+      agentId: speakerId,
       content,
       sentiment,
       tick,

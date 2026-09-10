@@ -448,7 +448,14 @@ describe('AC-33: LLM calls talk_to, client executes and sends tool result', () =
     const payload = makePayload({ tools: [chooseActionTool, talkToTool] });
     await client.completeStructured(payload);
 
-    expect(executor.executeTalkTo).toHaveBeenCalledWith('agent-1', 'agent-bob', 'Hello!');
+    // Spec 046 (R5/AC-5): the sentiment arg always reaches executeTalkTo —
+    // absence maps to the 'neutral' default instead of being dropped.
+    expect(executor.executeTalkTo).toHaveBeenCalledWith(
+      'agent-1',
+      'agent-bob',
+      'Hello!',
+      'neutral',
+    );
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // Verify second request includes the tool result
@@ -857,7 +864,8 @@ describe('AC-41: PerceptionBuilderImpl with agentsPresent', () => {
       primaryDriveLabel: 'low energy',
     };
     const payload = builder.build(pr);
-    expect(payload.perceptionContext).toContain('Agents present: Bob (idle)');
+    // Spec 046 (R4/AC-6): the pinned line now carries the real agent ID.
+    expect(payload.perceptionContext).toContain('Agents present: Bob (agent-bob) (idle)');
     const toolNames = payload.tools.map((t) => t.function.name);
     expect(toolNames).toContain('talk_to');
     expect(toolNames).toContain('observe_agent');
@@ -1039,7 +1047,8 @@ describe('AC-47: PlanBuilderImpl with agentsPresent', () => {
       primaryDriveLabel: 'low energy',
     };
     const payload = builder.build(pr);
-    expect(payload.perceptionContext).toContain('Agents present: Bob (idle)');
+    // Spec 046 (R4/AC-6): the pinned line now carries the real agent ID.
+    expect(payload.perceptionContext).toContain('Agents present: Bob (agent-bob) (idle)');
     const toolNames = payload.tools.map((t) => t.function.name);
     expect(toolNames).toContain('formulate_plan');
     expect(toolNames).toContain('talk_to');

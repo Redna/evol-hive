@@ -282,6 +282,15 @@ export interface SocialActionBridge {
   getAgentSummary(agentId: string): AgentSummary | null;
   /** Get an agent's drives as a flat record. Returns `{}` if not found. */
   getAgentDrives(agentId: string): Record<string, number>;
+  /**
+   * Resolve a display name (or ID) to the REAL active agent ID (spec 046, R1).
+   * Exact agent-ID passthrough first (an active agent state exists with that
+   * ID); otherwise a case-insensitive match on `profile.name` over active
+   * agents, preferring agents co-located with the requester. `null` when
+   * nothing unambiguous matches — never silent guessing. Deterministic: pure
+   * TypeScript over profiles/states, no LLM anywhere.
+   */
+  resolveAgentId(requesterAgentId: string, nameOrId: string): string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
