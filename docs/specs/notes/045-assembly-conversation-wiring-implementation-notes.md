@@ -203,3 +203,62 @@ AC-1..4 live-run evidence will land, per the spec's Live-validation section.
 Next session on this feature should check PR #172 review state / merge, then
 flip the INDEX row 045 to ✅ Done (and verify the spec checkbox states once
 #173 lands).
+
+---
+
+## Session 4 (2026-09-10) — QA coverage verification of PR #172: 3 deterministic gaps found and closed
+
+Full QA pass per the verify-coverage checklist (PR read, diff read, spec ACs mapped to
+tests, YAAM searched, missing tests written, suite + typecheck + lint run, QA report
+posted on the PR, `Status: In Review/QA` label added to #165).
+
+### Coverage audit result
+
+Every AC mapped to tests. Three deterministic seams were covered only at lower
+fidelity — machinery tests with MANUAL wiring (section 4), or neutral-only at
+production level — and are now closed by a new **section 6 (production-wiring
+E2E, no manual wiring anywhere)** in
+`examples/tests/spec-045-assembly-conversation-wiring.test.ts` (commit `e622d54`):
+
+1. **AC-2 render clause E2E**: the target's *rendered* perception — real
+   `PerceptionServiceImpl` + `PerceptionBuilderImpl` over the production-assembled
+   `core.bridges.perception` (the exact components `PPEROrchestratorImpl` builds in
+   its Perceive phase) — contains
+   `INFORMATION: agent-a addressed you, awaiting response: "Where do you get good beans?"`,
+   dynamic section only (spec 021); the speaker's own payload has no line. Before:
+   render layer was asserted only with manual wiring (CLI spec-044 E2E) or
+   query-level only through the assembled stack (section 5).
+2. **AC-3/AC-4 assembly-level E2E**: two-turn exchange through the PRODUCTION
+   `stack.cognitiveToolExecutor` — same thread id (1 conversation total), 2 turns,
+   status open→active, per-participant turnCount 1/1, spec 044 reciprocity exactly
+   once per direction, pending-address marker flips to agent-a. Before: only via
+   the manually-wired executor (section 4).
+3. **AC-1 non-legacy-delta E2E**: negative-sentiment talk_to through the PRODUCTION
+   executor yields the R6 delta (trust +0, familiarity +1) — not legacy +2/+5 —
+   asserted in relationship state AND the `[social]` telemetry line. Before: the
+   production-level test only exercised neutral, which coincides with legacy by
+   design (spec 033 R6), so the non-legacy clause was unproven at assembly level.
+
+E2E helper pattern worth reusing: `renderPerception(agentId)` builds the real
+Perceive phase over `core.bridges.perception` with a stub classifier
+(`prune: async (_d, a) => a`) — no LLM, full render fidelity.
+
+### Verified in this session (fresh runs)
+
+- `pnpm build` → `pnpm test`: **2,326 passed / 0 failed** (was 2,323 — +3 new;
+  shared 342, visualizer 48, memory 101, cognition 883+1 skipped, engine 783,
+  examples 154, cli 15). Spec 044 exactly-once + spec 033 lifecycle/bridge suites
+  unmodified and green (AC-5).
+- `pnpm typecheck` / `pnpm lint` clean; prettier clean on the touched file.
+- QA report posted: https://github.com/Redna/evol-hive/pull/172#issuecomment-5614728354
+- Issue #165 now labeled `Status: In Review/QA` (alongside `Status: Ready for Dev`).
+
+### Still open (unchanged)
+
+- Live-run clauses of AC-1/3/4 (`it.todo`): manual real-LLM evidence on #165;
+  non-legacy live deltas additionally blocked by #173 gap 2 (sentiment arg dropped
+  in the mid-loop tool-call path). Name-keyed targeting (gap 1) still the
+  root-cause candidate for #167.
+- AC-6 deviation (spec-018 INDEX regex uncap) reviewed in QA: test-only, sound.
+- QA verdict recorded on the PR: coverage complete for all deterministically
+  testable ACs; ready for review/merge from a QA standpoint.
