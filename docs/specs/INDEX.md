@@ -61,8 +61,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      62
 ✅ Done:          36
 🔨 In Development: 0
-🔍 In Review:      18
-📝 Drafted:        6
+🔍 In Review:      19
+📝 Drafted:        5
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -98,4 +98,4 @@ Architecture sections fully implemented: 11/11
 | [044](044-social-urge-model.md) | Social Urge Model — Influence, Not Force (Persona-Seeded Talk Inclination, Reciprocity Learning, Pending-Address Marker) | §3, §5, §6, §8 | 🔍 In Review | [#160](https://github.com/Redna/evol-hive/issues/160) | [#164](https://github.com/Redna/evol-hive/pull/164) | shared, engine, cognition |
 | [045](045-assembly-conversation-wiring.md) | Assembly Conversation Wiring — Connect the Conversation Bridge in `examples/assembly.ts` So Live Sims Run `talk_to` on the Conversation Path | §2, §6, §8 | 🔍 In Review | [#165](https://github.com/Redna/evol-hive/issues/165) | [#172](https://github.com/Redna/evol-hive/pull/172) | examples |
 | [046](046-talk-to-target-resolution-sentiment-passthrough.md) | talk_to Target Resolution — Display Names Must Never Create Phantom Participants; `sentiment` Must Reach the Executor | §2, §6, §8 | 🔍 In Review | [#173](https://github.com/Redna/evol-hive/issues/173) | [#174](https://github.com/Redna/evol-hive/pull/174), [#175](https://github.com/Redna/evol-hive/pull/175) | shared, engine, cognition |
-| [047](047-talk-loop-urge-gating-asymmetric-reward.md) | The Talk Loop Fix — Urge-Gated Social Urgency & Asymmetric Social Reward (Directive Suppression, Unanswered Cap, Monologue vs Exchange Split) | §3, §6, §8 | 📝 Drafted | [#176](https://github.com/Redna/evol-hive/issues/176) | — | shared, engine, cognition |
+| [047](047-talk-loop-urge-gating-asymmetric-reward.md) | The Talk Loop Fix — Urge-Gated Social Urgency & Asymmetric Social Reward (Directive Suppression, Unanswered Cap, Monologue vs Exchange Split) | §3, §6, §8 | 🔍 In Review | [#176](https://github.com/Redna/evol-hive/issues/176) | [#178](https://github.com/Redna/evol-hive/pull/178) | shared, engine, cognition |

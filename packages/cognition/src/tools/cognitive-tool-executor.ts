@@ -28,7 +28,7 @@ import type {
   SelfModelBridge,
   UpdateSelfModelToolResult,
 } from '@evol-hive/shared';
-import { sanitizeDriveOverrides } from '@evol-hive/shared';
+import { sanitizeDriveOverrides, SOCIAL_MONOLOGUE_REWARD } from '@evol-hive/shared';
 import { conversationRelationshipDelta, participantSentimentCounts } from '@evol-hive/shared';
 import type { MemoryInjector } from '@evol-hive/memory';
 
@@ -327,7 +327,13 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         receivedCount: 1,
       });
       if (this.stateDataProvider !== undefined) {
-        this.stateDataProvider.applyDriveChanges(agentId, { social: 10 });
+        // Spec 047 (R5 — issue #176): asymmetric social reward. The send alone
+        // is a potential monologue and grants only the token amount; the full
+        // restore completes engine-side (+8 via the conversation manager's
+        // exchange-completion hook, R6) when the target contributes to the
+        // same thread. The drive semantically means need for exchange, not
+        // need for emission.
+        this.stateDataProvider.applyDriveChanges(agentId, { social: SOCIAL_MONOLOGUE_REWARD });
       }
       const targetName = this.socialBridge.getAgentSummary(target)?.name ?? target;
       return {

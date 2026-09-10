@@ -36,6 +36,7 @@ import type {
 } from '@evol-hive/shared';
 import {
   CONVERSATION_TURN_WINDOW,
+  SOCIAL_EXCHANGE_BONUS,
   appendTurn,
   conversationRelationshipDelta,
   deriveParticipantRole,
@@ -66,6 +67,19 @@ export interface ConversationManagerOptions {
   config?: ConversationConfig;
   /** Optional close-time consolidation sink (R5). Inert when absent. */
   consolidationSink?: ConversationConsolidationSink;
+  /**
+   * Spec 047 (R6 — issue #176): injected drive-apply callback for the
+   * deferred exchange restore. When a turn by agent T lands in a
+   * conversation, every other participant S whose only contributions so far
+   * are unanswered messages (S has ≥ 1 prior turn in that thread) and who has
+   * not already been topped up for that thread is reported through this
+   * callback with `SOCIAL_EXCHANGE_BONUS`. Idempotent — at most once per
+   * (sender, conversation) pair, never re-granted on repeated contributions
+   * or thread rejoin. The manager detects; the applier pays — wired in
+   * `assembly.ts` to the existing `AgentManager` drive path. Inert when
+   * absent.
+   */
+  onExchangeRestore?: (agentId: string, conversationId: string, amount: number) => void;
 }
 
 /** Default lifecycle config (spec 033, R2/R4). */
@@ -87,6 +101,13 @@ export class ConversationManagerImpl implements ConversationBridge {
   private readonly sceneManager: SceneManager;
   private readonly config: ConversationConfig;
   private readonly sink: ConversationConsolidationSink | undefined;
+  private readonly onExchangeRestore:
+    ((agentId: string, conversationId: string, amount: number) => void) | undefined;
+  /**
+   * Granted deferred restores, keyed `${conversationId}:${senderId}` (spec 047,
+   * R6 idempotency — at most one top-up per (sender, conversation) pair).
+   */
+  private readonly exchangeRestored = new Set<string>();
   private nextId = 1;
 
   constructor(options: ConversationManagerOptions) {
@@ -95,6 +116,7 @@ export class ConversationManagerImpl implements ConversationBridge {
     this.sceneManager = options.sceneManager;
     this.config = options.config ?? defaultConversationManagerConfig();
     this.sink = options.consolidationSink;
+    this.onExchangeRestore = options.onExchangeRestore;
   }
 
   // ── ConversationBridge (spec 033, R3) ─────────────────────────────────────
@@ -306,6 +328,11 @@ export class ConversationManagerImpl implements ConversationBridge {
     };
     this.commit(appendTurn(conversation, turn));
     const updated = this.conversations.get(conversationId);
+    // Spec 047 (R6): the turn landed — detect completed exchanges and report
+    // the deferred restore for earlier monologue-only participants.
+    if (updated !== undefined) {
+      this.grantExchangeRestores(updated, speakerId);
+    }
     return {
       success: true,
       conversationId,
@@ -369,6 +396,33 @@ export class ConversationManagerImpl implements ConversationBridge {
       awaiting.push(conversation);
     }
     return awaiting;
+  }
+
+  // ── Deferred exchange restore (spec 047, R5/R6) ─────────────────────────
+
+  /**
+   * A turn by `speakerId` just landed in `conversation`. Every other current
+   * participant S whose contributions so far are unanswered messages (S has
+   * ≥ 1 prior turn in the thread — via `turnCount`, which survives the
+   * rolling turn window, or via the windowed turns for rejoined agents) and
+   * who has not already been topped up for this thread receives the deferred
+   * restore through the injected callback. Idempotent: at most once per
+   * (sender, conversation) pair — re-contributions, leave/rejoin, and
+   * multi-sender threads never double-grant. Inert without the callback.
+   */
+  private grantExchangeRestores(conversation: ConversationObject, speakerId: string): void {
+    if (this.onExchangeRestore === undefined) return;
+    for (const participant of conversation.participants) {
+      if (participant.agentId === speakerId) continue;
+      const key = `${conversation.id}:${participant.agentId}`;
+      if (this.exchangeRestored.has(key)) continue;
+      const contributedBefore =
+        participant.turnCount > 0 ||
+        conversation.turns.some((t) => t.agentId === participant.agentId);
+      if (!contributedBefore) continue;
+      this.exchangeRestored.add(key);
+      this.onExchangeRestore(participant.agentId, conversation.id, SOCIAL_EXCHANGE_BONUS);
+    }
   }
 
   // ── Lifecycle (spec 033, R2) ──────────────────────────────────────────────

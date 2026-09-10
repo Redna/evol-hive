@@ -31,6 +31,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { SmartObject } from '@evol-hive/shared';
+import { SOCIAL_MONOLOGUE_REWARD } from '@evol-hive/shared';
 import {
   createEngineCore,
   loadScene,
@@ -269,8 +270,8 @@ describe('AC-3: mock-cognition run — Execute phase raises energy and comfort',
 
 // ── AC-4: social restoration via talk_to through the sim cognition stack ─────
 
-describe('AC-4: talk_to raises the sender social +10 (spec 018 executor path)', () => {
-  it('with the apprentice co-present, a mocked talk_to execution raises the gardener social by +10', async () => {
+describe('AC-4: talk_to restores sender social (spec 018 path, spec 047 asymmetric reward)', () => {
+  it('with the apprentice co-present, a talk_to send grants +2 and the apprentice reply tops up to +10', async () => {
     // Sim's real-LLM wiring: memory subsystem → engine core → scene →
     // cognition stack. The executor is wired even though no LLM call is made —
     // the Execute/talk_to path is deterministic.
@@ -297,6 +298,9 @@ describe('AC-4: talk_to raises the sender social +10 (spec 018 executor path)', 
       initialDrives: { curiosity: 80, energy: 90 },
       startRoomId: 'garden',
     });
+    // No game loop runs here — place the apprentice explicitly so the reply
+    // below resolves and passes the spec 031/033 co-location rules.
+    core.agentManager.updateState('apprentice-1', { location: 'garden' });
 
     const stack = assembleCognitionStack(core, undefined, { memory });
     expect(stack.cognitiveToolExecutor).toBeDefined();
@@ -316,8 +320,22 @@ describe('AC-4: talk_to raises the sender social +10 (spec 018 executor path)', 
     );
 
     expect(result.success).toBe(true);
+    // Spec 047 (R5, issue #176): the send alone is a potential monologue —
+    // the token grant only. The full restore completes engine-side when the
+    // target contributes to the same thread.
+    expect(core.agentManager.getState(GARDENER)!.drives.social).toBe(
+      55 + SOCIAL_MONOLOGUE_REWARD,
+    ); // 55 + 2
+
+    // The apprentice replies into the SAME thread → the deferred +8 tops the
+    // gardener up to the historical +10 for a real exchange (spec 047 R5/R6).
+    await stack.cognitiveToolExecutor!.executeTalkTo(
+      'apprentice-1',
+      'gardener-1',
+      'Coming along nicely!',
+    );
     const after = core.agentManager.getState(GARDENER)!.drives.social;
-    expect(after).toBe(65); // 55 + 10 (spec 018: talk_to → own social +10)
+    expect(after).toBe(65); // 55 + 10 (monologue 2 + exchange 8, spec 018 total preserved)
   });
 });
 
