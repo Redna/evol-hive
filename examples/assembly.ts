@@ -260,6 +260,12 @@ export function assembleCognitionStack(
   const social = socialManager ?? new SocialManager(core.agentManager);
   // Wire social perception into the perception bridge.
   core.bridges.perception.setSocialManager(social);
+  // Spec 045 (R2): the sim's SocialManager — the instance passed as the
+  // executor's socialBridge below AND consumed by the perception bridge —
+  // delegates conversation queries to the SAME ConversationManagerImpl that
+  // createEngineCore built (spec 043 pending-address data, spec 044
+  // reciprocity). Exactly one SocialManager holds both roles.
+  social.setConversationManager(core.conversationManager);
 
   // ── LLM client (spec 019, Req 5, Req 9) ───────────────────────────────────
   const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
@@ -307,6 +313,12 @@ export function assembleCognitionStack(
         stateDataProvider: core.bridges.reflect,
         socialBridge: social,
         mutationPort: core.mutationService,
+        // Spec 045 (R1): talk_to joins/opens real conversation threads via
+        // spec 033 R1/R3 openOrContribute — the delta becomes a
+        // deterministic function of the conversation's aggregate sentiment
+        // (spec 033 R6) instead of the legacy blind +5/+2 fallback (kept
+        // for unwired contexts, spec 033 AC-14).
+        conversationBridge: core.conversationManager,
         maxSceneMutationsPerCycle: guardrailConfig.maxSceneMutationsPerCycle ?? 1,
       })
     : undefined;
