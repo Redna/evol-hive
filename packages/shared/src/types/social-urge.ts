@@ -83,6 +83,36 @@ export const SOCIAL_EXCHANGE_BONUS = 8;
  */
 export const DEFAULT_SOCIAL_TALKATIVENESS = 0.5;
 
+/**
+ * Ticks within which a pending address counts as FRESH (spec 049, R3 —
+ * issue #167): `currentTick − lastTurnTick < SOCIAL_PENDING_FRESH_TICKS`
+ * promotes the pending-address line to the FIRST dynamic line with a
+ * `FRESH:` prefix. 3600 ticks ≈ 60 sim-seconds ≈ the upper bound of the
+ * observed cc=3 own-cycle cadence — i.e. "fresh" means "before the addressed
+ * agent's first realistic chance to respond" (spec 048 measurements).
+ * Information, never a trigger (spec 044 R5 stands).
+ */
+export const SOCIAL_PENDING_FRESH_TICKS = 3600;
+
+/**
+ * Conservative own-cycle interval fallback in ticks (spec 049, R4 —
+ * issue #167): when an agent's `meanCycleIntervalTicks` is `undefined`
+ * (legacy saves, never-cycled agents), the conversation reply window treats
+ * the agent's cadence as this value — calibrated to the observed cc=3 upper
+ * bound so an UNKNOWN cadence widens rather than narrows the window
+ * (Decision 3: fail-open toward possible replies).
+ */
+export const DEFAULT_CYCLE_INTERVAL_TICKS = 3600;
+
+/**
+ * Fixed deterministic EMA coefficient for `meanCycleIntervalTicks` (spec 049,
+ * R4): each newly observed own-cycle interval updates the mean as
+ * `mean + CYCLE_INTERVAL_EMA_ALPHA × (interval − mean)`. Tick arithmetic
+ * only — no wall-clock reads; the constant is documented here so the engine's
+ * bookkeeping stays auditable and replay-stable.
+ */
+export const CYCLE_INTERVAL_EMA_ALPHA = 0.2;
+
 /** Seeds assigned to talkative-trait matches ("energetic", …). */
 const TALKATIVENESS_HIGH = 0.8;
 /** Seeds assigned to reserved-trait matches ("reserved", …). */
@@ -200,6 +230,30 @@ export interface PendingAddressInfo {
   fromAgentId: string;
   /** The actual message text quoted in the perception line. */
   content: string;
+  /**
+   * The engine tick of the conversation's last turn (spec 049, R3). Filled by
+   * the perceive service from the conversation object; `undefined` for legacy
+   * providers — freshness then cannot be computed and the line renders in
+   * today's position (no promotion).
+   */
+  lastTurnTick?: number;
+  /**
+   * The engine tick at perception time (spec 049, R3), from
+   * `provider.getCurrentTick()`. Same optional pattern as the urge inputs —
+   * pure data, no clock reads inside the builder.
+   */
+  currentTick?: number;
+}
+
+/**
+ * Whether a pending address is FRESH (spec 049, R3): the addressing turn is
+ * younger than {@link SOCIAL_PENDING_FRESH_TICKS}. Deterministic pure
+ * function of the carried tick fields — without both ticks (legacy providers)
+ * the address is never fresh (today's rendering, no promotion).
+ */
+export function isPendingAddressFresh(pending: PendingAddressInfo): boolean {
+  if (pending.currentTick === undefined || pending.lastTurnTick === undefined) return false;
+  return pending.currentTick - pending.lastTurnTick < SOCIAL_PENDING_FRESH_TICKS;
 }
 
 /** Per-present-agent urge assessment carried on `PerceptionResult` (R4b/R4c). */

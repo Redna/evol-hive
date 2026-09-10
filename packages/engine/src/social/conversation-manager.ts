@@ -36,6 +36,7 @@ import type {
 } from '@evol-hive/shared';
 import {
   CONVERSATION_TURN_WINDOW,
+  DEFAULT_CYCLE_INTERVAL_TICKS,
   SOCIAL_EXCHANGE_BONUS,
   appendTurn,
   conversationRelationshipDelta,
@@ -506,6 +507,19 @@ export class ConversationManagerImpl implements ConversationBridge {
    * Tick sweep (spec 033, R2/R7): closes idle conversations and removes
    * participants who wandered out of the room (wandering off = leaving —
    * the spec-031 co-location guard's lifecycle twin).
+   *
+   * Spec 049 (R4 — issue #167): the idle check uses the OWN-CYCLE REPLY
+   * WINDOW — for each participant who owes a reply (everyone but the
+   * last-turn speaker; everyone when there are no turns) the term is
+   * `2 × meanCycleIntervalTicks`, falling back to
+   * {@link DEFAULT_CYCLE_INTERVAL_TICKS} when the field is `undefined`
+   * (legacy saves, never-cycled agents — an unknown cadence WIDENS rather
+   * than narrows the window, Decision 3 fail-open). The effective timeout is
+   * `max(config.idleTimeoutTicks, max of those terms)`: the config value is
+   * repurposed as the wall-time floor, and the measured-interval term
+   * guarantees the addressed agent ≥ 2 own-cycle opportunities before
+   * closure. Closure by idle timeout emits a one-line `[conversation]`
+   * diagnostic (AC-8) so every expiry stays auditable.
    */
   tick(nowTick: number): void {
     for (const conversation of [...this.conversations.values()]) {
@@ -527,10 +541,55 @@ export class ConversationManagerImpl implements ConversationBridge {
         this.commit(updated);
       }
 
-      // Idle timeout (R2).
-      if (nowTick - updated.lastActivity > this.config.idleTimeoutTicks) {
+      // Own-cycle reply window (spec 049, R4): the effective timeout covers
+      // every participant who owes a reply.
+      const owing = participantsOwingReply(updated);
+      let widestTerm = 0;
+      for (const participantId of owing) {
+        const interval = this.agentManager.getState(participantId)?.meanCycleIntervalTicks;
+        const term = 2 * (interval ?? DEFAULT_CYCLE_INTERVAL_TICKS);
+        if (term > widestTerm) widestTerm = term;
+      }
+      const effectiveTimeout = Math.max(this.config.idleTimeoutTicks, widestTerm);
+      const idleTicks = nowTick - updated.lastActivity;
+      if (idleTicks > effectiveTimeout) {
+        this.logIdleClosure(updated, idleTicks, effectiveTimeout, owing);
         this.close(updated.id, 'idle timeout');
       }
+    }
+  }
+
+  /**
+   * The idle-timeout closure diagnostic (spec 049, R4 / AC-8): one line,
+   * prefixed `[conversation]`, carrying the conversation id, the idle tick
+   * count, the effective timeout, and each addressed participant's
+   * cycles-since-activity estimate (idle ÷ their own interval, or the
+   * fail-open default when unknown). Wrapped so a logging failure can never
+   * break the sweep (log-hygiene constraint).
+   */
+  private logIdleClosure(
+    conversation: ConversationObject,
+    idleTicks: number,
+    effectiveTimeout: number,
+    owing: string[],
+  ): void {
+    try {
+      const awaiting = owing
+        .map((participantId) => {
+          const interval =
+            this.agentManager.getState(participantId)?.meanCycleIntervalTicks ??
+            DEFAULT_CYCLE_INTERVAL_TICKS;
+          const cycles = Math.floor(idleTicks / interval);
+          return `${participantId}≈${cycles} cycles`;
+        })
+        .join(', ');
+      console.log(
+        `[conversation] ${conversation.id} idle=${idleTicks}` +
+          ` effectiveTimeout=${effectiveTimeout}` +
+          ` awaiting=[${awaiting}]`,
+      );
+    } catch {
+      // Diagnostics must never break the lifecycle sweep (spec 049 Constraints).
     }
   }
 
@@ -683,6 +742,19 @@ const CONVERSATION_AFFORDANCE_LABELS: Record<(typeof CONVERSATION_AFFORDANCES)[n
   leave: 'Leave this conversation',
   observe: 'Listen in — see the topic and participants',
 };
+
+/**
+ * Participants who owe a reply (spec 049, R4): every participant OTHER than
+ * the last-turn speaker; all participants when the conversation has no turns.
+ * The reply window's widest-term input — the set the `[conversation]`
+ * diagnostic reports as `awaiting=[…]`.
+ */
+function participantsOwingReply(conversation: ConversationObject): string[] {
+  const lastSpeaker = conversation.turns[conversation.turns.length - 1]?.agentId;
+  return conversation.participants
+    .map((p) => p.agentId)
+    .filter((agentId) => lastSpeaker === undefined || agentId !== lastSpeaker);
+}
 
 /** JSON-safe deep copy for plain data. */
 function structuredCloneSafe<T>(value: T): T {

@@ -153,33 +153,33 @@ with ≥ 2 turns; per-agent reply rates ordered Tomas > Iris > Maren. Evidence (
 
 ## Acceptance Criteria
 
-- [ ] **AC-1** (R1): Unit test — after A `talk_to`s co-located B, B's next cycle emits one `[social-urge]`
+- [x] **AC-1** (R1): Unit test — after A `talk_to`s co-located B, B's next cycle emits one `[social-urge]`
   line (captured via an injected log sink or console spy) containing B's persona seed, the pending entry
   (conversation id, from = A, age, fresh flag), and the urge entry for A with its four factor values and a
   rendered-line classification.
-- [ ] **AC-2** (R1): Unit test — with agents present but no pending addresses and all urges below the
+- [x] **AC-2** (R1): Unit test — with agents present but no pending addresses and all urges below the
   surface threshold, exactly one `[social-urge]` line is still emitted per cycle (with classification
   `none`); with no agents present, no line is emitted; a throw inside diagnostic construction leaves the
   cycle outcome unchanged.
-- [ ] **AC-3** (R2): The design-notes doc exists with the per-persona audit table; a unit test pins
+- [x] **AC-3** (R2): The design-notes doc exists with the per-persona audit table; a unit test pins
   `deriveSocialTalkativenessSeed` over the three shipped profiles: Tomas 0.8, Iris 0.25, Maren equal to
   her explicit field (< 0.25), and asserts that with the explicit field removed Maren would infer 0.5
   (proving the seed is explicit, not inferred).
-- [ ] **AC-4** (R3): Unit test — a pending address with `currentTick − lastTurnTick < SOCIAL_PENDING_FRESH_TICKS`
+- [x] **AC-4** (R3): Unit test — a pending address with `currentTick − lastTurnTick < SOCIAL_PENDING_FRESH_TICKS`
   renders the `FRESH: INFORMATION: …` line as the **first** dynamic line; the same pending address past the
   threshold renders today's line in today's position.
-- [ ] **AC-5** (R3, R5): The fresh line never appears in `stableLines` (spec 021 assertion on the built
+- [x] **AC-5** (R3, R5): The fresh line never appears in `stableLines` (spec 021 assertion on the built
   prompt sections), and no scheduler/enqueue behavior changes when a fresh pending address exists.
-- [ ] **AC-6** (R4): Unit test — B has `meanCycleIntervalTicks = 3600`; a conversation with
+- [x] **AC-6** (R4): Unit test — B has `meanCycleIntervalTicks = 3600`; a conversation with
   `lastActivity = nowTick − 120` is **not** closed by the tick sweep (today's code closes it); at
   `lastActivity = nowTick − 7201` it closes with reason `idle timeout`.
-- [ ] **AC-7** (R4): Unit test — with `meanCycleIntervalTicks` undefined on all participants, a
+- [x] **AC-7** (R4): Unit test — with `meanCycleIntervalTicks` undefined on all participants, a
   conversation still closes once `nowTick − lastActivity` exceeds `2 × DEFAULT_CYCLE_INTERVAL_TICKS`, and
   the existing spec 033 `conversation-manager` lifecycle tests pass unmodified (the `idleTimeoutTicks`
   floor semantics are intact for directly-driven configs).
-- [ ] **AC-8** (R4): Unit test — an idle-timeout closure emits one `[conversation]` line containing the
+- [x] **AC-8** (R4): Unit test — an idle-timeout closure emits one `[conversation]` line containing the
   conversation id, the idle tick count, and the effective timeout.
-- [ ] **AC-9** (R5): Full suite green; `pper-scheduler.ts` diff is limited to the two-field bookkeeping
+- [x] **AC-9** (R5): Full suite green; `pper-scheduler.ts` diff is limited to the two-field bookkeeping
   write in `startCycle`; no test asserting cycle cadence, gating, or spec 040 suppression behavior changes.
 - [ ] **AC-10** (R6): Live-run evidence per R6 is attached to issue #167 (reply rate > 0, ≥ 1 conversation
   with ≥ 2 turns, Tomas > Iris > Maren reply-rate ordering).

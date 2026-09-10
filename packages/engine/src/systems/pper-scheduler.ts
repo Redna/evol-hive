@@ -22,7 +22,7 @@ import type {
   System1OutcomeRecorderPort,
   System1TriggerSourcePort,
 } from '@evol-hive/shared';
-import { NO_HARD_TRIGGERS, hasHardTrigger } from '@evol-hive/shared';
+import { CYCLE_INTERVAL_EMA_ALPHA, NO_HARD_TRIGGERS, hasHardTrigger } from '@evol-hive/shared';
 import type { GameTick } from '@evol-hive/shared';
 import type { AgentManager } from '../index.js';
 
@@ -110,7 +110,7 @@ export class PPERScheduler {
             simTime: _tick.simulationTime,
           });
         }
-        this.startCycle(agent.agentId);
+        this.startCycle(agent.agentId, _tick.tickNumber);
       }
       idx = (idx + 1) % agents.length;
       scanned++;
@@ -119,8 +119,39 @@ export class PPERScheduler {
     this.rrCursor = idx;
   }
 
-  /** Fire-and-forget a single PPER cycle. */
-  private startCycle(agentId: string): void {
+  /**
+   * Fire-and-forget a single PPER cycle.
+   *
+   * Spec 049 (R4 — issue #167): the cycle start is the single choke point
+   * where an agent's cycle begins, so the own-cycle cadence bookkeeping
+   * lives here — two optional fields on `AgentInternalState` written at the
+   * cycle start that already happens. Pure tick arithmetic: interval =
+   * current tick − `lastCycleTick`; the first observed interval seeds the
+   * EMA directly, subsequent intervals update it with the fixed
+   * {@link CYCLE_INTERVAL_EMA_ALPHA}. No wall-clock reads (determinism), no
+   * scheduling/cadence/gating change (R5 — bookkeeping only).
+   */
+  private startCycle(agentId: string, tick: number): void {
+    // Cadence bookkeeping (spec 049, R4) — before the isThinking flip, from
+    // the pre-cycle state.
+    const preCycleState = this.agentManager.getState(agentId);
+    if (preCycleState !== null) {
+      const lastCycleTick = preCycleState.lastCycleTick;
+      if (lastCycleTick === undefined) {
+        // First observed cycle — anchor only; the interval (and EMA) seeds on
+        // the next cycle.
+        this.agentManager.updateState(agentId, { lastCycleTick: tick });
+      } else {
+        const interval = Math.max(0, tick - lastCycleTick);
+        const priorMean = preCycleState.meanCycleIntervalTicks;
+        const meanCycleIntervalTicks =
+          priorMean === undefined
+            ? interval // first observed interval seeds the EMA directly
+            : priorMean + CYCLE_INTERVAL_EMA_ALPHA * (interval - priorMean);
+        this.agentManager.updateState(agentId, { lastCycleTick: tick, meanCycleIntervalTicks });
+      }
+    }
+
     this.activeCycles += 1;
     this.agentManager.updateState(agentId, { isThinking: true });
 

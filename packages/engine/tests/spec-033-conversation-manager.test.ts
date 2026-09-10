@@ -24,6 +24,7 @@ import {
   ConversationManagerImpl,
   defaultConversationManagerConfig,
 } from '../src/social/conversation-manager.js';
+import { DEFAULT_CYCLE_INTERVAL_TICKS } from '@evol-hive/shared';
 import type { AgentProfile, MemoryEntryInput } from '@evol-hive/shared';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -276,9 +277,13 @@ describe('close-time consolidation (AC-4, R5)', () => {
   });
 
   it('idle timeout closes the conversation and consolidates', () => {
-    const config = defaultConversationManagerConfig();
     const first = world.manager.openOrContribute('agent-a', 'agent-b', 'hi', 'neutral', 11);
-    world.manager.tick(11 + config.idleTimeoutTicks + 1);
+    // Spec 049 (R4 — issue #167): the idle check is now the own-cycle reply
+    // window — with no cadence data on any participant the effective timeout
+    // fail-opens to max(config.idleTimeoutTicks, 2 × DEFAULT_CYCLE_INTERVAL_TICKS),
+    // so the sweep must run past THAT window to close (see
+    // docs/specs/notes/049-dialogue-completion-design-notes.md, R4 section).
+    world.manager.tick(11 + 2 * DEFAULT_CYCLE_INTERVAL_TICKS + 1);
     expect(world.manager.getConversation(first.conversation!.id)!.status).toBe('closed');
     expect(world.stored).toHaveLength(2);
   });
@@ -295,9 +300,10 @@ describe('close-time consolidation (AC-4, R5)', () => {
   });
 
   it('an open conversation with no turns closes via the sweep too', () => {
-    const config = defaultConversationManagerConfig();
     const first = world.manager.openOrContribute('agent-a', 'agent-b', 'hi', 'neutral', 11);
-    world.manager.tick(11 + config.idleTimeoutTicks + 1);
+    // Spec 049 (R4): no-turn conversations treat ALL participants as owing a
+    // reply — same fail-open window (see the R4 note above).
+    world.manager.tick(11 + 2 * DEFAULT_CYCLE_INTERVAL_TICKS + 1);
     expect(world.manager.getConversation(first.conversation!.id)!.status).toBe('closed');
   });
 });

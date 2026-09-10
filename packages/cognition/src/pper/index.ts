@@ -199,16 +199,28 @@ export class PerceptionServiceImpl {
     let socialUrges: SocialUrgeAssessment[] | undefined;
     try {
       const provider = this.options.provider;
+      // Spec 049 (R3): the current tick feeds BOTH the pending-address age
+      // fields (freshness) and the urge scene-novelty input — one read.
+      const currentTick =
+        typeof provider.getCurrentTick === 'function' ? provider.getCurrentTick() : undefined;
       // R4a: conversations where the agent owes a reply (Decision 4 query).
       if (typeof provider.getConversationsAwaitingAgentReply === 'function') {
         const awaiting = provider.getConversationsAwaitingAgentReply(agentId);
         if (awaiting.length > 0) {
           pendingAddresses = awaiting.map((conversation) => {
             const last = conversation.turns[conversation.turns.length - 1];
+            // Spec 049 (R3): the addressing turn's tick + the perception tick
+            // ride along as optional fields — pure data, same pattern as the
+            // urge inputs. The perception-builder's fresh-address promotion
+            // and the orchestrator's [social-urge] diagnostic consume them;
+            // without both (legacy providers) freshness is never claimed.
             return {
               conversationId: conversation.id,
               fromAgentId: last!.agentId,
               content: last!.content,
+              ...(last !== undefined && currentTick !== undefined
+                ? { lastTurnTick: last.tick, currentTick }
+                : {}),
             };
           });
         }
@@ -227,8 +239,6 @@ export class PerceptionServiceImpl {
           typeof provider.getAgentState === 'function'
             ? provider.getAgentState(agentId)?.spawnTick
             : undefined;
-        const currentTick =
-          typeof provider.getCurrentTick === 'function' ? provider.getCurrentTick() : undefined;
         socialUrges = agentsPresent.map((agent) => {
           const rel = relationships?.[agent.agentId];
           const result = computeSocialUrge({
@@ -312,6 +322,8 @@ export { ReflectServiceImpl } from './reflect-service.js';
 export type { ReflectServiceOptions } from './reflect-service.js';
 export { PPEROrchestratorImpl, createPPEROrchestrator } from './orchestrator.js';
 export type { PPEROrchestratorOptions } from './orchestrator.js';
+export { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
+export { classifySocialUrgeLine } from './perception-builder.js';
 export {
   BatchPlanService,
   type BatchPlanServiceOptions,
