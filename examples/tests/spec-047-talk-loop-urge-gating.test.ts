@@ -203,6 +203,9 @@ describe('spec 047 — production stack: urge-gated urgency, asymmetric reward',
   // ── AC-8 — prompt snapshot: no-outlet guidance replaces the talk_to push ────
 
   it('AC-8: decayed urge toward all present → no-outlet line, no talk_to directive or hint', async () => {
+    // Low social drive so the 018 hint would render pre-gate (meaningful
+    // suppression assertion); the urge decay dominates regardless.
+    core.agentManager.getState('agent-alice')!.drives.social = 30;
     // Drive the reciprocity counters down: three unanswered monologues.
     for (let i = 0; i < 3; i++) {
       await stack.cognitiveToolExecutor!.executeTalkTo(
@@ -246,6 +249,7 @@ describe('spec 047 — production stack: urge-gated urgency, asymmetric reward',
   // ── AC-7 — backward compat: fresh relationships keep today's behavior ───────
 
   it('AC-7: fresh relationship (no reciprocity history) → directive and hint render as today', async () => {
+    core.agentManager.getState('agent-alice')!.drives.social = 30; // primary drive: social
     const context = await renderPerception('agent-alice');
     expect(context).toContain(DIRECTIVE);
     expect(context).toContain(SOCIAL_HINT);
