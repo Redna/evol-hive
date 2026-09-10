@@ -100,3 +100,57 @@ audit's commit `03861f0`, which carried the spec-045 QA suite with 5
   the exchange in `events.jsonl` (record evidence on issue #165; the three
   `it.todo` scaffolds in the QA suite track this).
 - CI on PR #172 + merge.
+
+---
+
+## Session 2 (2026-09-10, resumed) — live validation ran; two cognition-layer gaps discovered
+
+Resumed with PR #172 open and all commits pushed. This session:
+
+1. **Re-verified everything**: build ✓, typecheck/lint/format ✓, spec-045
+   suite 16 passed / 3 todo ✓.
+2. **Live validation run** (the remaining evidence item): 10 min coffee-shop
+   sim, real LLM glm-5.3-flash via Ollama Cloud (`https://ollama.com/v1`,
+   `LLM_API_KEY=$OLLAMA_API_KEY`), harness `examples/live-conv-validation.ts`
+   (gitignored via `.git/info/exclude` — wraps the production
+   `buildCoffeeShopEngine()` and polls `conversationManager` / pending-query /
+   relationships every 10s; log `session-logs/045-live-run.log`).
+   - **First live conversations ever**: 3 created (`conv-…-1..3`) — pre-fix
+     this was structurally zero (openOrContribute never called). R1/R2 wiring
+     confirmed live.
+   - Speaker-side reciprocity accumulates live (Carol→Bob sentCount=2).
+   - BUT all 3 threads closed within a tick and no pending-address line ever
+     rendered. Root cause found (see below).
+3. **Gap 1 — name-keyed targeting**: perception renders agents by NAME only
+   (`perception-builder.ts:82`, `Agents present: Bob (…)`); the tool schema
+   asks for `targetAgentId`; nothing resolves name→ID. The live LLM passed
+   `"Bob"` → conversation participants keyed to a phantom with no agent state
+   → the R7 co-location sweep removes it within one tick → thread closes.
+   Real target never participates: no AC-2 pending-address, no AC-3
+   same-thread reply, no AC-4 target-side receivedCount, and `queueMessage`
+   delivers to a phantom key. **Root-cause candidate for #167's reply-rate-0.**
+4. **Gap 2 — sentiment dropped**: `openai-client.ts:662` calls
+   `executeTalkTo(agentId, targetAgentId, message)` — the `sentiment` arg from
+   the LLM never reaches the executor, so live deltas are always the
+   neutral-branch +5/+2. (Neutral/positive → +5/+2 by design per spec 033 R6;
+   only negative-dominant exchanges differ, +1/+0 — so live delta variation
+   additionally requires a negative-tagged turn.)
+5. Both gaps are in `packages/cognition`/`packages/shared` — outside spec
+   045's package boundary (`examples/assembly.ts` only). Filed as a follow-up
+   issue; referenced from #165 and #167. AC-1..4 left unchecked in the spec
+   with a Live-validation evidence section added; AC-5/AC-6 checked (AC-6 with
+   one noted deviation: the spec-018 INDEX regex uncap, commit 4c391de — the
+   previous session's honest recount to 61 broke the stale bounded pattern).
+6. Full suite re-verified green after the regex fix: 2,323 passed / 0 failed.
+
+### Environment notes (session 2)
+
+- Ollama Cloud direct API works with `LLM_BASE_URL=https://ollama.com/v1`
+  + `LLM_API_KEY` + `LLM_MODEL=glm-5.3-flash` (fast, tool-calling capable).
+  Model list: `curl https://ollama.com/v1/models`.
+- The 120-tick conversation idle timeout does NOT fire in live runs: the
+  executor's `currentTick` defaults to `Date.now()` (ms epoch) while the
+  lifecycle sweep compares game ticks — the idle check is vacuously false.
+  Threads persist across LLM cycles; what kills them is the R7 co-location
+  sweep removing phantom participants. Worth knowing before anyone "fixes"
+  the tick mismatch.
