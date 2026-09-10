@@ -32,10 +32,19 @@
  *    conversation in the core's manager with no manual wiring (R1 + instance
  *    identity), and the sim's SocialManager carries the conversation delegate
  *    with no manual wiring (R2).
- * 6. Live-run evidence (it.todo) — the real-LLM / events.jsonl clauses of
+ * 6. Production-wiring E2E (active) — the remaining deterministic seams at
+ *    full fidelity, all with NO manual wiring: the target's RENDERED perception
+ *    carries the spec 043 pending-address INFORMATION line quoting the actual
+ *    message text (AC-2's render clause, through the real Perceive-phase
+ *    components over the assembled provider); a reply through the PRODUCTION
+ *    executor extends the SAME thread with spec 044 exactly-once reciprocity
+ *    (AC-3/AC-4 at the assembly level); and a negative-sentiment exchange via
+ *    the PRODUCTION executor yields the R6-gated delta, not legacy +2/+5
+ *    (AC-1's sentiment-gating clause at the assembly level).
+ * 7. Live-run evidence (it.todo) — the real-LLM / events.jsonl clauses of
  *    AC-1/AC-3/AC-4 are manual live-run evidence (tracked on issue #165); the
  *    deterministic proxies for those clauses are the section-4 machinery tests
- *    plus the section-5 production-wiring tests.
+ *    plus the section-5 production-wiring and section-6 E2E tests.
  *
  * Deterministic throughout — no LLM anywhere (spec 033 AC-14). The live-run
  * evidence clauses of AC-1/AC-2/AC-3/AC-4 (real LLM, events.jsonl) are
@@ -45,11 +54,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AgentProfile, EngineConfig } from '@evol-hive/shared';
+import type { Affordance, AgentProfile, EngineConfig } from '@evol-hive/shared';
 import { createEngineCore } from '@evol-hive/engine';
 import type { EngineCore } from '@evol-hive/engine';
 import { SocialManager } from '@evol-hive/engine';
-import { CognitiveToolExecutorImpl } from '@evol-hive/cognition';
+import {
+  CognitiveToolExecutorImpl,
+  PerceptionBuilderImpl,
+  PerceptionServiceImpl,
+} from '@evol-hive/cognition';
+import type { AffordanceClassifier } from '@evol-hive/cognition';
 import { assembleCognitionStack, buildMemorySubsystem } from '../assembly.ts';
 import type { CognitionStack } from '../assembly.ts';
 
@@ -417,11 +431,183 @@ describe('spec 045 production wiring — assembled stack needs no manual wiring'
   );
 });
 
-// ── 6. Live-run evidence (it.todo — manual real-LLM run, tracked on #165) ────
+// ── 6. Production-wiring E2E — the full seam the fix closes (active) ────────
+//
+// Section 5 proves the production-constructed executor and the SocialManager
+// delegate carry the wires. These tests close the remaining deterministic
+// seams at full fidelity with NO manual wiring anywhere — every component
+// real, every wire from `assembleCognitionStack` itself:
+//
+// - AC-2's render clause: the target's actual RENDERED perception (real
+//   PerceptionServiceImpl + PerceptionBuilderImpl over the assembled
+//   core.bridges.perception — the exact components the production PPER
+//   orchestrator builds in its Perceive phase) includes the spec 043
+//   pending-address INFORMATION line quoting the actual message text,
+//   dynamic section only (spec 021 KV-cache rules).
+// - AC-3/AC-4 at the assembly level: a reply through the PRODUCTION executor
+//   extends the SAME thread (turnCount ≥ 2, open → active per spec 033
+//   lifecycle) and spec 044 reciprocity counts real replies exactly once per
+//   direction.
+// - AC-1's sentiment-gating clause at the assembly level: a negative-
+//   sentiment exchange through the PRODUCTION executor yields the R6-gated
+//   delta (+0 trust / +1 familiarity), not the legacy blind +2/+5, and the
+//   [social] telemetry line shows the non-legacy values.
+
+describe('spec 045 production-wiring E2E — rendered perception + multi-turn (no manual wiring)', () => {
+  let core: EngineCore;
+  let stack: CognitionStack;
+
+  beforeEach(() => {
+    delete process.env['USE_REAL_EMBEDDINGS'];
+    process.env['USE_REAL_LLM'] = 'true'; // the executor is only constructed on the real-LLM path
+    const memory = buildMemorySubsystem();
+    core = createEngineCore(makeEngineConfig(), memory.memoryStore, memory.vectorStore);
+    stack = assembleCognitionStack(core, undefined, { memory, wireMemoryMaintenance: false });
+    spawnCoLocatedPair(core);
+    // No manual wiring here — every wire under test comes from the assembly.
+    expect(stack.cognitiveToolExecutor).toBeDefined();
+  });
+
+  afterEach(() => {
+    delete process.env['USE_REAL_LLM'];
+  });
+
+  /**
+   * The real Perceive phase over the production-assembled provider — the exact
+   * components the PPER orchestrator constructs internally (PerceptionServiceImpl
+   * + PerceptionBuilderImpl, orchestrator.ts constructor), driven without the
+   * LLM phases (deterministic; spec 033 AC-14). Returns the rendered
+   * perceptionContext the LLM would see.
+   */
+  async function renderPerception(agentId: string): Promise<string> {
+    const stubClassifier: AffordanceClassifier = {
+      prune: async (_driveLabel: string, affordances: Affordance[]) => affordances,
+    };
+    const service = new PerceptionServiceImpl({
+      provider: core.bridges.perception,
+      classifier: stubClassifier,
+    });
+    const builder = new PerceptionBuilderImpl();
+    const perception = await service.perceive(agentId);
+    return builder.build(perception).perceptionContext;
+  }
+
+  it(
+    "AC-2 (R2) E2E: the target's rendered perception quotes the pending-address line through the " +
+      "production-assembled stack (dynamic section only; the speaker's own payload owes nobody)",
+    async () => {
+      const result = await stack.cognitiveToolExecutor!.executeTalkTo(
+        'agent-a',
+        'agent-b',
+        'Where do you get good beans?',
+        'neutral',
+      );
+      expect(result.conversationUpdated).toBe(true);
+
+      // The target's NEXT perception — the full AC-2 clause, rendered.
+      const payloadB = await renderPerception('agent-b');
+      expect(payloadB).toContain(
+        'agent-a addressed you, awaiting response: "Where do you get good beans?"',
+      );
+      // Dynamic section only (spec 021): never in the stable prefix.
+      const lines = payloadB.split('\n');
+      const separator = lines.indexOf('---');
+      expect(separator).toBeGreaterThan(0);
+      const stable = lines.slice(0, separator).join('\n');
+      const dynamic = lines.slice(separator + 1).join('\n');
+      expect(dynamic).toContain('awaiting response');
+      expect(stable).not.toContain('awaiting response');
+
+      // The speaker does not owe a reply to themselves — no line rendered.
+      expect(await renderPerception('agent-a')).not.toContain('awaiting response');
+    },
+  );
+
+  it(
+    'AC-3/AC-4 (R1/R2) E2E: a reply through the PRODUCTION executor extends the SAME thread and ' +
+      'spec 044 reciprocity counts real replies exactly once per direction',
+    async () => {
+      const first = await stack.cognitiveToolExecutor!.executeTalkTo(
+        'agent-a',
+        'agent-b',
+        'hello there',
+        'neutral',
+      );
+      expect(first.conversationUpdated).toBe(true);
+      const convId = core.conversationManager.listConversationsInRoom(ROOM)[0]!.id;
+
+      const reply = await stack.cognitiveToolExecutor!.executeTalkTo(
+        'agent-b',
+        'agent-a',
+        'hello back',
+        'positive',
+      );
+      expect(reply.conversationUpdated).toBe(true);
+
+      // AC-3: same thread — not a second conversation; lifecycle open → active.
+      expect(core.conversationManager.listConversationsInRoom(ROOM)).toHaveLength(1);
+      const conv = stack.socialManager.getOpenConversationBetween('agent-a', 'agent-b');
+      expect(conv).not.toBeNull();
+      expect(conv!.id).toBe(convId);
+      expect(conv!.turns).toHaveLength(2);
+      expect(conv!.status).toBe('active');
+      const a = conv!.participants.find((p) => p.agentId === 'agent-a');
+      const b = conv!.participants.find((p) => p.agentId === 'agent-b');
+      expect(a!.turnCount).toBe(1);
+      expect(b!.turnCount).toBe(1);
+
+      // AC-4: exactly-once counters through the production wiring.
+      const relA = stack.socialManager.getRelationships('agent-a')['agent-b'];
+      expect(relA!.sentCount).toBe(1);
+      expect(relA!.receivedCount).toBe(1);
+      const relB = stack.socialManager.getRelationships('agent-b')['agent-a'];
+      expect(relB!.sentCount).toBe(1);
+      expect(relB!.receivedCount).toBe(1);
+
+      // The pending-address marker flipped with the last turn (spec 044 Decision 4).
+      expect(core.bridges.perception.getConversationsAwaitingAgentReply('agent-b')).toHaveLength(0);
+      expect(core.bridges.perception.getConversationsAwaitingAgentReply('agent-a')).toHaveLength(1);
+    },
+  );
+
+  it(
+    'AC-1 (R1) E2E: sentiment gating is live through the PRODUCTION executor — a negative exchange ' +
+      'yields the R6 delta (+0/+1), not legacy +2/+5, and [social] telemetry shows the non-legacy values',
+    async () => {
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const before = stack.socialManager.getRelationships('agent-a')['agent-b'];
+      const result = await stack.cognitiveToolExecutor!.executeTalkTo(
+        'agent-a',
+        'agent-b',
+        'ugh, not this again',
+        'negative',
+      );
+      expect(result.success).toBe(true);
+      expect(result.conversationUpdated).toBe(true);
+
+      // R6: a negative exchange builds NO trust (+0 vs legacy blind +2) plus a
+      // minimal +1 familiarity bump (vs legacy +5). Base: trust 50, fam 0.
+      const relA = stack.socialManager.getRelationships('agent-a')['agent-b'];
+      expect(relA).toBeDefined();
+      expect(relA!.trust - (before?.trust ?? 50)).toBe(0);
+      expect(relA!.familiarity - (before?.familiarity ?? 0)).toBe(1);
+
+      // The [social] telemetry line shows the non-legacy values.
+      const socialLine = logSpy.mock.calls
+        .map((c) => String(c[0]))
+        .find((l) => l.includes('[social]'));
+      expect(socialLine).toBeDefined();
+      expect(socialLine).toContain('trust=+0');
+      expect(socialLine).toContain('familiarity=+1');
+    },
+  );
+});
+
+// ── 7. Live-run evidence (it.todo — manual real-LLM run, tracked on #165) ────
 // The deterministic proxies for these clauses are the section-4 machinery
-// tests and the section-5 production-wiring tests; the live artifacts (real
-// LLM telemetry across a whole run, events.jsonl) require a live sim run and
-// stay tracked here.
+// tests, the section-5 production-wiring tests, and the section-6 E2E tests;
+// the live artifacts (real LLM telemetry across a whole run, events.jsonl)
+// require a live sim run and stay tracked here.
 
 describe('spec 045 live-run evidence (todo — requires a real-LLM live run)', () => {
   it.todo(
