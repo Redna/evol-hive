@@ -114,3 +114,42 @@ coverage complete; no missing tests; no new tests required.**
   issue #176 (keeping `Status: Ready for Dev`, matching issues #160/#173 convention).
 - **YAAM**: daemon confirmed search-only from this session (JSON-RPC TCP :44835; no write
   methods) — this file is the indexed record. Next actor unchanged: human review + merge #178.
+
+## Re-verification record — second QA pass on PR #178 (post-docs-commit)
+
+Independent re-verification of PR #178 at the **current head `2ec0390`** (one docs commit past
+the first QA pass's `35f7ab6`; code identical — diff `35f7ab6..2ec0390` touches only
+`docs/specs/INDEX.md` and this notes file). **Verdict: PASS — coverage confirmed complete;
+no missing tests; no new tests required.**
+
+- **Gates re-run from a clean tree @ `2ec0390`**: `pnpm -r run build` ✓ → `pnpm test` ✓ 7/7
+  packages (shared 347; visualizer 48; memory 101 passed/24 todo; cognition 913 passed/
+  1 skipped/26 todo; engine 807 passed/141 todo; examples 169 passed/3 todo; cli 15) →
+  `pnpm typecheck` ✓, `pnpm lint` ✓, `pnpm format:check` ✓.
+- **Targeted suites**: shared spec-047+044 33/33 ✓; cognition spec-047+044+018 75/75 ✓
+  (spec-018 AC-26 asserts the +2 via `SOCIAL_MONOLOGUE_REWARD`); engine spec-047 9/9 ✓;
+  examples spec-047+046+032 31/31 ✓ (spec-046 target-resolution suite 10/10 untouched —
+  `git diff origin/main...HEAD --name-only` confirms zero spec-046 files changed).
+- **AC matrix re-confirmed (all 8 green)**: AC-1 → examples obedient-LLM spam bound
+  (30 iterations, ≤ 10 talk events/pair, > 0 asserted); AC-2 → shared sum test + engine
+  40→42→50 + examples AC-2/AC-2b + updated spec-032 AC-4 (55→57→65); AC-3/AC-8 → cognition
+  R1/R2 suites (directive absent, no-outlet line in dynamic only, "rarely answers" present,
+  stable prefix unchanged) + examples AC-8 production snapshot (capability line intact,
+  talk_to still in tool list — influence, not force); AC-4 → cognition +2 precision incl.
+  the "cognition never grants the +8" negative + legacy-path +2; AC-5 → cap math (≥ 3,
+  reply-offset), promotion exclusion, per-target hint exclusion; AC-6 → engine idempotency
+  (1..N turns, leave/rejoin, 3-sender thread, self-reply + silent-participant negatives);
+  AC-7 → full 7-package suite green + spec-044 (28 shared/17 cognition) + spec-046 (10
+  examples) unchanged.
+- **38 new spec-047 tests** across 4 suites (5 shared + 17 cognition + 9 engine + 5
+  examples; plus 2 intentionally-updated legacy assertions in spec-018/spec-032).
+- **One observation (non-blocking)**: the constraint "do not count a target's message in a
+  *different* conversation as the exchange" has no dedicated test — it is enforced structurally
+  (`grantExchangeRestores` scans only the conversation the turn landed in; the grant key is
+  `${conversationId}:${senderId}`), so no cross-conversation grant is possible by construction.
+  A dedicated test would be nice-to-have, not required.
+- **YAAM**: daemon (JSON-RPC TCP :42439 this session) re-confirmed search-only —
+  `workspace_append_note`/`workspace_initialize` hang (methods absent from the daemon's
+  dispatch table); `yaam_search("feature-")` surfaces this file, not workspace notes. This
+  section is the indexed QA record. QA report re-posted on PR #178 superseding the first
+  (same verdict). Next actor unchanged: human review + merge #178.
