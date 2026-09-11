@@ -166,9 +166,44 @@ Fresh verification: `pnpm test` **2,534 passed / 0 failed** (assembly 59, was 53
 Non-blocking residual: AC-2's live-LLM run clause remains manual evidence (spec 045
 pattern, unchanged).
 
+## QA session 4 — independent re-verification + final residual gaps (commit `8524c69`)
+
+Second QA pass, run independently of session 3 (fresh checkout, build from
+dist, all suites re-run). Session 3's AC map re-verified line-by-line against
+the actual test files — AC-1/2/3/4/6 all confirmed covered. Three residual
+R2/R5 wire gaps found and closed in
+`packages/assembly/tests/assembly-options.test.ts` (7 tests):
+
+1. **`autoSave` option (R2, spec 017 Req 16/18)** — the assembler sets
+   `core.autoSaveConfig` and forwards the config to `assembleGameLoop`, which
+   registers the AutoSaveSystem when enabled + persistence exists. After spec
+   050 moved this wiring out of `coffee-shop.ts` into the assembler, NO test
+   observed the wire. Now: enabled ⇒ config set + `'auto-save'` in
+   `gameLoop.systemNames()`; `enabled: false` ⇒ config recorded, system not
+   registered (Req 18); absent ⇒ neither.
+2. **`wireMemoryMaintenance: false` (R2, spec 014)** — the AC-2 suite passes
+   the option but never asserted its effect. Now asserted: no decay service,
+   no reflection loop, no `core.memoryMaintenanceConfig`, no
+   `'memory-maintenance'` system in the loop; default (unset) ⇒ all four
+   present.
+3. **`buildMemorySubsystem` provider selection (R5, spec 007/027)** — default
+   ⇒ `MockEmbeddingProvider`; `USE_REAL_EMBEDDINGS=true` ⇒
+   `OnnxEmbeddingProvider` (lazy construction — selection touches no file),
+   and the same provider family flows into `stack.embeddingProvider`.
+
+Also fixed: `assembly.test.ts` had a pre-existing prettier violation from
+`f7abef3` (three `it()` quote styles) — `pnpm format:check` failed locally on
+HEAD; quote style corrected, `format:check` clean again.
+
+Fresh verification: `pnpm test` **2,541 passed / 0 failed** (assembly 66, was
+59); `pnpm typecheck` / `pnpm lint` / `pnpm format:check` / `pnpm build`
+clean. QA report re-posted on the PR; YAAM node `qa-note-spec-050-pr-185`
+upserted (session 3's claimed node was absent from the index — query returned
+empty — so this session's upsert is the canonical one).
+
 ## Remaining for full done
 
-- ~~QA coverage pass~~ → done this session (see QA coverage verification above).
+- ~~QA coverage pass~~ → done sessions 3 + 4 (see above).
 - Merge PR #185 (reviewer sign-off).
 - After merge: flip INDEX row 050 → ✅ Done.
 
