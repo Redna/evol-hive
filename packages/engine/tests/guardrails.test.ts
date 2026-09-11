@@ -129,6 +129,7 @@ describe('AC-26: all individual flags false but guardrailsEnabled true', () => {
     process.env['ENGINE_GUARDRAILS_AFFORDANCE_MASKING'] = 'false';
     process.env['ENGINE_GUARDRAILS_CONTEXTUAL_FORCING'] = 'false';
     process.env['ENGINE_GUARDRAILS_PLAN_VALIDATION'] = 'false';
+    process.env['ENGINE_GUARDRAILS_WAIT_SUPPRESSION'] = 'false';
     const { loadEngineConfig } = await import('../../../config/engine.config.js');
     const config = loadEngineConfig();
     expect(config.guardrailsEnabled).toBe(true);
@@ -136,6 +137,7 @@ describe('AC-26: all individual flags false but guardrailsEnabled true', () => {
       affordanceMasking: false,
       contextualForcing: false,
       planValidation: false,
+      waitSuppression: false, // spec 052, Req 3 — same env→config plumbing
     });
   });
 });

@@ -28,12 +28,15 @@ import {
 // ─── AC-1: defaultGuardrailConfig ────────────────────────────────────────────
 
 describe('AC-1: defaultGuardrailConfig()', () => {
-  it('returns { affordanceMasking: true, contextualForcing: true, planValidation: true }', () => {
+  it('returns { affordanceMasking: true, contextualForcing: true, planValidation: true, waitSuppression: true } (waitSuppression added by spec 052, Req 3)', () => {
     const config = defaultGuardrailConfig();
     expect(config).toEqual({
       affordanceMasking: true,
       contextualForcing: true,
       planValidation: true,
+      // Spec 052 (Req 3): the critical-drive wait guard defaults on — only an
+      // explicit false disables it.
+      waitSuppression: true,
     });
   });
 });
