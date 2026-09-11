@@ -380,7 +380,7 @@ describe('spec 050 AC-2 — conversation bridge + urge surfaces wired by the def
 // ── R2: env-driven classifier selection ─────────────────────────────────────
 
 describe('spec 050 R2 — USE_REAL_EMBEDDINGS classifier selection happens inside the assembler', () => {
-  it('USE_REAL_EMBEDDINGS=true selects the real AffordanceClassifierImpl (System-0 pruner over the assembler\'s provider)', () => {
+  it("USE_REAL_EMBEDDINGS=true selects the real AffordanceClassifierImpl (System-0 pruner over the assembler's provider)", () => {
     process.env['USE_REAL_EMBEDDINGS'] = 'true';
     const world = assembleWorld({ config: makeConfig(), mockLLMClient: new GenericMockLLM() });
     expect(world.stack).toBeDefined();
@@ -389,7 +389,7 @@ describe('spec 050 R2 — USE_REAL_EMBEDDINGS classifier selection happens insid
     expect(world.stack!.classifier).toBeInstanceOf(AffordanceClassifierImpl);
   });
 
-  it('without the env var the classifier is the assembler\'s mock (env read ONLY in the assembler — spec 027 AC-9)', () => {
+  it("without the env var the classifier is the assembler's mock (env read ONLY in the assembler — spec 027 AC-9)", () => {
     const world = assembleWorld({ config: makeConfig(), mockLLMClient: new GenericMockLLM() });
     expect(world.stack!.classifier).toBeDefined();
     expect(world.stack!.classifier).not.toBeInstanceOf(AffordanceClassifierImpl);
@@ -420,7 +420,7 @@ describe('spec 050 R2 — System 1 wiring via the assembleWorld system1 option',
     expect(world.core.system1Tracker).toBeDefined();
   });
 
-  it('no-op mock mode + system1: the memory subsystem is still built (it reaches the core\'s persistence), the no-op orchestrator is kept, no cognition stack', () => {
+  it("no-op mock mode + system1: the memory subsystem is still built (it reaches the core's persistence), the no-op orchestrator is kept, no cognition stack", () => {
     const world = assembleWorld({ config: makeConfig(), system1: {} });
     expect(world.stack).toBeUndefined();
     expect(world.orchestrator).toBeInstanceOf(MockOrchestrator);
