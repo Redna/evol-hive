@@ -168,4 +168,7 @@ export class GuardrailEngineImpl implements GuardrailEngine {
   }
 }
 
+export { checkWaitSuppression, DRIVE_CRITICAL_THRESHOLD } from './wait-guard.js';
+export type { WaitGuardVerdict } from './wait-guard.js';
+
 export {};

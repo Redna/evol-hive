@@ -45,14 +45,39 @@ export class AffordanceClassifierImpl implements AffordanceClassifier {
     const topK = options?.topK ?? this.config.topK;
     const threshold = options?.similarityThreshold ?? this.config.similarityThreshold;
 
+    // Spec 052 (Req 2): urgent declared restorers are never similarity-pruned.
+    // An affordance whose declared `effects` contain a strictly positive entry
+    // for a drive that is CURRENTLY URGENT (below DRIVE_URGENCY_THRESHOLD) is
+    // the remedy for that drive — it must survive the funnel that sits before
+    // both the tool enum and the drive→affordance hints. Data-driven from
+    // declared `effects` only (spec 034 Req 3 — no hardcoded drive→affordance
+    // table), and gated on urgency (Constraints): restorers of non-urgent
+    // drives still prune, so tool lists do not bloat with irrelevant remedies.
+    // With no `urgentDrives` (legacy call sites) the set is empty and the
+    // exemption is inert — byte-identical pre-change behavior.
+    const urgent = new Set(options?.urgentDrives ?? []);
+    const isUrgentRestorer = (a: Affordance): boolean => {
+      if (urgent.size === 0) return false;
+      for (const [drive, delta] of Object.entries(a.effects ?? {})) {
+        if (delta !== undefined && delta > 0 && urgent.has(drive)) return true;
+      }
+      return false;
+    };
+
     // Movement affordances are NEVER similarity-pruned: navigation is the
     // means to every drive, not a drive itself. When nothing urgent anchors
     // them, the drive-similarity filter removes `go_to_*` from the enum and
     // the LLM cannot express movement intent — live runs then produced
     // wait-only plans whose descriptions leaked the suppressed intent
     // ("go to the greenhouse to find food" with targetAffordance=wait).
-    const movement = affordances.filter((a) => a.engineEffect.startsWith('go_to_'));
-    const candidates = affordances.filter((a) => !a.engineEffect.startsWith('go_to_'));
+    // Spec 052 extends the exemption to restoration: an urgent drive's
+    // declared restorer is exempt exactly like movement.
+    const exempt = affordances.filter(
+      (a) => a.engineEffect.startsWith('go_to_') || isUrgentRestorer(a),
+    );
+    const candidates = affordances.filter(
+      (a) => !a.engineEffect.startsWith('go_to_') && !isUrgentRestorer(a),
+    );
 
     const queryVec = await this.embeddingProvider.embed(driveLabel);
     const labels = candidates.map((a) => a.label);
@@ -66,10 +91,10 @@ export class AffordanceClassifierImpl implements AffordanceClassifier {
     const pruned = scored
       .filter((s) => s.score >= threshold)
       .sort((x, y) => y.score - x.score)
-      .slice(0, Math.max(0, topK - movement.length))
+      .slice(0, Math.max(0, topK - exempt.length))
       .map((s) => s.affordance);
 
-    return [...pruned, ...movement];
+    return [...pruned, ...exempt];
   }
 }
 

@@ -5,7 +5,9 @@
  * Runs the Dynamic World demo (garden ↔ workshop) with real LLM cognition for
  * an extended period while exercising every mutation type from spec 030:
  *
- *   t+60s   spawn_agent     — Gardener's Apprentice joins mid-run
+ *   t+60s   spawn_agent     — skipped: the Apprentice ships in the scene
+ *                             since spec 052 (Req 4, issue #183) — he is
+ *                             present from t=0 for the cc=3 decay divisor
  *   t+120s  move_object     — Toolbox carried garden → workshop
  *   t+180s  add_object      — Watering can appears in the garden
  *   t+240s  close gate      — connection closed; pathing blocked
@@ -28,9 +30,12 @@
  *   - social:   restored ONLY through agent-to-agent cognitive tools —
  *               `talk_to` (own social +10) and `help` (target's primary drive
  *               + own social), both require a co-present agent. Solo-window
- *               bound: at most 6 points of social decay (0.1/s × 60s, from
- *               the default 100) before the Apprentice spawns at t+60s, so
- *               social never approaches 0 while the Gardener is alone.
+ *               bound (historical): at most 6 points of social decay
+ *               (0.1/s × 60s, from the default 100) before the Apprentice
+ *               spawned at t+60s — since spec 052 (issue #183) apprentice-1
+ *               ships in the scene (greenhouse) from t=0, the t+60s spawn is
+ *               skipped and the cc=3 divisor counts 3 live agents from the
+ *               first tick.
  *   - hunger:   planter-1 `eat` (+25) — the plant → water → harvest → eat
  *               chain (spec 034, Req 6) closes the loop; hunger previously
  *               had NO restoration path and pinned at 0 in runs ≳ 16 min
@@ -107,33 +112,19 @@ function makeConfig(): EngineConfig {
   };
 }
 
-/** The apprentice profile, spawned mid-run (spec 030, Req 6).
+/** The apprentice profile — now sourced from the shipped scene (spec 052, Req 4).
  *
- * Exported for the spec 049 seed-audit test (issue #167): the AC-3 seed pins
- * run against the SHIPPED persona texts, and Tomas is the sim's apprentice.
+ * Tomas ships IN `DYNAMIC_WORLD_SCENE` (greenhouse-resident, the #183 run
+ * population) instead of joining mid-run. This function returns the scene's
+ * entry — the single source of truth for the persona the spec 049 seed-audit
+ * test pins (issue #167): 'energetic' infers the 0.8 talkativeness seed.
  */
 export function apprenticeProfile(): AgentProfile {
-  return {
-    id: 'apprentice-1',
-    name: 'Tomas Lind',
-    description:
-      'Apprentice gardener — a former furniture-maker who left the workshop bench to learn how things grow.',
-    traits: ['curious', 'energetic'],
-    backstory:
-      'Tomas spent three years sanding chair legs before realizing he wanted to grow ' +
-      'what he built with. He asked Maren for work until she said yes. He trusts his ' +
-      'hands more than his words and learns by doing, not by asking twice.',
-    longTermGoals: [
-      'Grow something from seed to table entirely on his own',
-      "Earn Maren's full trust",
-    ],
-    // Mid-level drives (spec 034/032 validation design — see dynamic-world.ts).
-    // social 35 (grand validation): urgency within ~50s of decay so the
-    // matcher surfaces `talk_to` while Maren is co-located in the garden;
-    // spawn moved into the garden for the same reason (was workshop).
-    initialDrives: { energy: 45, hunger: 40, social: 35, comfort: 50, curiosity: 60 },
-    startRoomId: 'garden',
-  };
+  const agent = DYNAMIC_WORLD_SCENE.agents.find((a) => a.id === 'apprentice-1');
+  if (agent === undefined) {
+    throw new Error('apprentice-1 must ship in DYNAMIC_WORLD_SCENE (spec 052, Req 4)');
+  }
+  return agent;
 }
 
 /** Schedule engine-driven mutations that exercise every spec-030 operation. */
@@ -145,13 +136,25 @@ function scheduleMutations(core: EngineCore, log: (msg: string) => void): NodeJS
     log(r.accepted ? `[mutation] ${label} accepted` : `[mutation] ${label} REJECTED: ${r.error}`);
   };
 
-  at(60_000, 'spawn_agent(apprentice-1)', () =>
+  // Spec 052 (Req 4 — issue #183): apprentice-1 ships in the scene from t=0
+  // (the #183 run population — 3 live agents for the cc=3 decay divisor), so
+  // the mid-run spawn proposal is skipped: the engine would reject it as a
+  // duplicate agent id. The t+60s slot is kept as an explicit no-op so the
+  // spec-030 mutation timeline stays recognizable in the logs; the
+  // despawn/respawn cycle below still exercises dormancy.
+  at(60_000, 'spawn_agent(apprentice-1)', () => {
+    if (DYNAMIC_WORLD_SCENE.agents.some((a) => a.id === 'apprentice-1')) {
+      log(
+        '[mutation] spawn_agent(apprentice-1) skipped: ships in the scene (spec 052 Req 4)',
+      );
+      return;
+    }
     propose('spawn_agent(apprentice-1)', {
       type: 'spawn_agent',
       payload: { profile: apprenticeProfile() },
       source: 'system',
-    }),
-  );
+    });
+  });
   at(120_000, 'move_object(toolbox-1 → workshop)', () =>
     propose('move_object(toolbox-1 → workshop)', {
       type: 'move_object',

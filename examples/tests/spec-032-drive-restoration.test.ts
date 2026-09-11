@@ -211,6 +211,86 @@ describe('AC-2: builtin furniture handlers restore energy + comfort', () => {
   });
 });
 
+// ── AC-2b: greenhouse seed-shelf handlers execute (spec 052 live-run finding) ─
+
+describe('AC-2b: greenhouse restorers execute with declared deltas (spec 052 live-run finding)', () => {
+  // Spec 052 live run (issue #183): seed-shelf-1's `pick_herbs` (+8 curiosity)
+  // and `eat_herbs` (+20 hunger) were DECLARED in the scene but no handler
+  // existed for either — every execution returned "No handler registered",
+  // the greenhouse's hunger loop never closed, and the greenhouse agents
+  // bottomed out exactly as #183 reports. The handlers live in
+  // `createDynamicWorldHandlers` and match the declared effects exactly
+  // (stateless — the shelf is described as "full of herbs and seedlings").
+  it('pick_herbs on seed-shelf-1 → success with driveChanges { curiosity: +8 }', async () => {
+    const core = wireSimCore();
+    // The gardener starts in the garden — move to the greenhouse (co-location guard).
+    core.sceneManager.moveAgent(GARDENER, 'greenhouse');
+
+    const result = await core.bridges.execute.executeAffordance(
+      'seed-shelf-1',
+      'pick_herbs',
+      GARDENER,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.driveChanges).toBeDefined();
+    expect(result.driveChanges!['curiosity']).toBe(8);
+  });
+
+  it('eat_herbs on seed-shelf-1 → success with driveChanges { hunger: +20 }', async () => {
+    const core = wireSimCore();
+    // The gardener starts in the garden — move to the greenhouse (co-location guard).
+    core.sceneManager.moveAgent(GARDENER, 'greenhouse');
+
+    const result = await core.bridges.execute.executeAffordance(
+      'seed-shelf-1',
+      'eat_herbs',
+      GARDENER,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.driveChanges).toBeDefined();
+    expect(result.driveChanges!['hunger']).toBe(20);
+  });
+
+  // QA extension of the same finding (issue #183): the potting-table's
+  // restorers were equally handlerless — including the greenhouse's ONLY
+  // in-room energy restorer (`rest_among_seedlings`), which the spec-032
+  // invariant ("every room must restore energy") requires to be executable.
+  // Stateless: resting and repotting among the seedlings consume nothing.
+  it('rest_among_seedlings on potting-table-1 → success with driveChanges { comfort: +15, energy: +4 }', async () => {
+    const core = wireSimCore();
+    core.sceneManager.moveAgent(GARDENER, 'greenhouse');
+
+    const result = await core.bridges.execute.executeAffordance(
+      'potting-table-1',
+      'rest_among_seedlings',
+      GARDENER,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.driveChanges).toBeDefined();
+    expect(result.driveChanges!['comfort']).toBe(15);
+    expect(result.driveChanges!['energy']).toBe(4);
+  });
+
+  it('repot_seedlings on potting-table-1 → success with driveChanges { curiosity: +12, comfort: +5 }', async () => {
+    const core = wireSimCore();
+    core.sceneManager.moveAgent(GARDENER, 'greenhouse');
+
+    const result = await core.bridges.execute.executeAffordance(
+      'potting-table-1',
+      'repot_seedlings',
+      GARDENER,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.driveChanges).toBeDefined();
+    expect(result.driveChanges!['curiosity']).toBe(12);
+    expect(result.driveChanges!['comfort']).toBe(5);
+  });
+});
+
 // ── AC-3: Execute phase applies the drive deltas to the agent ────────────────
 
 describe('AC-3: mock-cognition run — Execute phase raises energy and comfort', () => {
@@ -323,9 +403,7 @@ describe('AC-4: talk_to restores sender social (spec 018 path, spec 047 asymmetr
     // Spec 047 (R5, issue #176): the send alone is a potential monologue —
     // the token grant only. The full restore completes engine-side when the
     // target contributes to the same thread.
-    expect(core.agentManager.getState(GARDENER)!.drives.social).toBe(
-      55 + SOCIAL_MONOLOGUE_REWARD,
-    ); // 55 + 2
+    expect(core.agentManager.getState(GARDENER)!.drives.social).toBe(55 + SOCIAL_MONOLOGUE_REWARD); // 55 + 2
 
     // The apprentice replies into the SAME thread → the deferred +8 tops the
     // gardener up to the historical +10 for a real exchange (spec 047 R5/R6).

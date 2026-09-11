@@ -115,7 +115,14 @@ export function overrideSchedulerConfig(config: EngineConfig): PPERSchedulerConf
 
 /** Default guardrail config — all three guardrails enabled (spec 016, Req 2, AC-1). */
 export function defaultGuardrailConfig(): GuardrailConfig {
-  return { affordanceMasking: true, contextualForcing: true, planValidation: true };
+  // Spec 052 (Req 3): waitSuppression defaults true — only an explicit false
+  // turns the critical-drive wait guard off.
+  return {
+    affordanceMasking: true,
+    contextualForcing: true,
+    planValidation: true,
+    waitSuppression: true,
+  };
 }
 
 /** Default engine config with all existing defaults plus guardrails (spec 016, Req 2, AC-2). */

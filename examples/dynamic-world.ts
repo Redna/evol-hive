@@ -141,12 +141,13 @@ const workshop: SceneDefinition['rooms'][number] = {
 };
 
 // Greenhouse (grand-validation scene, conversation/exploration arc): an
-// UNEXPLORED third room. No agent starts here except iris-1 — Maren and Tomas
-// have empty spatial memory for it, so it only enters their `targetArea` enum
-// through the door-sighting gate (spec 039 R4) or social fog-lifting via a
-// `talk_to` conversation with Iris (spec 039 AC-4). The room's affordances
-// give exploration a real payoff (curiosity + a food-adjacent herb chain),
-// so curiosity-urgent agents have a reason to route there once known.
+// UNEXPLORED third room. iris-1 and apprentice-1 (Tomas, spec 052 Req 4 —
+// the #183 population) START here; Maren has empty spatial memory for it, so
+// it only enters her `targetArea` enum through the door-sighting gate
+// (spec 039 R4) or social fog-lifting via a `talk_to` conversation (spec 039
+// AC-4). The room's affordances give exploration a real payoff (curiosity + a
+// food-adjacent herb chain), so curiosity-urgent agents have a reason to
+// route there once known.
 const greenhouse: SceneDefinition['rooms'][number] = {
   id: 'greenhouse',
   name: 'Greenhouse',
@@ -316,6 +317,40 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
       initialDrives: { energy: 55, hunger: 45, social: 40, comfort: 55, curiosity: 50 },
       startRoomId: 'greenhouse',
     },
+    {
+      // Tomas (spec 052, Req 4 — issue #183): the #183 run population was
+      // THREE agents (gardener-1 garden, iris-1 greenhouse, apprentice-1
+      // greenhouse) but apprentice-1 only existed in the run's scene variant,
+      // so the observation was not reproducible from main. Tomas ships in the
+      // scene as the third agent, greenhouse-resident like Iris, making the
+      // cc=3 decay scaling (spec 048 Req 1: divisor = live agent count) and
+      // the #183 observation reproducible without re-deriving the scene.
+      // Persona texts and drives are the spec-049 seed-audit profiles
+      // (previously only the sim's mid-run spawn carried them): 'energetic'
+      // infers the 0.8 talkativeness seed, preserving the Tomas > Iris >
+      // Maren reply-rate ordering. No affordance/handler changes — agent
+      // profile only, additive to this array.
+      id: 'apprentice-1',
+      name: 'Tomas Lind',
+      description:
+        'Apprentice gardener — a former furniture-maker who left the workshop bench to learn how things grow.',
+      traits: ['curious', 'energetic'],
+      backstory:
+        'Tomas spent three years sanding chair legs before realizing he wanted to grow ' +
+        'what he built with. He asked Maren for work until she said yes. He trusts his ' +
+        'hands more than his words and learns by doing, not by asking twice.',
+      longTermGoals: [
+        'Grow something from seed to table entirely on his own',
+        "Earn Maren's full trust",
+      ],
+      // Mid-level drives (spec 034/032 validation design — see the scene
+      // header): urgency exists from tick 1, so the drive→affordance loop is
+      // exercisable within a single run. Tomas's drives match the spec-049
+      // seed-audit apprentice profile exactly (social 35 → talk_to urgency
+      // within ~50s of decay).
+      initialDrives: { energy: 45, hunger: 40, social: 35, comfort: 50, curiosity: 60 },
+      startRoomId: 'greenhouse',
+    },
   ],
 };
 
@@ -403,6 +438,46 @@ export function createDynamicWorldHandlers(): Record<string, AffordanceHandler> 
         success: true,
         newState: { ...state, vegetables: vegetables - 1 },
         driveChanges: { hunger: 25 },
+      };
+    },
+    // Spec 052 live-run finding (issue #183): the greenhouse restorers were
+    // DECLARED in the scene but had NO handler — every execution returned
+    // "No handler registered", the greenhouse's hunger loop never closed, and
+    // the greenhouse agents bottomed out exactly as #183 reports. All four
+    // match the declared effects exactly and are stateless: the shelf is
+    // described as "full of herbs and seedlings", and resting/repotting among
+    // the potting table's seedlings consumes nothing.
+    pick_herbs: async (_objectId, _agentId, state) => {
+      return {
+        success: true,
+        newState: state,
+        driveChanges: { curiosity: 8 },
+      };
+    },
+    eat_herbs: async (_objectId, _agentId, state) => {
+      return {
+        success: true,
+        newState: state,
+        driveChanges: { hunger: 20 },
+      };
+    },
+    // Potting-table restorers (QA gap, same live-run finding): the greenhouse's
+    // ONLY in-room energy restorer (`rest_among_seedlings`, spec-032 invariant
+    // "every room must restore energy") and the curiosity/comfort work loop
+    // were equally handlerless — the enum could carry them and execution still
+    // failed. Stateless like the seed shelf.
+    rest_among_seedlings: async (_objectId, _agentId, state) => {
+      return {
+        success: true,
+        newState: state,
+        driveChanges: { comfort: 15, energy: 4 },
+      };
+    },
+    repot_seedlings: async (_objectId, _agentId, state) => {
+      return {
+        success: true,
+        newState: state,
+        driveChanges: { curiosity: 12, comfort: 5 },
       };
     },
     work: async (_objectId, _agentId, state) => {

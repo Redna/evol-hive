@@ -475,6 +475,14 @@ export interface GuardrailConfig {
    * Optional — consumers default to 1 when absent.
    */
   maxSceneMutationsPerCycle?: number;
+  /**
+   * Spec 052 (Req 3): reject an all-`wait` plan while a hintable drive is
+   * below the critical threshold and a directly-restoring affordance sits in
+   * the post-prune enum. Optional and additive — legacy configs that omit the
+   * field get the guard ENABLED (the spec's default `true`); only an explicit
+   * `false` disables it.
+   */
+  waitSuppression?: boolean;
 }
 
 /** The result of plan validation (spec 016, Req 3). */

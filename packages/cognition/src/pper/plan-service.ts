@@ -21,6 +21,7 @@ import type {
 import { WAIT_AFFORDANCE } from '@evol-hive/shared';
 import type { LLMClient, PlanBuilder, GuardrailEngine, LLMContextPayload } from '../index.js';
 import { LLMResponseError } from '../llm/index.js';
+import { checkWaitSuppression } from '../guardrails/wait-guard.js';
 
 /** Constructor options for {@link PlanServiceImpl}. */
 export interface PlanServiceOptions {
@@ -107,6 +108,31 @@ export class PlanServiceImpl {
           return {
             success: false,
             error: `LLM plan violates the affordance enum after retry: ${verdict.feedback}`,
+          };
+        }
+      }
+
+      // Spec 052 (Req 3): critical-drive wait guard (§10 plan-level check,
+      // spec 016 pattern). When a hintable drive is below the critical
+      // threshold and a direct restorer sits in the post-prune enum, an
+      // all-`wait` plan is rejected with an actionable reason — the existing
+      // plan-failure recovery path re-prompts, and the plan builder's
+      // imperative drive hint already tells the LLM what to do. Gated by
+      // `GuardrailConfig.waitSuppression` (default true); inert without a
+      // guardrail engine.
+      const guardrailForWait = this.options.guardrail;
+      if (guardrailForWait !== undefined) {
+        const waitVerdict = checkWaitSuppression(
+          perceptionResult.passive.drives,
+          payload.availableAffordances,
+          result,
+          guardrailForWait.config.waitSuppression,
+        );
+        if (waitVerdict.rejected) {
+          console.error(`[wait-guard] agent=${agentId}: ${waitVerdict.reason}`);
+          return {
+            success: false,
+            error: waitVerdict.reason ?? 'all-wait plan under a critical drive',
           };
         }
       }
