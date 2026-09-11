@@ -36,6 +36,7 @@ function parseBoolEnv(value: string | undefined, defaultValue: boolean): boolean
  *   - `ENGINE_GUARDRAILS_AFFORDANCE_MASKING` (default `true`)
  *   - `ENGINE_GUARDRAILS_CONTEXTUAL_FORCING` (default `true`)
  *   - `ENGINE_GUARDRAILS_PLAN_VALIDATION` (default `true`)
+ *   - `ENGINE_GUARDRAILS_WAIT_SUPPRESSION` (default `true`) — spec 052, Req 3.
  *
  * When the master toggle is `false`, all three guardrails are disabled regardless
  * of individual flags.
@@ -55,6 +56,12 @@ export function loadEngineConfig(): EngineConfig {
         ),
         planValidation: parseBoolEnv(
           process.env['ENGINE_GUARDRAILS_PLAN_VALIDATION'],
+          true,
+        ),
+        // Spec 052 (Req 3): critical-drive wait guard (DRIVE_CRITICAL_THRESHOLD
+        // is read by the guard itself, packages/cognition guardrails/wait-guard).
+        waitSuppression: parseBoolEnv(
+          process.env['ENGINE_GUARDRAILS_WAIT_SUPPRESSION'],
           true,
         ),
       }

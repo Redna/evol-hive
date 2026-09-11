@@ -23,6 +23,10 @@ import {
 } from '@evol-hive/shared';
 import type { AffordanceClassifier } from '../classifier/index.js';
 import type { GuardrailEngine } from '../index.js';
+import {
+  DRIVE_URGENCY_THRESHOLD,
+  HINTABLE_DRIVES,
+} from './drive-affordance-matcher.js';
 
 /**
  * Assembles a PassivePerception from the engine-facing data provider.
@@ -100,10 +104,21 @@ export class PerceptionServiceImpl {
         : typeof this.options.provider.getAvailableAffordancesInRoom === 'function'
           ? this.options.provider.getAvailableAffordancesInRoom(passive.roomId)
           : this.options.provider.getAffordancesInRoom(passive.roomId);
-    const prunedAffordances = await this.options.classifier.prune(
-      primaryDriveLabel,
-      allAffordances,
-    );
+    // Spec 052 (Req 2): the agent's urgent HINTABLE drives ride into the
+    // classifier so a declared restorer for one of them survives the funnel
+    // (the greenhouse fix — `rest_among_seedlings`/`eat_herbs` were pruned
+    // away exactly when energy/hunger were urgent). The options object is
+    // omitted entirely when no hintable drive is urgent — the legacy call
+    // path stays byte-identical. `social` is never included: the spec-
+    // 018/024/047 social-hint system owns that drive.
+    const urgentDrives = HINTABLE_DRIVES.filter((drive) => {
+      const value = passive.drives[drive];
+      return value !== undefined && value < DRIVE_URGENCY_THRESHOLD;
+    });
+    const prunedAffordances =
+      urgentDrives.length > 0
+        ? await this.options.classifier.prune(primaryDriveLabel, allAffordances, { urgentDrives })
+        : await this.options.classifier.prune(primaryDriveLabel, allAffordances);
     // Stuck detection (spec 008, Req 5.1, AC-14): no actionable affordances.
     const stuck = prunedAffordances.length === 0;
 
@@ -323,6 +338,7 @@ export type { ReflectServiceOptions } from './reflect-service.js';
 export { PPEROrchestratorImpl, createPPEROrchestrator } from './orchestrator.js';
 export type { PPEROrchestratorOptions } from './orchestrator.js';
 export { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
+export { logDriveHintDiagnostic } from './drive-hint-diagnostic.js';
 export { classifySocialUrgeLine } from './perception-builder.js';
 export { computeTalkEnum, logTalkEnumDiagnostic } from './talk-enum.js';
 export type { TalkEnumOutcome } from './talk-enum.js';

@@ -42,6 +42,17 @@ export interface PruneOptions {
   topK?: number;
   /** Minimum cosine similarity threshold (default from config). */
   similarityThreshold?: number;
+  /**
+   * Spec 052 (Req 2): the agent's currently-urgent HINTABLE drives (below
+   * `DRIVE_URGENCY_THRESHOLD`, `social` excluded). An affordance whose
+   * declared `effects` contain a strictly positive entry for one of these
+   * drives is exempt from pruning — a declared restorer is the remedy for its
+   * drive and must survive the funnel that sits before the tool enum (same
+   * data-driven rule as the spec-034 matcher; no hardcoded table). Additive
+   * and optional: legacy call sites that omit it get byte-identical
+   * pre-change behavior.
+   */
+  urgentDrives?: readonly string[];
 }
 
 /** Runtime configuration for the System 0 classifier (env-driven). */

@@ -45,6 +45,7 @@ import {
 } from './index.js';
 import { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
 import { logTalkEnumDiagnostic } from './talk-enum.js';
+import { logDriveHintDiagnostic } from './drive-hint-diagnostic.js';
 import type { BatchPlanService } from './batch-plan-service.js';
 
 /** Dependencies for {@link PPEROrchestratorImpl}. */
@@ -198,6 +199,26 @@ export class PPEROrchestratorImpl {
     // (2) Plan — LLM formulates a plan.
     this.setPhase(agentId, 'plan');
     const plan: PlanResult = await this.planService.plan(agentId, perception);
+
+    // Spec 052 (R1 — issue #183): the per-cycle drive-hint diagnostic, after
+    // the plan phase so the chosen targetAffordance rides the SAME line as
+    // the funnel counts — "rendered but not chosen" vs "not rendered" vs
+    // "not present" is mechanically distinguishable from logs alone. One
+    // line per cycle whenever a hintable drive is below the urgency
+    // threshold (including plan failures — `chosen=[none]` pairs with the
+    // `[plan-failed]`/`[wait-guard]` stderr lines). Zero LLM calls, wrapped
+    // so a logging failure can never break the cycle (spec 049 discipline).
+    try {
+      logDriveHintDiagnostic(
+        agentId,
+        perception,
+        this.perceptionProvider,
+        plan.success ? plan.plan : undefined,
+      );
+    } catch {
+      // Diagnostics must never break a cycle (spec 049 Constraints).
+    }
+
     if (!plan.success) {
       console.error(`[plan-failed] agent=${agentId}: ${plan.error}`);
       this.recordFailure(agentId, plan.error);
