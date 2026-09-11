@@ -15,6 +15,7 @@ export default defineConfig({
       '@evol-hive/cognition': resolve(__dirname, '../packages/cognition/src/index.ts'),
       '@evol-hive/memory': resolve(__dirname, '../packages/memory/src/index.ts'),
       '@evol-hive/visualizer': resolve(__dirname, '../packages/visualizer/src/index.ts'),
+      '@evol-hive/assembly': resolve(__dirname, '../packages/assembly/src/index.ts'),
     },
   },
 });

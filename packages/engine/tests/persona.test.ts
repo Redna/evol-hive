@@ -184,23 +184,27 @@ describe('Backward compatibility — minimal scene old-style profile (AC-31)', (
     expect(personaText).toContain('sleepy agent who needs coffee');
   });
 
-  it('minimal scene runs a full PPER cycle without modification (AC-31)', async () => {
-    const { gameLoop, agentManager } = buildMinimalEngine();
-    const logs: string[] = [];
-    const origLog = console.log;
-    console.log = (...args: unknown[]) => logs.push(args.map(String).join(' '));
+  it('minimal scene runs a full PPER cycle without modification (AC-31; spec 050: demo log wrapper removed with the second wiring path)', async () => {
+    const engine = buildMinimalEngine();
+    const { gameLoop, agentManager } = engine;
 
     try {
       gameLoop.start();
       await new Promise((r) => setTimeout(r, 50));
       gameLoop.stop();
     } finally {
-      console.log = origLog;
+      // restore no-op
     }
 
-    // The PPER cycle completed successfully — no errors, isThinking reset.
-    const cycleLog = logs.find((l) => l.includes('completed PPER cycle'));
-    expect(cycleLog).toBeDefined();
-    expect(agentManager.getState('agent-1')?.isThinking).toBe(false);
+    // The PPER cycle completed successfully — the Reflect phase stored a
+    // memory node in the assembler's store and the cycle ended (isThinking
+    // reset). The demo log line the former LoggingOrchestrator emitted was
+    // spec-019 demo sugar; spec 050 removes the demo-side orchestrator wrapper
+    // (the promoted assembler owns the orchestrator), so the state assertions
+    // carry AC-31.
+    const state = agentManager.getState('agent-1');
+    expect(state?.isThinking).toBe(false);
+    const memories = await engine.vectorStore.queryByAgent('agent-1');
+    expect(memories.length).toBeGreaterThan(0);
   });
 });

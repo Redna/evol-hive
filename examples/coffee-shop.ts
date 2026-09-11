@@ -1,18 +1,18 @@
 /**
  * examples/coffee-shop.ts — "Coffee Shop" Phase 4 validation scene (spec 019, issue #74)
  * ────────────────────────────────────────────────────────────────────────────
- * A comprehensive integration scene that wires EVERY subsystem simultaneously:
+ * A comprehensive integration scene that exercises every subsystem
+ * simultaneously:
  *   - 4 connected rooms (kitchen ↔ living_room, living_room ↔ bathroom/garden, kitchen ↔ garden)
  *   - 3 agents with distinct drive profiles (Alice: energy, Bob: social, Carol: curiosity)
  *   - 7 non-doorway smart objects including compound actions, state rules, conditional
  *     affordances, object dependencies, and cross-object state changes
- *   - SocialManager wired as SocialActionBridge → CognitiveToolExecutorImpl
- *   - CognitiveToolExecutorImpl with stateDataProvider + socialBridge
- *   - GuardrailEngineImpl with all three guardrails
- *   - EnginePersistenceImpl + AutoSaveSystem (30s default interval)
- *   - MemoryDecayService + ReflectionLoop + MemoryMaintenanceSystem
- *   - Real LLM (OpenAICompatibleLLMClient) when USE_REAL_LLM=true
- *   - Real ONNX embeddings + AffordanceClassifierImpl when USE_REAL_EMBEDDINGS=true
+ *   - Cognitive tools (spec 015/018), guardrails, memory decay + reflection,
+ *     persistence + auto-save, social surfaces — ALL wired by the promoted
+ *     assembler (`@evol-hive/assembly`, spec 050): this entry point passes
+ *     config + env + scene data only (spec 050 R3)
+ *   - Real LLM when USE_REAL_LLM=true
+ *   - Real ONNX embeddings + real classifier when USE_REAL_EMBEDDINGS=true
  *   - Configurable drive decay, memory decay, run duration, and logging interval
  *
  * Run with: `npx tsx examples/coffee-shop.ts`
@@ -47,11 +47,11 @@ import type {
   ReflectionLoop,
   InMemoryVectorStore,
 } from '@evol-hive/memory';
-import { createEngineCore, assembleGameLoop, loadScene } from '@evol-hive/engine';
-import type { AssembledEngine, EngineCore, EnginePersistence } from '@evol-hive/engine';
-import { SocialManager } from '@evol-hive/engine';
+import type { AssembledEngine, EnginePersistence, SocialManager } from '@evol-hive/engine';
+import { loadScene } from '@evol-hive/engine';
 import { registerAffordanceHandlers, registerCoffeeShopHandlers } from './scene-helpers.ts';
-import { assembleCognitionStack, assembleSystem1, buildMemorySubsystem } from './assembly.ts';
+import { assembleWorld } from '@evol-hive/assembly';
+import type { System1Assembled } from '@evol-hive/assembly';
 
 // Re-export for convenience and testability (spec 019, Req 16–18).
 export { registerCoffeeShopHandlers } from './scene-helpers.ts';
@@ -504,13 +504,13 @@ export interface CoffeeShopAssembledEngine extends AssembledEngine {
 // ── Engine assembly (Req 5–15) ────────────────────────────────────────────────
 
 /**
- * Build the full Coffee Shop engine with all subsystems wired. Cognition and
- * memory assembly is delegated to the shared `assembleCognitionStack()` helper
- * (spec 027, Req 2) so this entry point and the visualizer demo share one
- * wiring source of truth. When `USE_REAL_LLM=true`, the helper builds an
- * `OpenAICompatibleLLMClient`; otherwise this scene's drive-aware
- * `CoffeeShopMockLLMClient`. When `USE_REAL_EMBEDDINGS=true`, the helper uses
- * `OnnxEmbeddingProvider` and `AffordanceClassifierImpl`; otherwise mocks.
+ * Build the full Coffee Shop engine with all subsystems wired by the promoted
+ * assembler (spec 050, R3): this entry point passes config + env + scene data
+ * only. The assembler selects the LLM client (`USE_REAL_LLM` → a real
+ * OpenAI-compatible client; otherwise this scene's drive-aware
+ * `CoffeeShopMockLLMClient`), the classifier (`USE_REAL_EMBEDDINGS` → the real
+ * embedding-backed one), wires the cognitive tools, guardrails, memory decay +
+ * reflection, System 1, persistence + auto-save, and the game loop.
  */
 export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
   const config = makeConfig();
@@ -520,62 +520,34 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
   // var is read here so it is ready when the underlying spec is implemented.
   void readDriveDecayRate();
 
-  // ── Memory subsystem (Req 6, Req 15) — shared helper (spec 027) ───────────
-  const memory = buildMemorySubsystem();
-
-  // ── Engine core (Req 11) ──────────────────────────────────────────────────
-  const core: EngineCore = createEngineCore(config, memory.memoryStore, memory.vectorStore);
-  loadScene(core, COFFEE_SHOP_SCENE);
-  registerAffordanceHandlers(core);
-  registerCoffeeShopHandlers(core);
-
-  // ── Cognition stack: SocialManager, LLM selection, classifier, guardrail,
-  //    PPER orchestrator, memory decay + reflection (Req 5–10, Req 13) —
-  //    shared helper (spec 027).
-  const stack = assembleCognitionStack(core, undefined, {
-    memory,
+  // One call, fully wired (spec 050 R2): engine core + cognition stack +
+  // memory maintenance + System 1 + auto-save + game loop. Scene data (scene
+  // load + affordance handlers) stays caller-side via the sceneSetup hook.
+  const world = assembleWorld({
+    config,
     mockLLMClient: new CoffeeShopMockLLMClient(),
-  });
-
-  // ── System 1 trainable heads (spec 035) — fail-open unless an artifact is
-  //    provided via SYSTEM1_GATE_ARTIFACT; session logs via SYSTEM1_SESSION_LOG_DIR.
-  const system1 = assembleSystem1(core, memory, {
-    ...(process.env['SYSTEM1_GATE_ARTIFACT'] !== undefined
-      ? { gateArtifactPath: process.env['SYSTEM1_GATE_ARTIFACT'] }
-      : {}),
-    ...(process.env['SYSTEM1_SESSION_LOG_DIR'] !== undefined
-      ? { sessionLogDir: process.env['SYSTEM1_SESSION_LOG_DIR'] }
-      : {}),
-  });
-
-  // ── Auto-save (Req 11) ────────────────────────────────────────────────────
-  const autoSaveConfig = buildAutoSaveConfig();
-  core.autoSaveConfig = autoSaveConfig;
-
-  // ── Assemble game loop with memory maintenance + auto-save ────────────────
-  const gameLoop = assembleGameLoop(
-    core,
-    stack.orchestrator,
-    stack.memoryDecayService !== undefined
-      ? {
-          memoryDecayService: stack.memoryDecayService,
-          ...(stack.reflectionLoop !== undefined ? { reflectionLoop: stack.reflectionLoop } : {}),
-          decayConfig: stack.decayConfig,
-        }
-      : undefined,
-    { config: autoSaveConfig },
-    undefined,
-    {
-      gate: system1.gate,
-      outcomeRecorder: system1.outcomeRecorder,
-      featureRefresher: system1.featureRefresher,
-      ...(system1.identityTrigger !== undefined
-        ? { identityTrigger: system1.identityTrigger }
+    autoSave: buildAutoSaveConfig(),
+    system1: {
+      ...(process.env['SYSTEM1_GATE_ARTIFACT'] !== undefined
+        ? { gateArtifactPath: process.env['SYSTEM1_GATE_ARTIFACT'] }
+        : {}),
+      ...(process.env['SYSTEM1_SESSION_LOG_DIR'] !== undefined
+        ? { sessionLogDir: process.env['SYSTEM1_SESSION_LOG_DIR'] }
         : {}),
     },
-  );
+    sceneSetup: (core) => {
+      loadScene(core, COFFEE_SHOP_SCENE);
+      registerAffordanceHandlers(core);
+      registerCoffeeShopHandlers(core);
+    },
+  });
 
+  const core = world.core;
+  const stack = world.stack;
+  const system1: System1Assembled | undefined = world.system1;
+  void system1;
   const persistence: EnginePersistence | undefined = core.persistence;
+  const gameLoop = world.gameLoop;
 
   return {
     gameLoop,
@@ -585,7 +557,7 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
     affordanceRegistry: core.affordanceRegistry,
     bridges: core.bridges,
     ...(persistence !== undefined ? { persistence } : {}),
-    socialManager: stack.socialManager,
+    socialManager: stack!.socialManager,
     // Conversations + identity self-model (spec 033) — always created by the core.
     conversationManager: core.conversationManager,
     selfModelManager: core.selfModelManager,
@@ -593,19 +565,19 @@ export function buildCoffeeShopEngine(): CoffeeShopAssembledEngine {
     mutationService: core.mutationService,
     dormantStore: core.dormantStore,
     yaamEventLog: core.yaamEventLog,
-    ...(stack.cognitiveToolExecutor !== undefined
-      ? { cognitiveToolExecutor: stack.cognitiveToolExecutor }
+    ...(stack!.cognitiveToolExecutor !== undefined
+      ? { cognitiveToolExecutor: stack!.cognitiveToolExecutor }
       : {}),
-    llmClient: stack.llmClient,
-    tokenUsageReporter: stack.tokenUsageReporter,
-    guardrail: stack.guardrail,
-    embeddingProvider: stack.embeddingProvider,
-    classifier: stack.classifier,
-    vectorStore: stack.vectorStore,
-    ...(stack.memoryDecayService !== undefined
-      ? { memoryDecayService: stack.memoryDecayService }
+    llmClient: stack!.llmClient,
+    tokenUsageReporter: stack!.tokenUsageReporter,
+    guardrail: stack!.guardrail,
+    embeddingProvider: stack!.embeddingProvider,
+    classifier: stack!.classifier,
+    vectorStore: stack!.vectorStore,
+    ...(stack!.memoryDecayService !== undefined
+      ? { memoryDecayService: stack!.memoryDecayService }
       : {}),
-    ...(stack.reflectionLoop !== undefined ? { reflectionLoop: stack.reflectionLoop } : {}),
+    ...(stack!.reflectionLoop !== undefined ? { reflectionLoop: stack!.reflectionLoop } : {}),
   };
 }
 

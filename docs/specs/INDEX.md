@@ -61,8 +61,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      62
 ✅ Done:          36
 🔨 In Development: 0
-🔍 In Review:      19
-📝 Drafted:        5
+🔍 In Review:      20
+📝 Drafted:        4
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -101,4 +101,4 @@ Architecture sections fully implemented: 11/11
 | [047](047-talk-loop-urge-gating-asymmetric-reward.md) | The Talk Loop Fix — Urge-Gated Social Urgency & Asymmetric Social Reward (Directive Suppression, Unanswered Cap, Monologue vs Exchange Split) | §3, §6, §8 | 🔍 In Review | [#176](https://github.com/Redna/evol-hive/issues/176) | [#178](https://github.com/Redna/evol-hive/pull/178) | shared, engine, cognition |
 | [048](048-drive-economy-rebalance-cc3.md) | Drive-Economy Rebalance for Concurrency 3 — Per-Agent Decay Scaling, Restoration Audit & Hunger-Chain Surfacing | §3, §4, §6, §9 | 📝 Drafted | [#168](https://github.com/Redna/evol-hive/issues/168) | — | shared, engine, cognition, examples |
 | [049](049-dialogue-completion-urge-observability-reply-window.md) | Dialogue Completion — Urge Observability, Persona-Seed Audit, Fresh-Address Salience & the Own-Cycle Reply Window | §3, §6, §8 | 🔍 In Review | [#167](https://github.com/Redna/evol-hive/issues/167) | [#182](https://github.com/Redna/evol-hive/pull/182) | shared, engine, cognition, examples |
-| [050](050-assembly-consolidation.md) | Assembly Consolidation — Promote the Cognition-Stack Assembler Out of `examples/`, Delete `examples/assembly.ts` (Single Wiring Source of Truth, New `@evol-hive/assembly` Package) | §2, §6, §8, §11 | 📝 Drafted | [#166](https://github.com/Redna/evol-hive/issues/166) | — | assembly (new), shared, engine, cognition, examples, cli |
+| [050](050-assembly-consolidation.md) | Assembly Consolidation — Promote the Cognition-Stack Assembler Out of `examples/`, Delete `examples/assembly.ts` (Single Wiring Source of Truth, New `@evol-hive/assembly` Package) | §2, §6, §8, §11 | 🔍 In Review | [#166](https://github.com/Redna/evol-hive/issues/166) | — | assembly (new), shared, engine, cognition, examples, cli |

@@ -35,8 +35,8 @@ import {
   PerceptionServiceImpl,
 } from '@evol-hive/cognition';
 import type { AffordanceClassifier } from '@evol-hive/cognition';
-import { assembleCognitionStack, buildMemorySubsystem } from '../assembly.ts';
-import type { CognitionStack } from '../assembly.ts';
+import { assembleCognitionStack, buildMemorySubsystem } from '@evol-hive/assembly';
+import type { CognitionStack } from '@evol-hive/assembly';
 
 const ROOM = 'garden';
 

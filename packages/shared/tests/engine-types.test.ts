@@ -3,7 +3,11 @@
  * Covers AC-12 (PPERSchedulerConfig) and AC-13 (SceneDefinition).
  */
 import { describe, it, expect } from 'vitest';
-import { defaultPPERSchedulerConfig, defaultEngineConfig } from '../src/index.js';
+import {
+  defaultPPERSchedulerConfig,
+  defaultEngineConfig,
+  overrideSchedulerConfig,
+} from '../src/index.js';
 import type {
   PPERSchedulerConfig,
   PPEROrchestratorPort,
@@ -118,5 +122,47 @@ describe('EngineConfig.driveDecayRate (Spec 019, AC-1, AC-2)', () => {
   it('AC-2: defaultEngineConfig() returns driveDecayRate: 0.1', () => {
     const config = defaultEngineConfig();
     expect(config.driveDecayRate).toBe(0.1);
+  });
+});
+
+// ─── Spec 050: EngineConfig.maxConcurrentLLM is consumed (R6/AC-6) ──────────
+
+describe('overrideSchedulerConfig (Spec 050, R6, AC-6)', () => {
+  it('forwards config.maxConcurrentLLM as the scheduler config when the env var is unset', () => {
+    const config: EngineConfig = {
+      fps: 60,
+      spatialDebounceSeconds: 5,
+      maxConcurrentLLM: 3,
+      guardrailsEnabled: true,
+      guardrails: { affordanceMasking: true, contextualForcing: true, planValidation: true },
+    };
+    expect(overrideSchedulerConfig(config)).toEqual({ maxConcurrentCycles: 3 });
+  });
+
+  it('returns undefined when ENGINE_MAX_CONCURRENT_LLM is set — the env var keeps override semantics (spec 022 R4)', () => {
+    process.env['ENGINE_MAX_CONCURRENT_LLM'] = '5';
+    try {
+      const config: EngineConfig = {
+        fps: 60,
+        spatialDebounceSeconds: 5,
+        maxConcurrentLLM: 3,
+        guardrailsEnabled: true,
+        guardrails: { affordanceMasking: true, contextualForcing: true, planValidation: true },
+      };
+      expect(overrideSchedulerConfig(config)).toBeUndefined();
+    } finally {
+      delete process.env['ENGINE_MAX_CONCURRENT_LLM'];
+    }
+  });
+
+  it('derives a scheduler config bounded by the field, not the default', () => {
+    const config: EngineConfig = {
+      fps: 60,
+      spatialDebounceSeconds: 5,
+      maxConcurrentLLM: 1,
+      guardrailsEnabled: true,
+      guardrails: { affordanceMasking: true, contextualForcing: true, planValidation: true },
+    };
+    expect(overrideSchedulerConfig(config)).toEqual({ maxConcurrentCycles: 1 });
   });
 });

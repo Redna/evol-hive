@@ -1,26 +1,44 @@
 /**
- * examples/assembly.ts — Shared cognition/memory assembly (spec 027, Req 1)
+ * @evol-hive/assembly — the composition root (spec 050, issue #166)
  * ────────────────────────────────────────────────────────────────────────────
- * Extracts the real-LLM subsystem wiring that was inlined in
- * `buildCoffeeShopEngine()` (spec 019) so that BOTH entry points — the
- * headless coffee-shop validation scene and the visualizer demo (spec 023/027)
- * — share one wiring source of truth instead of two code paths that drift.
+ * ONE assembler for the whole world. `assembleWorld()` internally calls
+ * `createEngineCore` (all engine wiring: agent/drive/plan managers, physics +
+ * spatial + scene manager, SocialManager ↔ ConversationManager ↔ self-model ↔
+ * consolidation sink, mutation funnel + dormancy + YAAM log, the four data
+ * provider bridges — perception wired with social/conversation/self-model/
+ * tick-source, persistence, scheduler config) AND builds the cognition stack
+ * (LLM client incl. `USE_REAL_LLM` selection, guardrail engine + topology and
+ * affordance guards, System-0 classifier incl. `USE_REAL_EMBEDDINGS`, PPER
+ * orchestrator, token usage reporter), memory maintenance (decay service,
+ * reflection loop, configs), System 1 (gate, importance head, feature service,
+ * outcome recorder, salience-weighted identity hook, session sample log), and
+ * calls `assembleGameLoop` with all of it — no optional wires left to the
+ * caller (R2).
+ *
+ * This package is the ONLY place allowed to depend on both `@evol-hive/engine`
+ * and `@evol-hive/cognition` (ADR-0001: the two never import each other; a
+ * package ABOVE both preserves the acyclic dependency graph — Decision 1 of
+ * the spec-050 workspace notes). `examples/assembly.ts` — the second wiring
+ * path that had already diverged twice (#155 stale renderer, #165 dormant
+ * conversation bridge) — is deleted by this spec; every consumer (all sims,
+ * `packages/cli` `run-scene`) passes config + env only (R3).
  *
  * All `USE_REAL_LLM` / `USE_REAL_EMBEDDINGS` / `LLM_*` / `EMBEDDING_*` /
- * `MEMORY_*` env vars are read here, in one place:
+ * `MEMORY_*` env vars are read here, in one place (spec 027, Req 1 / AC-9,
+ * now structurally enforced):
  *   - `USE_REAL_LLM=true`   → OpenAICompatibleLLMClient + CognitiveToolExecutorImpl
  *   - `USE_REAL_EMBEDDINGS=true` → OnnxEmbeddingProvider + AffordanceClassifierImpl
  *   - defaults              → in-memory mock embeddings + drive-aware/mock LLM
  *
- * `buildCoffeeShopEngine()` (spec 019) and `startVisualizerDemo()` (spec 023/027)
- * both call `assembleCognitionStack()`, so env-var behavior is identical across
- * entry points (spec 027, AC-9).
- *
- * Order matters: the memory subsystem must be constructed BEFORE
+ * Order matters (R5): the memory subsystem is constructed BEFORE
  * `createEngineCore(config, memoryStore, vectorStore)` — the engine core's
- * reflect bridge captures the memory store at construction time. Use
- * `buildMemorySubsystem()` first, pass it to `createEngineCore`, then hand the
- * assembled core to `assembleCognitionStack()`.
+ * reflect bridge captures the memory store at construction time.
+ * `assembleWorld()` does this internally; `buildMemorySubsystem()` is exported
+ * for callers that need to pre-build a subsystem.
+ *
+ * Scene data stays CALLER-side by design (spec 050 constraint): `loadScene`
+ * and affordance-handler registration are scene data, not wiring — the
+ * `sceneSetup` hook runs between `createEngineCore` and the loop assembly.
  */
 
 import type {
@@ -36,12 +54,20 @@ import type {
   System1IdentityTriggerPort,
   System1OutcomeProbePort,
   System1OutcomeRecorderPort,
+  System1FeatureRefresherPort,
   GateWeightArtifact,
+  AutoSaveConfig,
+  EngineConfig,
+  PPERCycleOutcome,
+  PPEROrchestratorPort,
+  PPERPhase,
 } from '@evol-hive/shared';
 import {
+  defaultEngineConfig,
   defaultMemoryDecayConfig,
   defaultReflectionConfig,
   defaultSystem1GateConfig,
+  overrideSchedulerConfig,
 } from '@evol-hive/shared';
 import type {
   LLMClient,
@@ -85,7 +111,13 @@ import {
   ReflectionLoopImpl,
 } from '@evol-hive/memory';
 import type { EngineCore } from '@evol-hive/engine';
-import { SocialManager, System1AgentTracker, System1OutcomeRecorderImpl } from '@evol-hive/engine';
+import {
+  GameLoopImpl,
+  SocialManager,
+  System1AgentTracker,
+  System1OutcomeRecorderImpl,
+} from '@evol-hive/engine';
+import { createEngineCore, assembleGameLoop } from '@evol-hive/engine';
 
 // ── Mock embedding provider (no network, deterministic) ─────────────────────
 
@@ -141,6 +173,24 @@ class DefaultMockLLMClient implements LLMClient {
   }
 }
 
+// ── No-op orchestrator (mock parity for entry points that run no cycles) ─────
+
+/**
+ * Minimal no-op orchestrator: mock mode runs no cycles — nothing was ever
+ * applied (spec 041 causal outcome). The former per-entry-point classes
+ * (`MockOrchestrator` in visualizer-demo, `NoopOrchestrator` in
+ * dynamic-world-sim) are now this one class, so a consumer can hand the
+ * assembler's mock-mode orchestrator to a visualizer adapter unchanged.
+ */
+export class MockOrchestrator implements PPEROrchestratorPort {
+  async runCycle(_agentId: string): Promise<PPERCycleOutcome> {
+    return { appliedDriveChanges: false };
+  }
+  getPhase(_agentId: string): PPERPhase {
+    return 'perceive';
+  }
+}
+
 // ── Memory subsystem (built before the engine core) ──────────────────────────
 
 /** The memory subsystem pieces required by `createEngineCore()`. */
@@ -153,7 +203,9 @@ export interface MemorySubsystem {
 /**
  * Build the memory subsystem: embedding provider (`USE_REAL_EMBEDDINGS` →
  * OnnxEmbeddingProvider, otherwise mock), vector store, and memory store.
- * Must be called BEFORE `createEngineCore(config, memoryStore, vectorStore)`.
+ * Must run BEFORE the engine core is created — the core's reflect bridge
+ * captures the memory store at construction time. `assembleWorld()` does this
+ * internally; consumers never construct memory stores directly (R5).
  */
 export function buildMemorySubsystem(): MemorySubsystem {
   const useRealEmbeddings = process.env['USE_REAL_EMBEDDINGS'] === 'true';
@@ -167,7 +219,10 @@ export function buildMemorySubsystem(): MemorySubsystem {
     : new MockEmbeddingProvider();
 
   const vectorStore = new InMemoryVectorStore();
-  const memoryStore: MemoryStore = new MemoryStoreImpl({ vectorStore, embeddingProvider });
+  const memoryStore: MemoryStore = new MemoryStoreImpl({
+    vectorStore,
+    embeddingProvider,
+  });
 
   return { embeddingProvider, vectorStore, memoryStore };
 }
@@ -196,8 +251,8 @@ export interface AssembleCognitionStackOptions {
 }
 
 /**
- * The assembled cognition stack: the subsystem fields `CoffeeShopAssembledEngine`
- * adds beyond `AssembledEngine` (spec 027, Req 1), plus the decay config used.
+ * The assembled cognition stack: the subsystem fields consumers observe beyond
+ * the engine core (spec 027, Req 1), plus the decay config used.
  */
 export interface CognitionStack {
   readonly socialManager: SocialManager;
@@ -236,16 +291,20 @@ function buildMemoryDecayConfig(): MemoryDecayConfig {
 }
 
 /**
- * Assemble the cognition subsystems on top of an engine core: SocialManager,
- * LLM client selection (`USE_REAL_LLM`), CognitiveToolExecutor, affordance
- * classifier (`USE_REAL_EMBEDDINGS`), guardrail engine, PPER orchestrator, and
- * (per options) the memory decay service + reflection loop. All env vars are
- * read here — one place, every entry point (spec 027, Req 1 / AC-9).
+ * Assemble the cognition subsystems on top of an engine core: the social
+ * surface, LLM client selection (`USE_REAL_LLM`), CognitiveToolExecutor,
+ * affordance classifier (`USE_REAL_EMBEDDINGS`), guardrail engine, PPER
+ * orchestrator, and (per options) the memory decay service + reflection loop.
+ * All env vars are read here — one place, every entry point (spec 027, Req 1
+ * / AC-9).
  *
  * @param core - An assembled engine core (created with the memory subsystem
  *   from {@link buildMemorySubsystem} so the reflect bridge shares it).
- * @param socialManager - Optional pre-built SocialManager. When omitted, a new
- *   one is constructed and wired into the perception bridge (spec 019, Req 8).
+ * @param socialManager - Optional pre-built SocialManager. When omitted, the
+ *   core's own SocialManager is used — the exact instance `createEngineCore`
+ *   built and wired into the perception bridge (spec 019, Req 8 / spec 045
+ *   R2: exactly one SocialManager holds both roles; this promoted assembler
+ *   constructs none — that would be a second manager, the #165 drift shape).
  * @param options - Optional memory subsystem / mock LLM / maintenance wiring.
  */
 export function assembleCognitionStack(
@@ -256,15 +315,14 @@ export function assembleCognitionStack(
   const memory = options.memory ?? buildMemorySubsystem();
   const wireMemoryMaintenance = options.wireMemoryMaintenance ?? true;
 
-  // ── SocialManager (spec 019, Req 8) ────────────────────────────────────────
-  const social = socialManager ?? new SocialManager(core.agentManager);
-  // Wire social perception into the perception bridge.
+  // ── Social surface (spec 019, Req 8; spec 045 R2) ──────────────────────────
+  // The core's SocialManager is THE manager: it is already wired into the
+  // perception bridge (createEngineCore) and already carries the conversation
+  // delegate (spec 043 pending-address data, spec 044 reciprocity). When a
+  // caller injects one explicitly (component tests), the same two wires are
+  // applied to it — never creating a second manager.
+  const social = socialManager ?? core.socialManager;
   core.bridges.perception.setSocialManager(social);
-  // Spec 045 (R2): the sim's SocialManager — the instance passed as the
-  // executor's socialBridge below AND consumed by the perception bridge —
-  // delegates conversation queries to the SAME ConversationManagerImpl that
-  // createEngineCore built (spec 043 pending-address data, spec 044
-  // reciprocity). Exactly one SocialManager holds both roles.
   social.setConversationManager(core.conversationManager);
 
   // ── LLM client (spec 019, Req 5, Req 9) ───────────────────────────────────
@@ -511,7 +569,7 @@ export function assembleSystem1(
     async snapshot(agentId) {
       const state = core.agentManager.getState(agentId);
       const plan = state?.currentPlan ?? null;
-      let memoryCount = 0;
+      let memoryCount: number;
       try {
         memoryCount = (await memory.vectorStore.countByAgent(agentId)) ?? 0;
       } catch {
@@ -575,5 +633,189 @@ export function assembleSystem1(
     importanceHead,
     salience,
     sampleLog,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The promoted assembler (spec 050, R1–R6)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Options for {@link assembleWorld}. Config + env + scene data only (R3). */
+export interface AssembleWorldOptions {
+  /**
+   * Engine configuration. When omitted, `defaultEngineConfig()` is used
+   * (env-driven where defined). The `maxConcurrentLLM` field is consumed by
+   * the scheduler via {@link overrideSchedulerConfig} (spec 050, R6).
+   */
+  config?: EngineConfig;
+  /**
+   * Scene-data hook (spec 050 constraint — scene data stays caller-side):
+   * runs between `createEngineCore` and the cognition/loop wiring. Put
+   * `loadScene`, `autoRegisterHandlers`, and per-scene affordance handlers
+   * here. NEVER wiring: components and ports are assembled by this function
+   * regardless of what the hook does.
+   */
+  sceneSetup?: (core: EngineCore) => void;
+  /**
+   * Pre-built memory subsystem (R5). When omitted, the assembler builds one
+   * from env (`USE_REAL_EMBEDDINGS`) BEFORE the engine core, so the reflect
+   * bridge and persistence capture the same store.
+   */
+  memory?: MemorySubsystem;
+  /**
+   * Scene-aware mock LLM used when `USE_REAL_LLM` is not `'true'`
+   * (e.g. a drive-aware scene mock). Providing one makes the assembler build
+   * a real orchestrator driven by the mock in mock mode; without it (and
+   * without `USE_REAL_LLM`), the assembler wires a no-op orchestrator —
+   * no cycles run, nothing applied (the former per-entry-point
+   * `NoopOrchestrator`/`MockOrchestrator` mock parity).
+   */
+  mockLLMClient?: LLMClient;
+  /**
+   * Construct the memory decay service + reflection loop (spec 014).
+   * Default: `true` on the cognition paths.
+   */
+  wireMemoryMaintenance?: boolean;
+  /**
+   * System 1 trainable heads wiring (spec 035): gate artifact path, session
+   * sample log dir, salience identity provider. When omitted, no System 1
+   * ports are wired (the scheduler behaves exactly as before spec 035).
+   */
+  system1?: System1AssemblyOptions;
+  /**
+   * Auto-save configuration (spec 017). When provided, `core.autoSaveConfig`
+   * is set and the AutoSaveSystem is registered (requires a vector store —
+   * present on every cognition path).
+   */
+  autoSave?: AutoSaveConfig;
+}
+
+/** The fully assembled world: engine core + wired loop + cognition stack. */
+export interface AssembledWorld {
+  /** The engine core (subsystems + bridges; scene data applied via `sceneSetup`). */
+  readonly core: EngineCore;
+  /** The registered game loop (also `core.gameLoop`). */
+  readonly gameLoop: GameLoopImpl;
+  /** The PPER orchestrator driving cycles (no-op instance in mock mode). */
+  readonly orchestrator: import('@evol-hive/shared').PPEROrchestratorPort;
+  /** The cognition stack — `undefined` in no-op mock mode (no cycles run). */
+  readonly stack?: CognitionStack;
+  /** System 1 pieces — present when `options.system1` was provided. */
+  readonly system1?: System1Assembled;
+  /** The memory subsystem the world was built around (undefined in no-op mock mode). */
+  readonly memory?: MemorySubsystem;
+}
+
+/** Map the assembled System 1 pieces onto {@link assembleGameLoop}'s port shape. */
+function toSystem1Ports(system1: System1Assembled): {
+  gate: System1GatePort;
+  outcomeRecorder?: System1OutcomeRecorderPort;
+  identityTrigger?: System1IdentityTriggerPort;
+  featureRefresher?: System1FeatureRefresherPort;
+} {
+  return {
+    gate: system1.gate,
+    outcomeRecorder: system1.outcomeRecorder,
+    featureRefresher: system1.featureRefresher,
+    ...(system1.identityTrigger !== undefined ? { identityTrigger: system1.identityTrigger } : {}),
+  };
+}
+
+/**
+ * Assemble the whole world — the single wiring source of truth (spec 050).
+ *
+ * @param options - config + env + scene data; see {@link AssembleWorldOptions}.
+ */
+export function assembleWorld(options: AssembleWorldOptions = {}): AssembledWorld {
+  const config = options.config ?? defaultEngineConfig();
+  const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
+  const wantsCognition = useRealLLM || options.mockLLMClient !== undefined;
+
+  // ── Memory subsystem FIRST (R5): the engine core's reflect bridge captures
+  // the memory store at construction time, and persistence captures the vector
+  // store. No-cognition mock mode keeps the former shape: no subsystem at all
+  // (the engine core uses its internal NullMemoryStore).
+  const memory: MemorySubsystem | undefined =
+    options.memory ??
+    (wantsCognition || options.system1 !== undefined ? buildMemorySubsystem() : undefined);
+
+  const core = createEngineCore(config, memory?.memoryStore, memory?.vectorStore);
+
+  // ── Scene data (caller-side by design): loadScene + handler registration
+  // run between the core and the cognition/loop wiring (spec 050 constraint).
+  options.sceneSetup?.(core);
+
+  // ── R6: forward `EngineConfig.maxConcurrentLLM` to the scheduler — unless a
+  // scene-level config exists (spec 022 Req 1 keeps precedence) or the
+  // `ENGINE_MAX_CONCURRENT_LLM` env var is set (spec 022 R4; forwarded via
+  // `defaultPPERSchedulerConfig()` when the override is omitted).
+  const schedulerConfig =
+    core.sceneSchedulerConfig !== undefined ? undefined : overrideSchedulerConfig(config);
+
+  const autoSaveArg = options.autoSave !== undefined ? { config: options.autoSave } : undefined;
+  if (options.autoSave !== undefined) core.autoSaveConfig = options.autoSave;
+
+  if (!wantsCognition) {
+    // No-cognition mock parity (spec 027-era behavior): a no-op orchestrator
+    // drives nothing — "nothing was ever applied" (spec 041 causal outcome).
+    // System 1 wiring is honored when explicitly requested (it needs the
+    // memory subsystem, which the assembler built above in that case).
+    const system1 =
+      options.system1 !== undefined && memory !== undefined
+        ? assembleSystem1(core, memory, options.system1)
+        : undefined;
+    assembleGameLoop(
+      core,
+      new MockOrchestrator(),
+      undefined,
+      autoSaveArg,
+      schedulerConfig,
+      ...(system1 !== undefined ? [toSystem1Ports(system1)] : []),
+    );
+    return {
+      core,
+      gameLoop: core.gameLoop,
+      orchestrator: new MockOrchestrator(),
+      ...(system1 !== undefined ? { system1 } : {}),
+    };
+  }
+
+  // ── The cognition stack + memory maintenance (R2). `memory` is always
+  // defined on this path (built above or caller-supplied).
+  const stack = assembleCognitionStack(core, undefined, {
+    ...(memory !== undefined ? { memory } : {}),
+    ...(options.mockLLMClient !== undefined ? { mockLLMClient: options.mockLLMClient } : {}),
+    ...(options.wireMemoryMaintenance !== undefined
+      ? { wireMemoryMaintenance: options.wireMemoryMaintenance }
+      : {}),
+  });
+
+  const system1 =
+    options.system1 !== undefined && memory !== undefined
+      ? assembleSystem1(core, memory, options.system1)
+      : undefined;
+
+  assembleGameLoop(
+    core,
+    stack.orchestrator,
+    stack.memoryDecayService !== undefined
+      ? {
+          memoryDecayService: stack.memoryDecayService,
+          ...(stack.reflectionLoop !== undefined ? { reflectionLoop: stack.reflectionLoop } : {}),
+          decayConfig: stack.decayConfig,
+        }
+      : undefined,
+    autoSaveArg,
+    schedulerConfig,
+    ...(system1 !== undefined ? [toSystem1Ports(system1)] : []),
+  );
+
+  return {
+    core,
+    gameLoop: core.gameLoop,
+    orchestrator: stack.orchestrator,
+    stack,
+    ...(system1 !== undefined ? { system1 } : {}),
+    ...(memory !== undefined ? { memory } : {}),
   };
 }

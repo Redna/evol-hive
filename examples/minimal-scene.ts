@@ -18,33 +18,13 @@ import type {
   ReflectLLMResponse,
   LLMActionResponse,
   ReflectionResult,
-  MemoryNode,
-  PPEROrchestratorPort,
-  PPERCycleOutcome,
-  PPERPhase,
   EngineConfig,
 } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
-import {
-  createPPEROrchestrator,
-  OpenAICompatibleLLMClient,
-  GuardrailEngineImpl,
-  CognitiveToolExecutorImpl,
-} from '@evol-hive/cognition';
-import type { AffordanceClassifier } from '@evol-hive/cognition';
-import {
-  OnnxEmbeddingProvider,
-  AffordanceClassifierImpl,
-  defaultClassifierConfig,
-} from '@evol-hive/cognition';
-import type {
-  EmbeddingProvider as MemEmbeddingProvider,
-  VectorStore,
-  MemoryStore,
-} from '@evol-hive/memory';
-import { MemoryStoreImpl } from '@evol-hive/memory';
-import { createEngineCore, assembleGameLoop, loadScene } from '@evol-hive/engine';
+import type { EmbeddingProvider as MemEmbeddingProvider } from '@evol-hive/memory';
+import { loadScene } from '@evol-hive/engine';
 import type { AssembledEngine } from '@evol-hive/engine';
+import { assembleWorld } from '@evol-hive/assembly';
 
 // ── Scene definition (AC-18) ─────────────────────────────────────────────────
 
@@ -190,67 +170,6 @@ export class MockEmbeddingProvider implements MemEmbeddingProvider {
   }
 }
 
-// ── Mock affordance classifier (returns all affordances — no pruning) ─────────
-
-function makeMockClassifier(): AffordanceClassifier {
-  return {
-    async prune(_driveLabel: string, affordances: Affordance[]) {
-      return affordances;
-    },
-  };
-}
-
-// ── In-memory vector store ────────────────────────────────────────────────────
-
-class InMemoryVectorStore implements VectorStore {
-  private readonly nodes = new Map<string, MemoryNode>();
-
-  async store(node: MemoryNode): Promise<void> {
-    this.nodes.set(node.id, node);
-  }
-
-  async get(id: string): Promise<MemoryNode | null> {
-    return this.nodes.get(id) ?? null;
-  }
-
-  async queryByEmbedding(_embedding: number[], _topK: number): Promise<MemoryNode[]> {
-    return [...this.nodes.values()];
-  }
-
-  async delete(ids: string[]): Promise<void> {
-    for (const id of ids) this.nodes.delete(id);
-  }
-
-  async countRecent(_agentId: string, _sinceTimestamp: number): Promise<number> {
-    return 0;
-  }
-}
-
-// ── Logging orchestrator wrapper (AC-20) ─────────────────────────────────────
-
-class LoggingOrchestrator implements PPEROrchestratorPort {
-  private readonly inner: PPEROrchestratorPort;
-  private logged = false;
-
-  constructor(inner: PPEROrchestratorPort) {
-    this.inner = inner;
-  }
-
-  async runCycle(agentId: string): Promise<PPERCycleOutcome> {
-    const outcome = await this.inner.runCycle(agentId);
-    if (!this.logged) {
-      this.logged = true;
-      // eslint-disable-next-line no-console
-      console.log(`Agent ${agentId} completed PPER cycle: success=true`);
-    }
-    return outcome;
-  }
-
-  getPhase(agentId: string): PPERPhase {
-    return this.inner.getPhase(agentId);
-  }
-}
-
 // ── Engine assembly (AC-19) ──────────────────────────────────────────────────
 
 function makeConfig(): EngineConfig {
@@ -264,98 +183,52 @@ function makeConfig(): EngineConfig {
   };
 }
 
-export function buildMinimalEngine(): AssembledEngine {
+export function buildMinimalEngine(): AssembledEngine & {
+  vectorStore: import('@evol-hive/memory').InMemoryVectorStore;
+} {
   const config = makeConfig();
 
-  // Memory subsystem — use real ONNX embeddings when USE_REAL_EMBEDDINGS=true.
-  const useRealEmbeddings = process.env['USE_REAL_EMBEDDINGS'] === 'true';
-  const vectorStore = new InMemoryVectorStore();
-  const embeddingProvider: MemEmbeddingProvider = useRealEmbeddings
-    ? new OnnxEmbeddingProvider({
-        modelPath: process.env['EMBEDDING_MODEL_PATH']!,
-        tokenizerPath: process.env['EMBEDDING_TOKENIZER_PATH'] ?? undefined,
-      })
-    : new MockEmbeddingProvider();
-  const memoryStore: MemoryStore = new MemoryStoreImpl({ vectorStore, embeddingProvider });
+  // One call, fully wired (spec 050 R2/R3): the promoted assembler owns every
+  // wire — engine core, cognition stack (the scene's mock LLM is handed in via
+  // `mockLLMClient`; `USE_REAL_LLM=true` selects the real client), memory
+  // subsystem, guardrails, orchestrator, and the game loop. Scene data (the
+  // scene load + the two demo handlers) stays caller-side via `sceneSetup`.
+  const world = assembleWorld({
+    config,
+    mockLLMClient: new MockLLMClient(),
+    sceneSetup: (core) => {
+      loadScene(core, MINIMAL_SCENE);
 
-  // Engine core + scene.
-  const core = createEngineCore(config, memoryStore);
-  loadScene(core, MINIMAL_SCENE);
-
-  // Register the brew_coffee affordance handler.
-  core.affordanceRegistry.registerHandler('brew_coffee', async (_objectId, _agentId, state) => {
-    const newState = { ...state, water_level: ((state['water_level'] as number) ?? 0) - 1 };
-    return {
-      success: true,
-      newState,
-      driveChanges: { energy: 20 },
-    };
-  });
-  core.affordanceRegistry.registerHandler('observe', async (_objectId, _agentId, state) => {
-    return { success: true, newState: state };
+      // Register the brew_coffee affordance handler.
+      core.affordanceRegistry.registerHandler('brew_coffee', async (_objectId, _agentId, state) => {
+        const newState = { ...state, water_level: ((state['water_level'] as number) ?? 0) - 1 };
+        return {
+          success: true,
+          newState,
+          driveChanges: { energy: 20 },
+        };
+      });
+      core.affordanceRegistry.registerHandler('observe', async (_objectId, _agentId, state) => {
+        return { success: true, newState: state };
+      });
+    },
   });
 
-  // PPER orchestrator (cognition) wired from the engine bridges + LLM.
-  const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
-  const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as
-    'low' | 'medium' | 'high' | 'none' | undefined;
-
-  // Cognitive tool executor (spec 015, Req 24/26): wire the state data provider
-  // (the engine's reflect bridge implements updateGoal + applyDriveChanges) so
-  // `update_internal_state` is executed mid-loop. The minimal scene does not
-  // wire a MemoryInjector, so `query_memory` returns an empty result. When not
-  // using a real LLM, the mock client bypasses the loop entirely.
-  const maxToolCallIterationsEnv = process.env['LLM_MAX_TOOL_CALL_ITERATIONS'];
-  const maxToolCallIterations =
-    maxToolCallIterationsEnv !== undefined ? Number(maxToolCallIterationsEnv) : undefined;
-  const cognitiveToolExecutor = useRealLLM
-    ? new CognitiveToolExecutorImpl({
-        stateDataProvider: core.bridges.reflect,
-        socialBridge: core.socialManager,
-      })
-    : undefined;
-
-  const llmClient: LLMClient = useRealLLM
-    ? new OpenAICompatibleLLMClient({
-        baseUrl: process.env['LLM_BASE_URL'] ?? 'http://localhost:11434/v1',
-        model: process.env['LLM_MODEL'] ?? 'llama3.1',
-        ...(process.env['LLM_API_KEY'] !== undefined ? { apiKey: process.env['LLM_API_KEY'] } : {}),
-        ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
-        ...(cognitiveToolExecutor !== undefined ? { cognitiveToolExecutor } : {}),
-        ...(maxToolCallIterations !== undefined ? { maxToolCallIterations } : {}),
-      })
-    : new MockLLMClient();
-
-  // Classifier — use real AffordanceClassifierImpl when USE_REAL_EMBEDDINGS=true.
-  const classifier: AffordanceClassifier = useRealEmbeddings
-    ? new AffordanceClassifierImpl(embeddingProvider, defaultClassifierConfig())
-    : makeMockClassifier();
-
-  const guardrail = config.guardrailsEnabled
-    ? new GuardrailEngineImpl(config.guardrails)
-    : undefined;
-
-  const orchestrator = createPPEROrchestrator({
-    perceptionProvider: core.bridges.perception,
-    planProvider: core.bridges.plan,
-    executeProvider: core.bridges.execute,
-    reflectProvider: core.bridges.reflect,
-    classifier,
-    llmClient,
-    ...(guardrail !== undefined ? { guardrail } : {}),
-  });
-
-  const loggingOrchestrator = new LoggingOrchestrator(orchestrator);
-
-  const gameLoop = assembleGameLoop(core, loggingOrchestrator);
+  const core = world.core;
 
   return {
-    gameLoop,
+    gameLoop: world.gameLoop,
     agentManager: core.agentManager,
     sceneManager: core.sceneManager,
     smartObjectRegistry: core.smartObjectRegistry,
     affordanceRegistry: core.affordanceRegistry,
     bridges: core.bridges,
+    // The social surface the assembler wired (spec 019): the core's own
+    // SocialManager — the single instance holding both bridge roles.
+    socialManager: core.socialManager,
+    // Exposed so tests can observe a completed PPER cycle end-to-end (the
+    // Reflect phase stores a memory node in the assembler's store).
+    vectorStore: world.memory!.vectorStore,
   };
 }
 

@@ -94,6 +94,25 @@ export function defaultPPERSchedulerConfig(): PPERSchedulerConfig {
   return { maxConcurrentCycles };
 }
 
+/**
+ * Derive a scheduler config override from `EngineConfig.maxConcurrentLLM`
+ * (spec 050, R6 / AC-6). The field was historically declared-but-unread — the
+ * scheduler only consulted the `ENGINE_MAX_CONCURRENT_LLM` env var (spec 022,
+ * R4) — so the promoted assembler forwards the field to the scheduler.
+ *
+ * Returns `undefined` when the env var is set: the env var keeps override
+ * semantics and `defaultPPERSchedulerConfig()` consumes it downstream.
+ * Otherwise returns `{ maxConcurrentCycles: config.maxConcurrentLLM }`.
+ *
+ * Callers should skip forwarding entirely when a scene-level config exists
+ * (`SceneDefinition.maxConcurrentCycles` via `loadScene`, spec 022 Req 1) —
+ * scene-level data keeps precedence over the generic engine knob.
+ */
+export function overrideSchedulerConfig(config: EngineConfig): PPERSchedulerConfig | undefined {
+  if (process.env['ENGINE_MAX_CONCURRENT_LLM'] !== undefined) return undefined;
+  return { maxConcurrentCycles: config.maxConcurrentLLM };
+}
+
 /** Default guardrail config — all three guardrails enabled (spec 016, Req 2, AC-1). */
 export function defaultGuardrailConfig(): GuardrailConfig {
   return { affordanceMasking: true, contextualForcing: true, planValidation: true };
