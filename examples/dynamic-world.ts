@@ -440,6 +440,46 @@ export function createDynamicWorldHandlers(): Record<string, AffordanceHandler> 
         driveChanges: { hunger: 25 },
       };
     },
+    // Spec 052 live-run finding (issue #183): the greenhouse restorers were
+    // DECLARED in the scene but had NO handler — every execution returned
+    // "No handler registered", the greenhouse's hunger loop never closed, and
+    // the greenhouse agents bottomed out exactly as #183 reports. All four
+    // match the declared effects exactly and are stateless: the shelf is
+    // described as "full of herbs and seedlings", and resting/repotting among
+    // the potting table's seedlings consumes nothing.
+    pick_herbs: async (_objectId, _agentId, state) => {
+      return {
+        success: true,
+        newState: state,
+        driveChanges: { curiosity: 8 },
+      };
+    },
+    eat_herbs: async (_objectId, _agentId, state) => {
+      return {
+        success: true,
+        newState: state,
+        driveChanges: { hunger: 20 },
+      };
+    },
+    // Potting-table restorers (QA gap, same live-run finding): the greenhouse's
+    // ONLY in-room energy restorer (`rest_among_seedlings`, spec-032 invariant
+    // "every room must restore energy") and the curiosity/comfort work loop
+    // were equally handlerless — the enum could carry them and execution still
+    // failed. Stateless like the seed shelf.
+    rest_among_seedlings: async (_objectId, _agentId, state) => {
+      return {
+        success: true,
+        newState: state,
+        driveChanges: { comfort: 15, energy: 4 },
+      };
+    },
+    repot_seedlings: async (_objectId, _agentId, state) => {
+      return {
+        success: true,
+        newState: state,
+        driveChanges: { curiosity: 12, comfort: 5 },
+      };
+    },
     work: async (_objectId, _agentId, state) => {
       const items = (state['items_built'] as number) ?? 0;
       return {

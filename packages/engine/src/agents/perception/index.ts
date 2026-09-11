@@ -118,7 +118,16 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
     const all = this.smartObjectRegistry.getObjectsInRoom(roomId);
     const mem = this.fog(agentId);
     if (mem === null) return all; // legacy: no fog
-    if (!mem.visitedRooms.includes(roomId)) return []; // unexplored room
+    // Spec 052 live-run finding (issue #183): the room the agent physically
+    // occupies is self-evidently known — fog models knowledge of the world,
+    // and an agent perceives its surroundings passively. The `go_to_*`
+    // teleport handler moves the agent WITHOUT recording the visit, so a
+    // fogged occupied room left the agent perceiving EMPTY surroundings
+    // forever (`inRoom=0 … enum=[] … chosen=[wait]` while drives decayed to
+    // zero — the #183 headline symptom through a new path). Occupancy
+    // overrides the unexplored-room gate.
+    const occupied = this.agentManager.getState(agentId)?.location === roomId;
+    if (!mem.visitedRooms.includes(roomId) && !occupied) return []; // unexplored room
     // Room explored → the agent observes everything currently in it (fresh
     // sightings update the remembered anchor set).
     const observed = { ...(mem.observedObjects ?? {}) };
@@ -141,7 +150,10 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
     const mem = this.fog(agentId);
     const base = this.getAvailableAffordancesInRoom(roomId);
     if (mem === null) return base; // legacy: no fog
-    if (!mem.visitedRooms.includes(roomId)) return []; // unexplored room
+    // Occupancy overrides the unexplored-room gate (spec 052 finding, #183 —
+    // same rationale as getVisibleObjectsInRoom above).
+    const occupied = this.agentManager.getState(agentId)?.location === roomId;
+    if (!mem.visitedRooms.includes(roomId) && !occupied) return []; // unexplored room
     const visited = new Set(mem.visitedRooms);
     const doors = this.doorAdjacentRooms(agentId);
     return base.filter((affordance) => {

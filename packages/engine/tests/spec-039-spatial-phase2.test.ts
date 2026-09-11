@@ -161,9 +161,9 @@ describe('fog-gated perception (spec 039, AC-2)', () => {
     core.agentManager.updateState('a1', {
       spatialMemory: { visitedRooms: [], knownDoors: [], discoveredAt: {} },
     });
-    expect(
-      core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden').length,
-    ).toBeGreaterThan(0);
+    expect(core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden').length).toBeGreaterThan(
+      0,
+    );
     expect(
       core.bridges.perception.getVisibleAffordancesInRoom!('a1', 'garden').length,
     ).toBeGreaterThan(0);

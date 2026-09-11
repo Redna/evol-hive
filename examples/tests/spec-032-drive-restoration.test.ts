@@ -213,7 +213,7 @@ describe('AC-2: builtin furniture handlers restore energy + comfort', () => {
 
 // ── AC-2b: greenhouse seed-shelf handlers execute (spec 052 live-run finding) ─
 
-describe('AC-2b: seed-shelf pick_herbs/eat_herbs execute with declared deltas', () => {
+describe('AC-2b: greenhouse restorers execute with declared deltas (spec 052 live-run finding)', () => {
   // Spec 052 live run (issue #183): seed-shelf-1's `pick_herbs` (+8 curiosity)
   // and `eat_herbs` (+20 hunger) were DECLARED in the scene but no handler
   // existed for either — every execution returned "No handler registered",
@@ -251,6 +251,43 @@ describe('AC-2b: seed-shelf pick_herbs/eat_herbs execute with declared deltas', 
     expect(result.success).toBe(true);
     expect(result.driveChanges).toBeDefined();
     expect(result.driveChanges!['hunger']).toBe(20);
+  });
+
+  // QA extension of the same finding (issue #183): the potting-table's
+  // restorers were equally handlerless — including the greenhouse's ONLY
+  // in-room energy restorer (`rest_among_seedlings`), which the spec-032
+  // invariant ("every room must restore energy") requires to be executable.
+  // Stateless: resting and repotting among the seedlings consume nothing.
+  it('rest_among_seedlings on potting-table-1 → success with driveChanges { comfort: +15, energy: +4 }', async () => {
+    const core = wireSimCore();
+    core.sceneManager.moveAgent(GARDENER, 'greenhouse');
+
+    const result = await core.bridges.execute.executeAffordance(
+      'potting-table-1',
+      'rest_among_seedlings',
+      GARDENER,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.driveChanges).toBeDefined();
+    expect(result.driveChanges!['comfort']).toBe(15);
+    expect(result.driveChanges!['energy']).toBe(4);
+  });
+
+  it('repot_seedlings on potting-table-1 → success with driveChanges { curiosity: +12, comfort: +5 }', async () => {
+    const core = wireSimCore();
+    core.sceneManager.moveAgent(GARDENER, 'greenhouse');
+
+    const result = await core.bridges.execute.executeAffordance(
+      'potting-table-1',
+      'repot_seedlings',
+      GARDENER,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.driveChanges).toBeDefined();
+    expect(result.driveChanges!['curiosity']).toBe(12);
+    expect(result.driveChanges!['comfort']).toBe(5);
   });
 });
 
@@ -366,9 +403,7 @@ describe('AC-4: talk_to restores sender social (spec 018 path, spec 047 asymmetr
     // Spec 047 (R5, issue #176): the send alone is a potential monologue —
     // the token grant only. The full restore completes engine-side when the
     // target contributes to the same thread.
-    expect(core.agentManager.getState(GARDENER)!.drives.social).toBe(
-      55 + SOCIAL_MONOLOGUE_REWARD,
-    ); // 55 + 2
+    expect(core.agentManager.getState(GARDENER)!.drives.social).toBe(55 + SOCIAL_MONOLOGUE_REWARD); // 55 + 2
 
     // The apprentice replies into the SAME thread → the deferred +8 tops the
     // gardener up to the historical +10 for a real exchange (spec 047 R5/R6).
