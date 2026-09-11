@@ -57,6 +57,9 @@ import {
   OpenAICompatibleLLMClient,
   PerceptionServiceImpl,
   PerceptionBuilderImpl,
+  AffordanceClassifierImpl,
+  ReactGateHead,
+  LinearImportanceHead,
 } from '@evol-hive/cognition';
 import type { EngineCore } from '@evol-hive/engine';
 import { loadScene } from '@evol-hive/engine';
@@ -371,5 +374,68 @@ describe('spec 050 AC-2 — conversation bridge + urge surfaces wired by the def
     const relB = stack!.socialManager.getRelationships('agent-b')['agent-a'];
     expect(relB!.receivedCount).toBe(1);
     expect(relB!.sentCount).toBe(1);
+  });
+});
+
+// ── R2: env-driven classifier selection ─────────────────────────────────────
+
+describe('spec 050 R2 — USE_REAL_EMBEDDINGS classifier selection happens inside the assembler', () => {
+  it('USE_REAL_EMBEDDINGS=true selects the real AffordanceClassifierImpl (System-0 pruner over the assembler\'s provider)', () => {
+    process.env['USE_REAL_EMBEDDINGS'] = 'true';
+    const world = assembleWorld({ config: makeConfig(), mockLLMClient: new GenericMockLLM() });
+    expect(world.stack).toBeDefined();
+    // Construction is lazy (spec 007: file I/O deferred to embed()/ready()) —
+    // asserting the selection never touches the network or the model file.
+    expect(world.stack!.classifier).toBeInstanceOf(AffordanceClassifierImpl);
+  });
+
+  it('without the env var the classifier is the assembler\'s mock (env read ONLY in the assembler — spec 027 AC-9)', () => {
+    const world = assembleWorld({ config: makeConfig(), mockLLMClient: new GenericMockLLM() });
+    expect(world.stack!.classifier).toBeDefined();
+    expect(world.stack!.classifier).not.toBeInstanceOf(AffordanceClassifierImpl);
+  });
+});
+
+// ── R2: System 1 trainable heads through the assembler (spec 035) ────────────
+
+describe('spec 050 R2 — System 1 wiring via the assembleWorld system1 option', () => {
+  it('mock-LLM mode + system1: gate, importance head, feature service, outcome recorder, salience + sample log all wired', () => {
+    const world = assembleWorld({
+      config: makeConfig(),
+      mockLLMClient: new GenericMockLLM(),
+      system1: {},
+    });
+    expect(world.system1).toBeDefined();
+    const s1 = world.system1!;
+    expect(s1.gate).toBeDefined();
+    expect(s1.outcomeRecorder).toBeDefined();
+    expect(s1.featureRefresher).toBeDefined();
+    expect(s1.gateHead).toBeInstanceOf(ReactGateHead);
+    expect(s1.importanceHead).toBeInstanceOf(LinearImportanceHead);
+    expect(s1.salience).toBeDefined();
+    expect(s1.sampleLog).toBeDefined();
+    expect(typeof s1.hotSwapGateArtifact).toBe('function');
+    // The engine-side outcome tracker was attached to the core — the loop's
+    // outcome probe reads engine state through it (spec 035 R4).
+    expect(world.core.system1Tracker).toBeDefined();
+  });
+
+  it('no-op mock mode + system1: the memory subsystem is still built (it reaches the core\'s persistence), the no-op orchestrator is kept, no cognition stack', () => {
+    const world = assembleWorld({ config: makeConfig(), system1: {} });
+    expect(world.stack).toBeUndefined();
+    expect(world.orchestrator).toBeInstanceOf(MockOrchestrator);
+    // AssembledWorld.memory stays undefined in no-op mode (interface contract),
+    // but the subsystem WAS built for the System 1 heads — provable via the
+    // persistence the engine core created from the vector store (spec 017).
+    expect(world.core.persistence).toBeDefined();
+    expect(world.system1).toBeDefined();
+    expect(world.system1!.gateHead).toBeInstanceOf(ReactGateHead);
+    expect(world.core.system1Tracker).toBeDefined();
+  });
+
+  it('default (no system1 option): no System 1 ports wired — the pre-035 scheduler shape is untouched', () => {
+    const world = assembleWorld({ config: makeConfig(), mockLLMClient: new GenericMockLLM() });
+    expect(world.system1).toBeUndefined();
+    expect(world.core.system1Tracker).toBeUndefined();
   });
 });

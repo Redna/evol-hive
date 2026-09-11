@@ -169,6 +169,11 @@ describe('AC-3 — engine-side wiring appears only in packages/engine', () => {
     'new EnginePersistenceImpl',
     'new AgentManagerImpl',
     'new SceneMutationServiceImpl',
+    // The SocialManager is ENGINE-side state (spec 018): constructed once by
+    // `createEngineCore`. The assembler REUSES the core's instance (spec 050
+    // R4 — the #165 drift shape was a second `new SocialManager`), so no
+    // package outside `packages/engine` may construct it.
+    'new SocialManager',
   ];
 
   // The negative space: every OTHER package's src + consumer entry points.
@@ -190,12 +195,34 @@ describe('AC-3 — engine-side wiring appears only in packages/engine', () => {
   it('cognition-side wiring appears in packages/assembly (and its cognition definitions), nowhere else', () => {
     // cognition-side CONSTRUCTION calls must be confined to the assembly
     // package's src (the orchestrator/guardrail factories are DEFINED in
-    // cognition's src and are not scanned here).
+    // cognition's src and are not scanned here). The full AC-1/AC-3 grep
+    // token set: orchestrator, guardrails, classifier, System 1 heads, the
+    // cognitive tool executor, the LLM client, and the memory machinery that
+    // `buildMemorySubsystem` owns (spec 050 R5 — consumers never build it).
+    const COGNITION_SIDE_CONSTRUCTIONS = [
+      /createPPEROrchestrator\(/,
+      /new GuardrailEngineImpl/,
+      /new AffordanceClassifierImpl/,
+      /new CognitiveToolExecutorImpl/,
+      /new OpenAICompatibleLLMClient/,
+      /new InMemoryVectorStore/,
+      /new MemoryStoreImpl/,
+      /new MemoryDecayServiceImpl/,
+      /new ReflectionLoopImpl/,
+      /new OnnxEmbeddingProvider/,
+      /new ReactGateHead/,
+      /new LinearImportanceHead/,
+      /new System1GateServiceImpl/,
+      /new System1FeatureServiceImpl/,
+      /new SalienceWeightedIdentityService/,
+      /buildMemorySubsystem/,
+    ];
     for (const pkg of ['engine', 'shared', 'memory']) {
       for (const file of pkgSourceFiles(pkg)) {
         const src = read(file);
-        expect(src, rel(file)).not.toMatch(/createPPEROrchestrator\(/);
-        expect(src, rel(file)).not.toMatch(/new GuardrailEngineImpl/);
+        for (const pattern of COGNITION_SIDE_CONSTRUCTIONS) {
+          expect(src, rel(file)).not.toMatch(pattern);
+        }
       }
     }
   });
