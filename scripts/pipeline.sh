@@ -151,7 +151,7 @@ for pr in json.load(sys.stdin):
     ref = '#' + issue
     linked = (ref in (pr.get('title') or '')) or (ref in (pr.get('body') or ''))
     if linked or pr['head']['ref'].startswith(prefix):
-        print(f'{pr["number"]}|{pr["head"]["ref"]}')
+        print(f'{pr[\"number\"]}|{pr[\"head\"][\"ref\"]}')
         break
 " 2>/dev/null
 }
