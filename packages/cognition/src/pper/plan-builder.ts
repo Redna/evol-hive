@@ -14,7 +14,7 @@ import {
   formulatePlanToolFor,
   queryMemoryTool,
   updateInternalStateTool,
-  talkToTool,
+  talkToToolFor,
   observeAgentTool,
   helpTool,
   ignoreTool,
@@ -24,6 +24,7 @@ import {
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PlanBuilder } from '../index.js';
 import { defaultCognitiveTools } from '../tools/index.js';
+import { computeTalkEnum } from './talk-enum.js';
 import {
   matchDrivesToAffordances,
   formatPlanDriveHint,
@@ -224,7 +225,16 @@ export class PlanBuilderImpl implements PlanBuilder {
       // Spec 039, R1: the known-area value space rides with the payload so
       // the plan validator can enforce area-bound steps.
       ...(knownAreas !== undefined ? { knownAreas } : {}),
-      tools: buildPlanTools(hasAgentsPresent, affordanceTools, isSocialPrimary, planTool),
+      tools: buildPlanTools(
+        hasAgentsPresent,
+        affordanceTools,
+        isSocialPrimary,
+        planTool,
+        // Spec 051 (R1/R2): the plan-phase talk_to is enum-bound per cycle to
+        // the present, uncapped agent IDs — same construction as the
+        // perception builder; omitted entirely when nothing is valid.
+        computeTalkEnum(passive.agentsPresent, perceptionResult.socialUrges).valid,
+      ),
     };
   }
 }
@@ -277,6 +287,11 @@ function formatDrives(drives: Record<string, number>): string {
 /**
  * Build tool definitions for the Plan phase, including social tools when agents are present
  * (spec 018, Req 38).
+ *
+ * Spec 051 (R1/R2 — issue #186): `talk_to` is enum-bound per cycle — built
+ * from the per-cycle valid-target list (present, uncapped agent IDs) via
+ * `talkToToolFor`; the tool is omitted when nothing is valid, while
+ * observe_agent/help/ignore render as today.
  */
 function buildPlanTools(
   hasAgentsPresent: boolean,
@@ -284,6 +299,8 @@ function buildPlanTools(
   isSocialPrimary = false,
   /** Spec 037: the per-cycle enum-bound formulate_plan tool. */
   planTool: import('@evol-hive/shared').ToolDefinition = formulatePlanToolFor([]),
+  /** Spec 051: per-cycle valid talk_to targets (empty → talk_to omitted). */
+  talkValidTargets: string[] = [],
 ) {
   // Spec 024, Req 1 & Req 2: When agents are present, social tools are placed
   // FIRST in the tools array to leverage the positional bias of smaller LLMs
@@ -293,7 +310,8 @@ function buildPlanTools(
   if (!hasAgentsPresent) {
     return [planTool, queryMemoryTool, updateInternalStateTool, ...affordanceTools];
   }
-  const socialTools = [talkToTool, observeAgentTool, helpTool, ignoreTool];
+  const talkTool = talkValidTargets.length > 0 ? [talkToToolFor(talkValidTargets)] : [];
+  const socialTools = [...talkTool, observeAgentTool, helpTool, ignoreTool];
   if (isSocialPrimary) {
     // Req 2: social first, cognitive + affordance next, formulate_plan LAST.
     return [...socialTools, queryMemoryTool, updateInternalStateTool, ...affordanceTools, planTool];

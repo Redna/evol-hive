@@ -17,6 +17,7 @@ import type {
   ConversationObserveResult,
   ConversationSentiment,
 } from '@evol-hive/shared';
+import { isSocialTalkGapCapped } from '@evol-hive/shared';
 import type { AgentManager } from '../agents/index.js';
 import type { ConversationManagerImpl } from './conversation-manager.js';
 import { MessageQueue } from './message-queue.js';
@@ -231,6 +232,39 @@ export class SocialManager implements SocialActionBridge, ConversationBridge {
     if (coLocated.length > 1) return null;
     if (elsewhere.length === 1) return elsewhere[0]!;
     return null;
+  }
+
+  /**
+   * The per-cycle valid talk targets for the requester (spec 051, R3 —
+   * issue #186): co-located ACTIVE agents (what the perception 'Agents
+   * present' line describes) minus any target whose unanswered gap
+   * (`sentCount − receivedCount`) is at or above `SOCIAL_TALK_CAP` for that
+   * relationship. The exclusion is per-target: a fresh target with a healthy
+   * reciprocity remains valid. Recovery is mechanical — the target's reply
+   * raises `receivedCount`, the gap drops below the cap, and the target
+   * re-enters the list on the next call (Decision 2 — the gap IS the clock,
+   * no cooldown timer). The cap arithmetic is the shared
+   * `isSocialTalkGapCapped` helper — the single computation the cognition
+   * enum builder also consumes (no second cap computation).
+   *
+   * This is the runtime value-space the cognition executor's choke point
+   * validates against: the enum the LLM sees is built from perception, but
+   * the ENGINE is the source of truth for validity (spec 051 Constraints).
+   * Deterministic — pure TypeScript over agent states, no LLM anywhere.
+   */
+  enumerateTalkTargets(requesterAgentId: string): string[] {
+    const requesterState = this.agentManager.getState(requesterAgentId);
+    if (!requesterState) return [];
+    const roomId = requesterState.location;
+    if (!roomId || roomId === '') return [];
+    const requesterRelationships = requesterState.relationships ?? {};
+    const valid: string[] = [];
+    for (const summary of this.getAgentsInRoom(roomId, requesterAgentId)) {
+      const rel = requesterRelationships[summary.agentId];
+      if (isSocialTalkGapCapped(rel?.sentCount ?? 0, rel?.receivedCount ?? 0)) continue;
+      valid.push(summary.agentId);
+    }
+    return valid;
   }
 
   // ── Perception query methods (spec 018, Req 18–20) ──────────────────────────

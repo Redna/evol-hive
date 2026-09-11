@@ -547,6 +547,69 @@ export const talkToTool: ToolDefinition = {
   },
 };
 
+/**
+ * Per-cycle enum-bound talk_to schema (spec 051, R1 — issue #186).
+ *
+ * `targetAgentId` becomes a value-space constraint: an enum of the agent IDs
+ * actually valid THIS cycle — agents present in perception minus any target
+ * past the spec 047 consecutive-unanswered cap (spec 037/039 enum-as-value-
+ * space pattern). There is no free-form target string.
+ *
+ * Empty valid-target list: the enum property is OMITTED (the spec 037/039
+ * empty-value-space pattern — never an illegal empty enum), but callers MUST
+ * NOT offer the tool at all when the list is empty (nothing valid to talk
+ * to) — the builders enforce that omission.
+ */
+export function talkToSchemaFor(validTargetIds: string[]) {
+  // Spec 037 lesson: an empty value space must not produce an empty enum
+  // (illegal JSON Schema) — omit the property's enum instead. Builders omit
+  // the whole tool in that case, so the degenerate schema never ships.
+  const targetEnum = validTargetIds.length > 0 ? [...validTargetIds] : null;
+  return {
+    type: 'object',
+    properties: {
+      targetAgentId: {
+        type: 'string',
+        description:
+          'an agent ID from the enum (agents present right now, not past the unanswered cap)',
+        ...(targetEnum !== null ? { enum: targetEnum } : {}),
+      },
+      message: {
+        type: 'string',
+        description: 'The message content to send to the target agent.',
+      },
+      sentiment: {
+        type: 'string',
+        enum: ['positive', 'neutral', 'negative'],
+        description:
+          'The sentiment of your message (spec 033). Tagged at write time; a predominantly negative exchange will not build trust. Default: neutral.',
+      },
+    },
+    required: ['targetAgentId', 'message'],
+    additionalProperties: false,
+  } as const;
+}
+
+/**
+ * Dynamic talk_to tool definition (spec 051, R1) — the per-cycle replacement
+ * for the static {@link talkToTool}. Builders MUST use this factory so the
+ * `targetAgentId` value space is bound per cycle to the agents actually
+ * present and not past the unanswered cap (spec 037 `formulatePlanToolFor`
+ * pattern). The static tool remains exported for backward compatibility of
+ * tests that assert schema shape.
+ */
+export function talkToToolFor(validTargetIds: string[]): ToolDefinition {
+  return {
+    type: 'function',
+    function: {
+      name: 'talk_to',
+      description:
+        'Send a message to another agent in the same room. The message will appear in their next perception tick, join the ongoing conversation thread between you, and open one if none exists. Optionally tag the message sentiment.',
+      parameters: talkToSchemaFor(validTargetIds),
+    },
+  };
+}
+
 /** Tool definition for the observe_agent social cognitive tool (spec 018, Req 14). */
 export const observeAgentTool: ToolDefinition = {
   type: 'function',

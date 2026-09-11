@@ -58,6 +58,21 @@ export const SOCIAL_URGE_RECIPROCITY_DECAYED = 0.7;
 export const SOCIAL_TALK_CAP = 3;
 
 /**
+ * THE unanswered-gap cap condition (spec 051, R2 — issue #186): a pair whose
+ * `sentCount − receivedCount` gap is at or above {@link SOCIAL_TALK_CAP} is
+ * capped — the target is excluded from the per-cycle talk_to enum (no longer
+ * a *valid choice*, not merely un-promoted) and refused at the executor
+ * choke point. One arithmetic, multiple consumers: the cognition assessment
+ * wrapper and the engine's enumeration both delegate here (no second cap
+ * computation). Recovery is mechanical: `receivedCount` catches up when the
+ * target replies, the gap drops below the cap, and the target re-enters the
+ * enum — no separate cooldown timer (Decision 2).
+ */
+export function isSocialTalkGapCapped(sentCount: number, receivedCount: number): boolean {
+  return sentCount - receivedCount >= SOCIAL_TALK_CAP;
+}
+
+/**
  * Own-social granted on the `talk_to` send itself (spec 047, R5 — issue #176):
  * a potential monologue is worth only this token amount. The drive
  * semantically means *need for exchange*, not need for emission — the full

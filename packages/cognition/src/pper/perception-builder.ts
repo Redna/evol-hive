@@ -21,7 +21,7 @@ import type {
 import {
   queryMemoryTool,
   updateInternalStateTool,
-  talkToTool,
+  talkToToolFor,
   observeAgentTool,
   helpTool,
   ignoreTool,
@@ -31,11 +31,12 @@ import {
   affordancesToToolDefinitions,
   SOCIAL_URGE_SURFACE_THRESHOLD,
   SOCIAL_URGE_RECIPROCITY_DECAYED,
-  SOCIAL_TALK_CAP,
+  isSocialTalkGapCapped,
   isPendingAddressFresh,
 } from '@evol-hive/shared';
 import type { LLMContextPayload, PerceptionBuilder } from '../index.js';
 import { defaultCognitiveTools, cognitiveToolsToToolDefinitions } from '../tools/index.js';
+import { computeTalkEnum } from './talk-enum.js';
 import {
   matchDrivesToAffordances,
   formatPerceptionDriveHint,
@@ -285,8 +286,22 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     // placed FIRST in the tools array (before cognitive and affordance tools)
     // to leverage the positional bias of smaller LLMs toward first-listed
     // tools. This applies to both the normal and masked paths.
+    //
+    // Spec 051 (R1/R2 — issue #186): `talk_to` is enum-bound per cycle — its
+    // `targetAgentId` value space is the present, uncapped agent IDs (the
+    // spec 037/039 enum-as-value-space pattern), so a capped or absent target
+    // is no longer a VALID choice, not merely an un-promoted one. When no
+    // valid target remains, the tool is omitted entirely this cycle while
+    // observe_agent/help/ignore render as today. The enum lives inside the
+    // per-cycle tool-definition block, never in the stable system prompt
+    // prefix (KV-cache, spec 021).
     if (hasAgentsPresent) {
-      tools = [talkToTool, observeAgentTool, helpTool, ignoreTool, ...tools];
+      const talkEnum = computeTalkEnum(passive.agentsPresent, perceptionResult.socialUrges);
+      const socialTools =
+        talkEnum.valid.length > 0
+          ? [talkToToolFor(talkEnum.valid), observeAgentTool, helpTool, ignoreTool]
+          : [observeAgentTool, helpTool, ignoreTool];
+      tools = [...socialTools, ...tools];
     }
 
     // talk_to ranking shift (spec 044, R4c / Decision 5): when the urge
@@ -394,10 +409,14 @@ export function isSocialUrgeDecayed(assessment: SocialUrgeAssessment): boolean {
  * One (agent, target) pair is past the consecutive-unanswered cap (spec 047,
  * R4 / AC-5): `sentCount − receivedCount ≥ SOCIAL_TALK_CAP` for that
  * relationship — the same counters the urge model consumes (single source of
- * truth, no second reciprocity computation).
+ * truth, no second reciprocity computation). Spec 051 (R2): the arithmetic
+ * lives in the shared `isSocialTalkGapCapped` helper — the same single
+ * computation the engine's `enumerateTalkTargets` enumeration consumes, so
+ * the perception-side enum and the executor's runtime validation can never
+ * drift.
  */
 export function isSocialTalkCapped(assessment: SocialUrgeAssessment): boolean {
-  return assessment.sentCount - assessment.receivedCount >= SOCIAL_TALK_CAP;
+  return isSocialTalkGapCapped(assessment.sentCount, assessment.receivedCount);
 }
 
 /**
