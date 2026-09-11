@@ -45,7 +45,8 @@ describe('talkToToolFor (R1, AC-1)', () => {
     expect(target).toEqual({
       type: 'string',
       enum: ['agent-bob'],
-      description: 'an agent ID from the enum (agents present right now, not past the unanswered cap)',
+      description:
+        'an agent ID from the enum (agents present right now, not past the unanswered cap)',
     });
   });
 
@@ -120,7 +121,9 @@ describe('SocialActionBridge.enumerateTalkTargets (R3 — source pin)', () => {
     const block = source.slice(start, source.indexOf('\n}', start));
     expect(block).toContain('enumerateTalkTargets?(');
     // The spec 046 method stays REQUIRED — no interface break.
-    expect(block).toContain('resolveAgentId(requesterAgentId: string, nameOrId: string): string | null;');
+    expect(block).toContain(
+      'resolveAgentId(requesterAgentId: string, nameOrId: string): string | null;',
+    );
   });
 });
 

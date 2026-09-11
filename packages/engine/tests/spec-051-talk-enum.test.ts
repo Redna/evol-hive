@@ -49,8 +49,14 @@ function buildWorld(): { agentManager: AgentManagerImpl; social: SocialManager }
   const sceneManager = new SceneManagerImpl(
     agentManager,
     new Map([
-      [GARDEN, { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] }],
-      [KITCHEN, { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] }],
+      [
+        GARDEN,
+        { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] },
+      ],
+      [
+        KITCHEN,
+        { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] },
+      ],
     ]),
   );
   void registry;

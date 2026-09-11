@@ -45,10 +45,7 @@ import type {
 } from '@evol-hive/shared';
 import { computeSocialUrge } from '@evol-hive/shared';
 import { CognitiveToolExecutorImpl } from '../src/tools/cognitive-tool-executor.js';
-import {
-  PerceptionBuilderImpl,
-  classifySocialUrgeLine,
-} from '../src/pper/perception-builder.js';
+import { PerceptionBuilderImpl, classifySocialUrgeLine } from '../src/pper/perception-builder.js';
 import { PlanBuilderImpl } from '../src/pper/plan-builder.js';
 import { computeTalkEnum, logTalkEnumDiagnostic } from '../src/pper/talk-enum.js';
 
@@ -229,7 +226,9 @@ describe('plan-builder enum-bound talk_to (R1, AC-2)', () => {
   });
 
   it('a capped target is excluded from the plan-phase enum too (per-target)', () => {
-    const payload = builder.build(makePerceptionResult({ socialUrges: [cappedIris(), healthyMaren()] }));
+    const payload = builder.build(
+      makePerceptionResult({ socialUrges: [cappedIris(), healthyMaren()] }),
+    );
     const talkTo = toolByName(payload.tools, 'talk_to')!;
     expect(talkTo.function.parameters.properties.targetAgentId.enum).toEqual(['agent-maren']);
   });
@@ -241,15 +240,15 @@ describe('the spec 047 cap participates in enum construction (R2, AC-3)', () => 
   const builder = new PerceptionBuilderImpl();
 
   it('capped Iris absent from the enum; healthy Maren remains; siblings unaffected', () => {
-    const payload = builder.build(makePerceptionResult({ socialUrges: [cappedIris(), healthyMaren()] }));
+    const payload = builder.build(
+      makePerceptionResult({ socialUrges: [cappedIris(), healthyMaren()] }),
+    );
     const talkTo = toolByName(payload.tools, 'talk_to');
     expect(talkTo!.function.parameters.properties.targetAgentId.enum).toEqual(['agent-maren']);
     // The other social tools still list every present agent (their schemas
     // are unchanged — only talk_to is enum-bound).
     const names = payload.tools.map((t) => t.function.name);
-    expect(names).toEqual(
-      expect.arrayContaining(['observe_agent', 'help', 'ignore', 'talk_to']),
-    );
+    expect(names).toEqual(expect.arrayContaining(['observe_agent', 'help', 'ignore', 'talk_to']));
   });
 
   it('the exclusion is per-target: a fresh target survives while the capped one is removed', () => {
@@ -263,7 +262,9 @@ describe('the spec 047 cap participates in enum construction (R2, AC-3)', () => 
       socialDrive: 80,
       relationship: { sentCount: 3, receivedCount: 0, trust: 50, familiarity: 0 },
     });
-    const payload = builder.build(makePerceptionResult({ socialUrges: [healthyIris, cappedMaren] }));
+    const payload = builder.build(
+      makePerceptionResult({ socialUrges: [healthyIris, cappedMaren] }),
+    );
     const talkTo = toolByName(payload.tools, 'talk_to')!;
     expect(talkTo.function.parameters.properties.targetAgentId.enum).toEqual(['agent-iris']);
   });
@@ -277,14 +278,18 @@ describe('talk_to omitted when no valid target exists (R1/R2, AC-4)', () => {
 
   it('no agents present → no talk_to in the perception tools (no crash)', () => {
     const payload = perceptionBuilder.build(
-      makePerceptionResult({ passive: { roomId: 'garden', objectsPresent: [], drives: {}, agentsPresent: [] } }),
+      makePerceptionResult({
+        passive: { roomId: 'garden', objectsPresent: [], drives: {}, agentsPresent: [] },
+      }),
     );
     expect(toolByName(payload.tools, 'talk_to')).toBeUndefined();
   });
 
   it('no agents present → no talk_to in the plan tools (no crash)', () => {
     const payload = planBuilder.build(
-      makePerceptionResult({ passive: { roomId: 'garden', objectsPresent: [], drives: {}, agentsPresent: [] } }),
+      makePerceptionResult({
+        passive: { roomId: 'garden', objectsPresent: [], drives: {}, agentsPresent: [] },
+      }),
     );
     expect(toolByName(payload.tools, 'talk_to')).toBeUndefined();
     expect(payload.tools.map((t) => t.function.name)).toContain('formulate_plan');
@@ -325,17 +330,20 @@ describe('reply-driven recovery (R2, AC-5)', () => {
   const builder = new PerceptionBuilderImpl();
 
   it('after the target replies (gap < cap), the target re-enters the enum on the next cycle', () => {
-    const before = builder.build(makePerceptionResult({ socialUrges: [cappedIris(), healthyMaren()] }));
-    expect(toolByName(before.tools, 'talk_to')!.function.parameters.properties.targetAgentId.enum).toEqual([
-      'agent-maren',
-    ]);
+    const before = builder.build(
+      makePerceptionResult({ socialUrges: [cappedIris(), healthyMaren()] }),
+    );
+    expect(
+      toolByName(before.tools, 'talk_to')!.function.parameters.properties.targetAgentId.enum,
+    ).toEqual(['agent-maren']);
 
     // The target replied: receivedCount catches up → gap 0 < cap → next cycle.
-    const after = builder.build(makePerceptionResult({ socialUrges: [recoveredIris(), healthyMaren()] }));
-    expect(toolByName(after.tools, 'talk_to')!.function.parameters.properties.targetAgentId.enum).toEqual([
-      'agent-iris',
-      'agent-maren',
-    ]);
+    const after = builder.build(
+      makePerceptionResult({ socialUrges: [recoveredIris(), healthyMaren()] }),
+    );
+    expect(
+      toolByName(after.tools, 'talk_to')!.function.parameters.properties.targetAgentId.enum,
+    ).toEqual(['agent-iris', 'agent-maren']);
   });
 });
 
@@ -369,7 +377,11 @@ function makeSocialBridge(
         message: { fromAgentId, fromName: fromAgentId, content, timestamp: 0 },
       });
     },
-    updateRelationship(agentId: string, otherAgentId: string, updates: Partial<Relationship>): void {
+    updateRelationship(
+      agentId: string,
+      otherAgentId: string,
+      updates: Partial<Relationship>,
+    ): void {
       writes.relationships.push({ agentId, otherAgentId, updates });
     },
     getAgentSummary(agentId: string): AgentSummary | null {
