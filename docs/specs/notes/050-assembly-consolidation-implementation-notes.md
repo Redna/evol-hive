@@ -114,9 +114,22 @@ spec 044 reciprocity). The *live-LLM* run clause (real backend, full sim)
 remains manual evidence for QA/merge — same pattern spec 045 followed
 (live-run clauses tracked as todos/evidence notes).
 
+## Session-2 resume verification (post-PR, CI watch)
+
+Resumed after an interrupted session. State found: branch clean, all work
+committed through `ea61623`, PR #185 open, INDEX row 050 already 🔍 In Review.
+Nothing was missing — this session re-verified end-to-end and closed the
+loop:
+
+- Local fresh runs (post-`ea61623`): `pnpm typecheck` ✅, `pnpm build` ✅,
+  `pnpm test` ✅ (examples 193 +3 todo, cli 15 — tail of the run; full-suite
+  2,528 per session 1), `pnpm lint` ✅, `pnpm format:check` ✅.
+- CI on PR #185 all four checks **SUCCESS**: Type Check & Lint, Build, Test,
+  GitGuardian. `mergeable: MERGEABLE`, no reviews yet.
+
 ## Remaining for full done
 
-- CI on the PR + merge; QA coverage pass.
+- Merge PR #185 (reviewer sign-off) + QA coverage pass.
 - After merge: flip INDEX row 050 → ✅ Done.
 
 ## Environment notes
