@@ -54,3 +54,46 @@ _(to be filled when the run completes — final `logState()` sample, `[drive-hin
 - PR #190 is OPEN, MERGEABLE, only GitGuardian CI (pass); review approval pending.
 - Remaining after the live run: attach evidence to #183, refresh PR body AC-5/6/7 statuses,
   commit these notes.
+
+## QA verification record — PR #190 coverage audit (issue #183, commit `3dcd25d`)
+
+Independent test-coverage verification of PR #190 against the spec's 8 ACs. **Verdict: PASS —
+deterministic ACs (1–4, 8) fully covered and green; AC-5/6/7 remain live-run-pending by design
+(Req 5), now with a green deterministic proxy rehearsing them in CI.**
+
+- **Gates re-run from a clean tree @ `3dcd25d`**: `pnpm test` ✓ 8/8 suites (shared 362;
+  visualizer 48; memory 101; cognition 998 passed/1 skipped/26 todo; engine 840 passed/141 todo;
+  assembly 66; examples 214 passed/3 todo; cli 15 — 2644 passed) → `pnpm typecheck` ✓,
+  `pnpm lint` ✓, `pnpm format:check` ✓, `pnpm build` ✓. Bootstrap note: fresh checkouts need
+  `pnpm build` (or `pnpm --filter @evol-hive/shared build`) first — vite package-entry resolution.
+- **The PR's HEAD at review start (`1c90346`) was TDD-RED**: the "RED — live-run findings" commit
+  pinned two behaviors with failing tests and no implementation, so `pnpm test` did NOT pass at
+  the reviewed HEAD (the PR body's AC-8 ✅ predates that commit). QA implemented both findings:
+  1. **Occupied-room fog override** (`packages/engine/src/agents/perception/index.ts`): the room
+     an agent physically occupies is self-evidently known — occupancy overrides the
+     unexplored-room gate in `getVisibleObjectsInRoom`/`getVisibleAffordancesInRoom` (the
+     `go_to_*` teleport path moves agents without recording the fog visit → `inRoom=0 … enum=[]
+     … chosen=[wait]` forever, the #183 headline symptom through a new path).
+  2. **Seed-shelf handlers** (`createDynamicWorldHandlers`): `pick_herbs` (+8 curiosity),
+     `eat_herbs` (+20 hunger) — stateless, matching the declared effects exactly.
+- **QA-found gap beyond the RED pins**: `repot_seedlings` (+12 curiosity/+5 comfort) and
+  `rest_among_seedlings` (+15 comfort/+4 energy) were equally handlerless — `rest_among_seedlings`
+  is the greenhouse's ONLY in-room energy restorer (spec-032 invariant "every room must restore
+  energy"). Implemented both, pinned in the extended spec-032 AC-2b block (4 tests).
+- **Integration/E2E gap closed**: no suite exercised the mechanisms THROUGH the production stack.
+  New `examples/tests/spec-052-greenhouse-restoration-loop.test.ts` (3 tests): perceive→plan→
+  execute→reflect over the real scene with the real classifier + real `GuardrailEngineImpl` +
+  real handlers + the #183 fog condition — all-wait plan rejected before `storePlan`
+  (`[wait-guard]` names hunger + `eat_herbs`; `[drive-hint] chosen=[none]`), restorer executed
+  next cycle (hunger 8 → 28), no greenhouse drive at 0 (AC-5 proxy), `waitSuppression:false`
+  inert end-to-end, energy loop closes via `rest_among_seedlings` (39/65).
+- **Format**: prettier violations in `spec-039-spatial-phase2.test.ts` fixed (format:check was
+  red at HEAD).
+- **AC matrix**: AC-1 ✅ restoration-exemption suite (12); AC-2 ✅ wait-guard suite (15: pure
+  guard + PlanServiceImpl integration); AC-3 ✅ drive-hint-diagnostic suite (5); AC-4 ✅
+  greenhouse-scene suite (5); AC-5/6/7 ⏳ live (Req 5) + ✅ E2E proxy; AC-8 ✅ all gates +
+  spec-032/034/048/049 suites green unmodified except the allowed additive config pins.
+- **Issue #183 labels**: `Status: Ready for Dev` → `Status: In Review/QA` (single-status
+  convention); QA report posted on PR #190.
+- **Remaining before merge**: the 30-min cc=3 live run (AC-5/6/7 evidence → #183; the smoke run
+  above already shows the restorers in the enum at urgency with `prunedAway=[]`).
