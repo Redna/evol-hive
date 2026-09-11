@@ -58,6 +58,11 @@ class SlowMockLLMClient implements LLMClient {
 
   async completeStructured(payload: LLMContextPayload): Promise<LLMActionResponse> {
     this.started.push(payload.perceptionContext.slice(0, 32));
+    return this.hold();
+  }
+
+  /** Shared hold window — cycles in flight overlap during the plan phase. */
+  private async hold(): Promise<LLMActionResponse> {
     this.inFlight += 1;
     this.maxInFlight = Math.max(this.maxInFlight, this.inFlight);
     await new Promise((r) => setTimeout(r, 30));
@@ -68,6 +73,8 @@ class SlowMockLLMClient implements LLMClient {
     return { agentId: 'mock', newMemories: [], consolidatedNodeIds: [] };
   }
   async completePlan(_payload: LLMContextPayload): Promise<FormulatePlanResult> {
+    this.started.push('plan');
+    await this.hold();
     return {
       description: 'Observe the environment',
       steps: [{ description: 'Observe', targetAffordance: 'observe' }],

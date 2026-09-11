@@ -55,10 +55,13 @@ import type {
   AffordanceClassifier,
   LLMClient,
   LLMContextPayload,
-  PerceptionBuilderImpl,
-  PerceptionServiceImpl,
 } from '@evol-hive/cognition';
-import { PPEROrchestratorImpl, OpenAICompatibleLLMClient } from '@evol-hive/cognition';
+import {
+  PPEROrchestratorImpl,
+  OpenAICompatibleLLMClient,
+  PerceptionServiceImpl,
+  PerceptionBuilderImpl,
+} from '@evol-hive/cognition';
 import type { EngineCore } from '@evol-hive/engine';
 import { loadScene } from '@evol-hive/engine';
 import { assembleWorld, buildMemorySubsystem, MockOrchestrator } from '@evol-hive/assembly';
@@ -113,29 +116,18 @@ function stubClassifier(): AffordanceClassifier {
  * components the PPER orchestrator builds internally (spec 045 QA pattern).
  */
 async function renderPerception(core: EngineCore, agentId: string): Promise<string> {
-  const { PerceptionServiceImpl, PerceptionBuilderImpl: Builder } = (await import(
-    '@evol-hive/cognition'
-  )) as {
-    PerceptionServiceImpl: new (opts: {
-      provider: EngineCore['bridges']['perception'];
-      classifier: AffordanceClassifier;
-    }) => { perceive: (agentId: string) => Promise<unknown> };
-    PerceptionBuilderImpl: new () => PerceptionBuilderImpl;
-  };
   const service = new PerceptionServiceImpl({
     provider: core.bridges.perception,
     classifier: stubClassifier(),
   });
-  const builder = new Builder();
-  const perception = (await service.perceive(agentId)) as Parameters<
-    PerceptionBuilderImpl['build']
-  >[0];
+  const builder = new PerceptionBuilderImpl();
+  const perception = await service.perceive(agentId);
   return builder.build(perception).perceptionContext;
 }
 
 /** Generic no-network mock LLM (the assembler's own default, re-declared here). */
 class GenericMockLLM implements LLMClient {
-  async completeStructured(_payload: LLMContextPayload): Promise<import('@evol-hive/shared').LLMActionResponse> {
+  async completeStructured(_payload: LLMContextPayload): Promise<LLMActionResponse> {
     return { reasoning: 'Mock action.', action: 'observe' };
   }
   async completeReflection(): Promise<ReflectionResult> {
