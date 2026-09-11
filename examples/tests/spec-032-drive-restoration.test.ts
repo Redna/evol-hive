@@ -211,6 +211,49 @@ describe('AC-2: builtin furniture handlers restore energy + comfort', () => {
   });
 });
 
+// ── AC-2b: greenhouse seed-shelf handlers execute (spec 052 live-run finding) ─
+
+describe('AC-2b: seed-shelf pick_herbs/eat_herbs execute with declared deltas', () => {
+  // Spec 052 live run (issue #183): seed-shelf-1's `pick_herbs` (+8 curiosity)
+  // and `eat_herbs` (+20 hunger) were DECLARED in the scene but no handler
+  // existed for either — every execution returned "No handler registered",
+  // the greenhouse's hunger loop never closed, and the greenhouse agents
+  // bottomed out exactly as #183 reports. The handlers live in
+  // `createDynamicWorldHandlers` and match the declared effects exactly
+  // (stateless — the shelf is described as "full of herbs and seedlings").
+  it('pick_herbs on seed-shelf-1 → success with driveChanges { curiosity: +8 }', async () => {
+    const core = wireSimCore();
+    // The gardener starts in the garden — move to the greenhouse (co-location guard).
+    core.sceneManager.moveAgent(GARDENER, 'greenhouse');
+
+    const result = await core.bridges.execute.executeAffordance(
+      'seed-shelf-1',
+      'pick_herbs',
+      GARDENER,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.driveChanges).toBeDefined();
+    expect(result.driveChanges!['curiosity']).toBe(8);
+  });
+
+  it('eat_herbs on seed-shelf-1 → success with driveChanges { hunger: +20 }', async () => {
+    const core = wireSimCore();
+    // The gardener starts in the garden — move to the greenhouse (co-location guard).
+    core.sceneManager.moveAgent(GARDENER, 'greenhouse');
+
+    const result = await core.bridges.execute.executeAffordance(
+      'seed-shelf-1',
+      'eat_herbs',
+      GARDENER,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.driveChanges).toBeDefined();
+    expect(result.driveChanges!['hunger']).toBe(20);
+  });
+});
+
 // ── AC-3: Execute phase applies the drive deltas to the agent ────────────────
 
 describe('AC-3: mock-cognition run — Execute phase raises energy and comfort', () => {

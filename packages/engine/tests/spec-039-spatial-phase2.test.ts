@@ -137,18 +137,41 @@ describe('fog-gated perception (spec 039, AC-2)', () => {
     expect(affordances.map((a) => a.id)).toContain('harvest');
   });
 
-  it('a never-visited (unexplored) room produces NO objects or affordances', () => {
-    // The agent stands in `garden` but its spatial memory has never explored
-    // it (constructed pre-seeding state — fog unchanged since spawn).
+  it('a never-visited (unexplored) room the agent does NOT occupy produces NO objects or affordances', () => {
+    // Amended by spec 052's live-run finding (issue #183): the unexplored-room
+    // gate only hides rooms the agent is not standing in — occupancy makes a
+    // room self-evidently known (see the occupied-room test below). The agent
+    // therefore waits in `workshop` while querying the unexplored `garden`.
     core.agentManager.updateState('a1', {
+      location: 'workshop',
       spatialMemory: { visitedRooms: [], knownDoors: [], discoveredAt: {} },
     });
     expect(core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden')).toEqual([]);
     expect(core.bridges.perception.getVisibleAffordancesInRoom!('a1', 'garden')).toEqual([]);
   });
 
+  it('an agent standing in a room perceives it even when the fog never recorded the visit (spec 052 finding)', () => {
+    // Spec 052 live run (issue #183): apprentice-1 executed the go_to_garden
+    // teleport handler (moveAgent — no discover/walk), then perceived an
+    // EMPTY garden forever: `inRoom=0 … enum=[] … chosen=[wait]` while his
+    // drives decayed to zero — the #183 headline symptom through a new path.
+    // Fog models knowledge of the world; the room the agent physically
+    // occupies is self-evidently known ("you perceive your surroundings
+    // passively"), so occupancy overrides the unexplored-room gate.
+    core.agentManager.updateState('a1', {
+      spatialMemory: { visitedRooms: [], knownDoors: [], discoveredAt: {} },
+    });
+    expect(
+      core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden').length,
+    ).toBeGreaterThan(0);
+    expect(
+      core.bridges.perception.getVisibleAffordancesInRoom!('a1', 'garden').length,
+    ).toBeGreaterThan(0);
+  });
+
   it('exploration unlocks perception — only the fog set changes, no code change', () => {
     core.agentManager.updateState('a1', {
+      location: 'workshop',
       spatialMemory: { visitedRooms: [], knownDoors: [], discoveredAt: {} },
     });
     expect(core.bridges.perception.getVisibleObjectsInRoom!('a1', 'garden')).toEqual([]);
