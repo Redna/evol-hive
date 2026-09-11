@@ -155,7 +155,7 @@ describe('spec 052 Req 2 — restoration exemption in pruning (AC-1)', () => {
     // topK 3: one similar candidate + one urgent restorer + one movement →
     // all three survive (the restorer's exemption mirrors go_to_*'s).
     const classifier = new AffordanceClassifierImpl(
-      new class implements EmbeddingProvider {
+      new (class implements EmbeddingProvider {
         dimensions = 2;
         async embed(text: string): Promise<number[]> {
           return text === ENERGY_LABEL || text === 'Brew coffee' ? [1, 0] : [0, 1];
@@ -163,7 +163,7 @@ describe('spec 052 Req 2 — restoration exemption in pruning (AC-1)', () => {
         async embedBatch(texts: string[]): Promise<number[][]> {
           return texts.map((t) => (t === ENERGY_LABEL || t === 'Brew coffee' ? [1, 0] : [0, 1]));
         }
-      }(),
+      })(),
       { topK: 3, similarityThreshold: 0.3 },
     );
     const affordances: Affordance[] = [
@@ -186,10 +186,10 @@ describe('spec 052 Req 2 — restoration exemption in pruning (AC-1)', () => {
   it('restorers of urgent drives are never dropped by the topK cap either', async () => {
     // topK 1 with two similar candidates + one urgent restorer: the restorer
     // survives even though the cap is exhausted.
-    const classifier = new AffordanceClassifierImpl(
-      new OrthogonalEmbeddingProvider(),
-      { topK: 1, similarityThreshold: 0.3 },
-    );
+    const classifier = new AffordanceClassifierImpl(new OrthogonalEmbeddingProvider(), {
+      topK: 1,
+      similarityThreshold: 0.3,
+    });
     const affordances: Affordance[] = [
       {
         id: 'a',

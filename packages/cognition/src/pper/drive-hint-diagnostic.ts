@@ -32,7 +32,12 @@
  * wraps the call — spec 049 discipline).
  */
 
-import type { Affordance, PerceptionDataProvider, PerceptionResult, AgentPlan } from '@evol-hive/shared';
+import type {
+  Affordance,
+  PerceptionDataProvider,
+  PerceptionResult,
+  AgentPlan,
+} from '@evol-hive/shared';
 import {
   DRIVE_URGENCY_THRESHOLD,
   HINTABLE_DRIVES,

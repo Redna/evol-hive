@@ -183,7 +183,10 @@ function makePlanLLM(steps: { description: string; targetAffordance?: string }[]
   };
 }
 
-function makeOrchestrator(opts: ProviderOptions, planSteps: { description: string; targetAffordance?: string }[]): PPEROrchestratorImpl {
+function makeOrchestrator(
+  opts: ProviderOptions,
+  planSteps: { description: string; targetAffordance?: string }[],
+): PPEROrchestratorImpl {
   const state = makeState(AGENT_ID, opts.drives);
   return new PPEROrchestratorImpl({
     perceptionProvider: makePerceptionProvider(opts),
@@ -222,10 +225,9 @@ describe('spec 052 R1 — [drive-hint] diagnostic (AC-3)', () => {
   it('emits exactly one [drive-hint] line per cycle when a hintable drive is urgent, with agent, room, primary label, funnel counts, hint flags, pruned-away IDs, and the chosen target', async () => {
     // Classifier drops BOTH restorers (the #183 failure mode) — the room
     // still contains them; the plan then picks 'observe'.
-    const orch = makeOrchestrator(
-      { drives: URGENT_DRIVES, pruned: ['go_to_garden', 'observe'] },
-      [{ description: 'Look around', targetAffordance: 'observe' }],
-    );
+    const orch = makeOrchestrator({ drives: URGENT_DRIVES, pruned: ['go_to_garden', 'observe'] }, [
+      { description: 'Look around', targetAffordance: 'observe' },
+    ]);
 
     await orch.runCycle(AGENT_ID);
 
@@ -258,7 +260,10 @@ describe('spec 052 R1 — [drive-hint] diagnostic (AC-3)', () => {
 
   it('reports hint=true and prunedAway=[] when the restorers survive the funnel', async () => {
     const orch = makeOrchestrator(
-      { drives: URGENT_DRIVES, pruned: ['rest_among_seedlings', 'eat_herbs', 'go_to_garden', 'observe'] },
+      {
+        drives: URGENT_DRIVES,
+        pruned: ['rest_among_seedlings', 'eat_herbs', 'go_to_garden', 'observe'],
+      },
       [{ description: 'Rest among the seedlings', targetAffordance: 'rest_among_seedlings' }],
     );
 
@@ -274,10 +279,9 @@ describe('spec 052 R1 — [drive-hint] diagnostic (AC-3)', () => {
   });
 
   it('emits no [drive-hint] line when all hintable drives are ≥ 40', async () => {
-    const orch = makeOrchestrator(
-      { drives: HEALTHY_DRIVES, pruned: ['go_to_garden', 'observe'] },
-      [{ description: 'Look around', targetAffordance: 'observe' }],
-    );
+    const orch = makeOrchestrator({ drives: HEALTHY_DRIVES, pruned: ['go_to_garden', 'observe'] }, [
+      { description: 'Look around', targetAffordance: 'observe' },
+    ]);
 
     await orch.runCycle(AGENT_ID);
 
@@ -335,5 +339,5 @@ describe('spec 052 R1 — [drive-hint] diagnostic (AC-3)', () => {
     expect(lines[0]).toContain('afterPrune=2');
     expect(lines[0]).toContain('afterMask=0');
     expect(lines[0]).toContain('enum=[]');
-   });
+  });
 });

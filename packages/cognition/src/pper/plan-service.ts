@@ -130,7 +130,10 @@ export class PlanServiceImpl {
         );
         if (waitVerdict.rejected) {
           console.error(`[wait-guard] agent=${agentId}: ${waitVerdict.reason}`);
-          return { success: false, error: waitVerdict.reason ?? 'all-wait plan under a critical drive' };
+          return {
+            success: false,
+            error: waitVerdict.reason ?? 'all-wait plan under a critical drive',
+          };
         }
       }
 

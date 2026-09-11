@@ -23,10 +23,7 @@ import {
 } from '@evol-hive/shared';
 import type { AffordanceClassifier } from '../classifier/index.js';
 import type { GuardrailEngine } from '../index.js';
-import {
-  DRIVE_URGENCY_THRESHOLD,
-  HINTABLE_DRIVES,
-} from './drive-affordance-matcher.js';
+import { DRIVE_URGENCY_THRESHOLD, HINTABLE_DRIVES } from './drive-affordance-matcher.js';
 
 /**
  * Assembles a PassivePerception from the engine-facing data provider.
