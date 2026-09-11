@@ -17,7 +17,14 @@ import type {
   EngineConfig,
 } from '@evol-hive/shared';
 import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
-import { loadScene, loadSceneFile, createBuiltinPlugins, registerHandlerPlugin, clearHandlerPlugins, autoRegisterHandlers } from '@evol-hive/engine';
+import {
+  loadScene,
+  loadSceneFile,
+  createBuiltinPlugins,
+  registerHandlerPlugin,
+  clearHandlerPlugins,
+  autoRegisterHandlers,
+} from '@evol-hive/engine';
 import { assembleWorld } from '@evol-hive/assembly';
 
 // ── Mock LLM (no network needed) ────────────────────────────────────────────

@@ -34,11 +34,13 @@ const REPO = resolve(HERE, '..', '..', '..');
 /** All top-level examples entry points (the demo/validation entry points). */
 function exampleEntryFiles(): string[] {
   const dir = resolve(REPO, 'examples');
-  return readdirSync(dir)
-    .filter((f) => f.endsWith('.ts'))
-    // Build/tooling config files are not consumers.
-    .filter((f) => !f.endsWith('.config.ts'))
-    .map((f) => resolve(dir, f));
+  return (
+    readdirSync(dir)
+      .filter((f) => f.endsWith('.ts'))
+      // Build/tooling config files are not consumers.
+      .filter((f) => !f.endsWith('.config.ts'))
+      .map((f) => resolve(dir, f))
+  );
 }
 
 /** All CLI source files. */

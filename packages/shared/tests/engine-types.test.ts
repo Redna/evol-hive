@@ -3,7 +3,11 @@
  * Covers AC-12 (PPERSchedulerConfig) and AC-13 (SceneDefinition).
  */
 import { describe, it, expect } from 'vitest';
-import { defaultPPERSchedulerConfig, defaultEngineConfig, overrideSchedulerConfig } from '../src/index.js';
+import {
+  defaultPPERSchedulerConfig,
+  defaultEngineConfig,
+  overrideSchedulerConfig,
+} from '../src/index.js';
 import type {
   PPERSchedulerConfig,
   PPEROrchestratorPort,

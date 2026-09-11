@@ -51,11 +51,7 @@ import type {
   ReflectionResult,
   SceneDefinition,
 } from '@evol-hive/shared';
-import type {
-  AffordanceClassifier,
-  LLMClient,
-  LLMContextPayload,
-} from '@evol-hive/cognition';
+import type { AffordanceClassifier, LLMClient, LLMContextPayload } from '@evol-hive/cognition';
 import {
   PPEROrchestratorImpl,
   OpenAICompatibleLLMClient,

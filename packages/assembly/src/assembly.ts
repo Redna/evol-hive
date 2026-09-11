@@ -111,11 +111,13 @@ import {
   ReflectionLoopImpl,
 } from '@evol-hive/memory';
 import type { EngineCore } from '@evol-hive/engine';
-import { GameLoopImpl, SocialManager, System1AgentTracker, System1OutcomeRecorderImpl } from '@evol-hive/engine';
 import {
-  createEngineCore,
-  assembleGameLoop,
+  GameLoopImpl,
+  SocialManager,
+  System1AgentTracker,
+  System1OutcomeRecorderImpl,
 } from '@evol-hive/engine';
+import { createEngineCore, assembleGameLoop } from '@evol-hive/engine';
 
 // ── Mock embedding provider (no network, deterministic) ─────────────────────
 
@@ -326,11 +328,7 @@ export function assembleCognitionStack(
   // ── LLM client (spec 019, Req 5, Req 9) ───────────────────────────────────
   const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
   const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as
-    | 'low'
-    | 'medium'
-    | 'high'
-    | 'none'
-    | undefined;
+    'low' | 'medium' | 'high' | 'none' | undefined;
 
   // Spec 022 (Req 10): token usage aggregation — created always so the
   // end-of-run summary can report real token numbers when USE_REAL_LLM=true.
@@ -571,7 +569,7 @@ export function assembleSystem1(
     async snapshot(agentId) {
       const state = core.agentManager.getState(agentId);
       const plan = state?.currentPlan ?? null;
-      let memoryCount = 0;
+      let memoryCount: number;
       try {
         memoryCount = (await memory.vectorStore.countByAgent(agentId)) ?? 0;
       } catch {
@@ -719,9 +717,7 @@ function toSystem1Ports(system1: System1Assembled): {
     gate: system1.gate,
     outcomeRecorder: system1.outcomeRecorder,
     featureRefresher: system1.featureRefresher,
-    ...(system1.identityTrigger !== undefined
-      ? { identityTrigger: system1.identityTrigger }
-      : {}),
+    ...(system1.identityTrigger !== undefined ? { identityTrigger: system1.identityTrigger } : {}),
   };
 }
 
