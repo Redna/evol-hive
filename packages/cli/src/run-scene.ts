@@ -1,10 +1,12 @@
 /**
  * run-scene command — loads a scene, builds the engine, and runs the simulation (spec 022, Req 16)
  * ────────────────────────────────────────────────────────────────────────────
- * Loads a scene file, builds the engine (using `createEngineCore` + `loadScene` +
- * `assembleGameLoop` with a real or mock LLM based on the `USE_REAL_LLM` env var),
- * registers affordance handlers, starts the game loop, and runs the simulation
- * for a configurable duration. Prints periodic agent state snapshots.
+ * Loads a scene file and hands it to the promoted assembler (spec 050):
+ * `assembleWorld()` wires the engine core + cognition stack in one call —
+ * a real or mock LLM based on the `USE_REAL_LLM` env var, mock memory by
+ * default — with the scene load + affordance-handler registration staying
+ * caller-side (scene data). Starts the game loop, runs the simulation for a
+ * configurable duration, and prints periodic agent state snapshots.
  */
 
 import type {
@@ -14,20 +16,9 @@ import type {
   ReflectionResult,
   EngineConfig,
 } from '@evol-hive/shared';
-import type { LLMClient, LLMContextPayload, AffordanceClassifier } from '@evol-hive/cognition';
-import { createPPEROrchestrator, GuardrailEngineImpl } from '@evol-hive/cognition';
-import type { MemoryStore } from '@evol-hive/memory';
-import { MemoryStoreImpl, InMemoryVectorStore } from '@evol-hive/memory';
-import {
-  createEngineCore,
-  loadScene,
-  assembleGameLoop,
-  loadSceneFile,
-  createBuiltinPlugins,
-  registerHandlerPlugin,
-  clearHandlerPlugins,
-  autoRegisterHandlers,
-} from '@evol-hive/engine';
+import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
+import { loadScene, loadSceneFile, createBuiltinPlugins, registerHandlerPlugin, clearHandlerPlugins, autoRegisterHandlers } from '@evol-hive/engine';
+import { assembleWorld } from '@evol-hive/assembly';
 
 // ── Mock LLM (no network needed) ────────────────────────────────────────────
 
@@ -57,30 +48,6 @@ class MockLLMClient implements LLMClient {
       },
     };
   }
-}
-
-class MockEmbeddingProvider {
-  readonly dimensions = 384;
-  async embed(text: string): Promise<number[]> {
-    const vec = new Array<number>(this.dimensions).fill(0);
-    vec[0] = text.length;
-    return vec;
-  }
-  async embedBatch(texts: string[]): Promise<number[][]> {
-    return texts.map((t) => {
-      const vec = new Array<number>(this.dimensions).fill(0);
-      vec[0] = t.length;
-      return vec;
-    });
-  }
-}
-
-function makeMockClassifier(): AffordanceClassifier {
-  return {
-    async prune(_driveLabel: string, affordances) {
-      return affordances;
-    },
-  };
 }
 
 // ── Engine config ────────────────────────────────────────────────────────────
@@ -131,48 +98,25 @@ export async function runSceneCommand(args: string[]): Promise<number> {
     // ── Build engine ──
     const config = makeConfig();
 
-    // Memory subsystem (mock)
-    const embeddingProvider = new MockEmbeddingProvider();
-    const vectorStore = new InMemoryVectorStore();
-    const memoryStore: MemoryStore = new MemoryStoreImpl({ vectorStore, embeddingProvider });
+    // One call, fully wired (spec 050): the promoted assembler owns all wiring.
+    // The scene-aware mock LLM is handed in; scene data (scene load + builtin
+    // plugin handler registration) stays caller-side via `sceneSetup`.
+    const world = assembleWorld({
+      config,
+      mockLLMClient: new MockLLMClient(),
+      sceneSetup: (core) => {
+        loadScene(core, scene);
 
-    // Engine core
-    const core = createEngineCore(config, memoryStore, vectorStore);
-    loadScene(core, scene);
-
-    // Register built-in plugins + auto-register handlers
-    clearHandlerPlugins();
-    for (const plugin of createBuiltinPlugins()) {
-      registerHandlerPlugin(plugin);
-    }
-    autoRegisterHandlers(core, scene);
-
-    // LLM client (mock by default, real when USE_REAL_LLM=true)
-    const llmClient = new MockLLMClient();
-
-    // Classifier (mock)
-    const classifier = makeMockClassifier();
-
-    // Guardrails
-    const guardrail = new GuardrailEngineImpl({
-      affordanceMasking: true,
-      contextualForcing: true,
-      planValidation: true,
+        // Register built-in plugins + auto-register handlers
+        clearHandlerPlugins();
+        for (const plugin of createBuiltinPlugins()) {
+          registerHandlerPlugin(plugin);
+        }
+        autoRegisterHandlers(core, scene);
+      },
     });
-
-    // PPER orchestrator
-    const orchestrator = createPPEROrchestrator({
-      perceptionProvider: core.bridges.perception,
-      planProvider: core.bridges.plan,
-      executeProvider: core.bridges.execute,
-      reflectProvider: core.bridges.reflect,
-      classifier,
-      llmClient,
-      guardrail,
-    });
-
-    // Assemble game loop
-    const gameLoop = assembleGameLoop(core, orchestrator);
+    const core = world.core;
+    const gameLoop = world.gameLoop;
 
     // ── Run simulation ──
     console.log(`Starting simulation (${durationMs}ms)...`);
