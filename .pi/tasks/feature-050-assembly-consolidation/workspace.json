@@ -1,0 +1,7 @@
+{
+  "name": "feature-050-assembly-consolidation",
+  "description": "Assembly Consolidation — promote the cognition-stack assembler out of examples/assembly.ts into a new @evol-hive/assembly package (composition root above engine and cognition), delete the second wiring path, make examples/CLI thin consumers (config + env only), wire conversation bridge + urge surfaces by default, move buildMemorySubsystem, and resolve the dead EngineConfig.maxConcurrentLLM field. Single wiring source of truth. Issue #166.",
+  "createdAt": "2026-09-10T23:30:00Z",
+  "specIssue": 166,
+  "specFile": "docs/specs/050-assembly-consolidation.md"
+}
