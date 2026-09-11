@@ -191,27 +191,28 @@ describe('Spec 019 — AC-14: office-day engine exposes socialManager', () => {
 
 // ── AC-7: minimal-scene.ts wires socialBridge when USE_REAL_LLM ─────────────
 
-describe('Spec 019 — AC-7: minimal-scene wires socialBridge', () => {
-  it('minimal-scene.ts passes socialBridge: core.socialManager to CognitiveToolExecutorImpl', () => {
+// Spec 050 amended the scene-side assertions: the demos are thin consumers —
+// the promoted assembler (`@evol-hive/assembly`) owns the LLM client, the
+// executor, and the social wiring (spec 019's `socialBridge: core.socialManager`
+// lives there now). The scenes still expose the core's socialManager.
+describe('Spec 019 — AC-7: minimal-scene exposes the wired socialManager (spec 050: via the assembler)', () => {
+  it('minimal-scene.ts delegates wiring to the assembler and exposes the core social surface', () => {
     const src = readExample('minimal-scene.ts');
-    expect(src).toContain('socialBridge');
+    expect(src).toContain('assembleWorld');
     expect(src).toContain('core.socialManager');
   });
 });
 
 // ── AC-8, AC-9: morning-routine real-LLM mode ───────────────────────────────
 
-describe('Spec 019 — AC-8/AC-9: morning-routine real-LLM mode', () => {
-  it('morning-routine.ts imports OpenAICompatibleLLMClient and CognitiveToolExecutorImpl', () => {
+describe('Spec 019 — AC-8/AC-9: morning-routine real-LLM mode (spec 050: via the assembler)', () => {
+  it('morning-routine.ts delegates LLM/executor construction to the promoted assembler', () => {
     const src = readExample('morning-routine.ts');
-    expect(src).toMatch(/OpenAICompatibleLLMClient/);
-    expect(src).toMatch(/CognitiveToolExecutorImpl/);
+    expect(src).toContain('assembleWorld');
   });
 
-  it('morning-routine.ts checks USE_REAL_LLM and wires socialBridge: core.socialManager', () => {
+  it('morning-routine.ts exposes the social surface the assembler wired (core.socialManager)', () => {
     const src = readExample('morning-routine.ts');
-    expect(src).toContain('USE_REAL_LLM');
-    expect(src).toContain('socialBridge');
     expect(src).toContain('core.socialManager');
   });
 
@@ -223,17 +224,14 @@ describe('Spec 019 — AC-8/AC-9: morning-routine real-LLM mode', () => {
 
 // ── AC-12, AC-13: office-day real-LLM mode ──────────────────────────────────
 
-describe('Spec 019 — AC-12/AC-13: office-day real-LLM mode', () => {
-  it('office-day.ts imports OpenAICompatibleLLMClient and CognitiveToolExecutorImpl', () => {
+describe('Spec 019 — AC-12/AC-13: office-day real-LLM mode (spec 050: via the assembler)', () => {
+  it('office-day.ts delegates LLM/executor construction to the promoted assembler', () => {
     const src = readExample('office-day.ts');
-    expect(src).toMatch(/OpenAICompatibleLLMClient/);
-    expect(src).toMatch(/CognitiveToolExecutorImpl/);
+    expect(src).toContain('assembleWorld');
   });
 
-  it('office-day.ts checks USE_REAL_LLM and wires socialBridge: core.socialManager', () => {
+  it('office-day.ts exposes the social surface the assembler wired (core.socialManager)', () => {
     const src = readExample('office-day.ts');
-    expect(src).toContain('USE_REAL_LLM');
-    expect(src).toContain('socialBridge');
     expect(src).toContain('core.socialManager');
   });
 

@@ -22,23 +22,11 @@ import type {
   LLMActionResponse,
   ReflectionResult,
 } from '@evol-hive/shared';
-import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
-import {
-  createPPEROrchestrator,
-  GuardrailEngineImpl,
-  OpenAICompatibleLLMClient,
-  CognitiveToolExecutorImpl,
-} from '@evol-hive/cognition';
-import type { AffordanceClassifier } from '@evol-hive/cognition';
-import type {
-  EmbeddingProvider as MemEmbeddingProvider,
-  VectorStore,
-  MemoryStore,
-} from '@evol-hive/memory';
-import { MemoryStoreImpl } from '@evol-hive/memory';
-import { createEngineCore, assembleGameLoop, loadScene } from '@evol-hive/engine';
-import type { AssembledEngine, EngineCore } from '@evol-hive/engine';
+import type { LLMClient } from '@evol-hive/cognition';
+import { loadScene } from '@evol-hive/engine';
+import type { AssembledEngine } from '@evol-hive/engine';
 import { registerAffordanceHandlers } from './scene-helpers.ts';
+import { assembleWorld } from '@evol-hive/assembly';
 
 // ── Affordance factory helpers ───────────────────────────────────────────────
 
@@ -307,57 +295,6 @@ export class OfficeDayMockLLMClient implements LLMClient {
   }
 }
 
-// ── Mock embedding provider ───────────────────────────────────────────────────
-
-class MockEmbeddingProvider implements MemEmbeddingProvider {
-  readonly dimensions = 384;
-
-  async embed(text: string): Promise<number[]> {
-    const vec = new Array<number>(this.dimensions).fill(0);
-    vec[0] = text.length;
-    return vec;
-  }
-
-  async embedBatch(texts: string[]): Promise<number[][]> {
-    return texts.map((t) => {
-      const vec = new Array<number>(this.dimensions).fill(0);
-      vec[0] = t.length;
-      return vec;
-    });
-  }
-}
-
-function makeMockClassifier(): AffordanceClassifier {
-  return {
-    async prune(_driveLabel: string, affordances: Affordance[]) {
-      return affordances;
-    },
-  };
-}
-
-class InMemoryVectorStore implements VectorStore {
-  private readonly nodes = new Map<string, import('@evol-hive/shared').MemoryNode>();
-
-  async store(node: import('@evol-hive/shared').MemoryNode): Promise<void> {
-    this.nodes.set(node.id, node);
-  }
-  async get(id: string): Promise<import('@evol-hive/shared').MemoryNode | null> {
-    return this.nodes.get(id) ?? null;
-  }
-  async queryByEmbedding(
-    _embedding: number[],
-    _topK: number,
-  ): Promise<import('@evol-hive/shared').MemoryNode[]> {
-    return [...this.nodes.values()];
-  }
-  async delete(ids: string[]): Promise<void> {
-    for (const id of ids) this.nodes.delete(id);
-  }
-  async countRecent(_agentId: string, _sinceTimestamp: number): Promise<number> {
-    return 0;
-  }
-}
-
 // ── Engine assembly (Req 28) ───────────────────────────────────────────────────
 
 function makeConfig(): import('@evol-hive/shared').EngineConfig {
@@ -374,67 +311,31 @@ function makeConfig(): import('@evol-hive/shared').EngineConfig {
 export function buildOfficeDayEngine(): AssembledEngine {
   const config = makeConfig();
 
-  const vectorStore = new InMemoryVectorStore();
-  const embeddingProvider: MemEmbeddingProvider = new MockEmbeddingProvider();
-  const memoryStore: MemoryStore = new MemoryStoreImpl({ vectorStore, embeddingProvider });
-
-  const core: EngineCore = createEngineCore(config, memoryStore);
-  loadScene(core, OFFICE_DAY_SCENE);
-  registerAffordanceHandlers(core);
-
-  // LLM client — real OpenAI-compatible LLM when USE_REAL_LLM=true (spec 019, Req 14),
-  // otherwise the drive-aware mock LLM (backward compatible).
-  const useRealLLM = process.env['USE_REAL_LLM'] === 'true';
-  const reasoningEffort = process.env['LLM_REASONING_EFFORT'] as
-    'low' | 'medium' | 'high' | 'none' | undefined;
-  const maxToolCallIterationsEnv = process.env['LLM_MAX_TOOL_CALL_ITERATIONS'];
-  const maxToolCallIterations =
-    maxToolCallIterationsEnv !== undefined ? Number(maxToolCallIterationsEnv) : undefined;
-
-  let llmClient: LLMClient;
-  if (useRealLLM) {
-    const cognitiveToolExecutor = new CognitiveToolExecutorImpl({
-      stateDataProvider: core.bridges.reflect,
-      socialBridge: core.socialManager,
-    });
-    llmClient = new OpenAICompatibleLLMClient({
-      baseUrl: process.env['LLM_BASE_URL'] ?? 'http://localhost:11434/v1',
-      model: process.env['LLM_MODEL'] ?? 'llama3.1',
-      ...(process.env['LLM_API_KEY'] !== undefined ? { apiKey: process.env['LLM_API_KEY'] } : {}),
-      ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
-      cognitiveToolExecutor,
-      ...(maxToolCallIterations !== undefined ? { maxToolCallIterations } : {}),
-    });
-  } else {
-    llmClient = new OfficeDayMockLLMClient();
-  }
-
-  const classifier: AffordanceClassifier = makeMockClassifier();
-
-  const guardrail = config.guardrailsEnabled
-    ? new GuardrailEngineImpl(config.guardrails)
-    : undefined;
-
-  const orchestrator = createPPEROrchestrator({
-    perceptionProvider: core.bridges.perception,
-    planProvider: core.bridges.plan,
-    executeProvider: core.bridges.execute,
-    reflectProvider: core.bridges.reflect,
-    classifier,
-    llmClient,
-    ...(guardrail !== undefined ? { guardrail } : {}),
+  // One call, fully wired (spec 050 R2/R3): the promoted assembler owns every
+  // wire — engine core, cognition stack (`USE_REAL_LLM=true` selects the real
+  // client; otherwise this scene's drive-aware mock), memory subsystem,
+  // guardrails, orchestrator, and the game loop. Scene data stays caller-side
+  // via `sceneSetup`.
+  const world = assembleWorld({
+    config,
+    mockLLMClient: new OfficeDayMockLLMClient(),
+    sceneSetup: (core) => {
+      loadScene(core, OFFICE_DAY_SCENE);
+      registerAffordanceHandlers(core);
+    },
   });
 
-  const gameLoop = assembleGameLoop(core, orchestrator);
+  const core = world.core;
 
   return {
-    gameLoop,
+    gameLoop: world.gameLoop,
     agentManager: core.agentManager,
     sceneManager: core.sceneManager,
     smartObjectRegistry: core.smartObjectRegistry,
     affordanceRegistry: core.affordanceRegistry,
     bridges: core.bridges,
     socialManager: core.socialManager,
+    vectorStore: world.memory!.vectorStore,
   };
 }
 

@@ -29,8 +29,6 @@ import type {
   SceneDefinition,
   EngineConfig,
   PPEROrchestratorPort,
-  PPERCycleOutcome,
-  PPERPhase,
   AffordanceResult,
   Room,
   SmartObject,
@@ -38,8 +36,6 @@ import type {
   AgentProfile,
 } from '@evol-hive/shared';
 import {
-  createEngineCore,
-  assembleGameLoop,
   loadScene,
   loadSceneFile,
   clearHandlerPlugins,
@@ -51,7 +47,7 @@ import {
 import type { EngineCore } from '@evol-hive/engine';
 import type { LLMClient } from '@evol-hive/cognition';
 import type { GuardrailEngineImpl } from '@evol-hive/cognition';
-import { assembleCognitionStack, buildMemorySubsystem } from './assembly.js';
+import { assembleWorld, MockOrchestrator } from '@evol-hive/assembly';
 import { VisualizerServer } from '@evol-hive/visualizer';
 
 // ── Built-in scenes ──────────────────────────────────────────────────────────
@@ -177,22 +173,12 @@ function makeConfig(): EngineConfig {
   };
 }
 
-// ── Mock PPER orchestrator ────────────────────────────────────────────────────
-// For the visualizer demo in mock mode we do not need LLM-driven cognition —
-// the renderer only displays state. A lightweight mock orchestrator reports
-// the 'perceive' phase for every agent and never runs cycles (spec 027:
-// the mock demo stays deterministic — no simulated cycles).
-
-export class MockOrchestrator implements PPEROrchestratorPort {
-  async runCycle(_agentId: string): Promise<PPERCycleOutcome> {
-    // No-op — the visualizer does not require PPER cycles to run.
-    // Nothing ran → nothing applied (spec 041 causal outcome).
-    return { appliedDriveChanges: false };
-  }
-  getPhase(_agentId: string): PPERPhase {
-    return 'perceive';
-  }
-}
+// ── Mock PPER orchestrator (spec 050) ────────────────────────────────────────
+// The no-op orchestrator lives in `@evol-hive/assembly` now — the promoted
+// assembler wires it in mock mode. Re-exported here for the spec 027 tests
+// (the demo's mock-mode handle reports the 'perceive' phase for every agent
+// and never runs cycles — deterministic, no simulated cycles).
+export { MockOrchestrator };
 
 // ── LLM backend health check (spec 027, Req 9) ───────────────────────────────
 
@@ -326,47 +312,32 @@ export async function startVisualizerDemo(
     );
   }
 
-  // Memory subsystem — real mode only; mock mode keeps the no-op default store.
-  const memory = useRealLLM ? buildMemorySubsystem() : undefined;
-  const core = createEngineCore(config, memory?.memoryStore, memory?.vectorStore);
-  loadScene(core, scene);
-
-  if (useRealLLM) {
-    // Demo handler parity (Req 4): register the same affordance handlers the
-    // coffee-shop validation scene uses, via the spec-022 plugin path.
-    clearHandlerPlugins();
-    for (const plugin of createBuiltinPlugins()) {
-      registerHandlerPlugin(plugin);
-    }
-    autoRegisterHandlers(core, scene);
-  } else {
-    registerHandlers(core);
-  }
-
-  // ── Orchestrator selection (Req 3): real PPER orchestrator in real mode. ──
-  let orchestrator: PPEROrchestratorPort;
-  let llmClient: LLMClient | undefined;
-  let guardrail: GuardrailEngineImpl | undefined;
-  if (useRealLLM && memory !== undefined) {
-    const stack = assembleCognitionStack(core, undefined, { memory });
-    orchestrator = stack.orchestrator;
-    llmClient = stack.llmClient;
-    guardrail = stack.guardrail;
-    assembleGameLoop(
-      core,
-      orchestrator,
-      stack.memoryDecayService !== undefined
-        ? {
-            memoryDecayService: stack.memoryDecayService,
-            ...(stack.reflectionLoop !== undefined ? { reflectionLoop: stack.reflectionLoop } : {}),
-            decayConfig: stack.decayConfig,
-          }
-        : undefined,
-    );
-  } else {
-    orchestrator = new MockOrchestrator();
-    assembleGameLoop(core, orchestrator);
-  }
+  // One call, fully wired (spec 050 R2): the promoted assembler owns ALL
+  // wiring. Mock mode (no env, no mock client) gets no-op-orchestrator parity;
+  // real mode wires the cognition stack + memory maintenance.
+  const world = assembleWorld({
+    config,
+    sceneSetup: (core) => {
+      loadScene(core, scene);
+      if (useRealLLM) {
+        // Demo handler parity (Req 4): register the same affordance handlers
+        // the coffee-shop validation scene uses, via the spec-022 plugin path.
+        clearHandlerPlugins();
+        for (const plugin of createBuiltinPlugins()) {
+          registerHandlerPlugin(plugin);
+        }
+        autoRegisterHandlers(core, scene);
+      } else {
+        registerHandlers(core);
+      }
+    },
+  });
+  const core = world.core;
+  // Orchestrator selection (Req 3): a real PPER orchestrator in real mode, a
+  // no-op orchestrator in mock mode — both wired by the assembler.
+  let orchestrator: PPEROrchestratorPort = world.orchestrator;
+  let llmClient: LLMClient | undefined = world.stack?.llmClient;
+  let guardrail: GuardrailEngineImpl | undefined = world.stack?.guardrail;
 
   // Build the agent profiles map from the loaded agents so the adapter can
   // resolve display names (falls back to agentManager.getProfile()).

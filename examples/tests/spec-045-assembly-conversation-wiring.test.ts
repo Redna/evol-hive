@@ -64,12 +64,14 @@ import {
   PerceptionServiceImpl,
 } from '@evol-hive/cognition';
 import type { AffordanceClassifier } from '@evol-hive/cognition';
-import { assembleCognitionStack, buildMemorySubsystem } from '../assembly.ts';
-import type { CognitionStack } from '../assembly.ts';
+import { assembleCognitionStack, buildMemorySubsystem } from '@evol-hive/assembly';
+import type { CognitionStack } from '@evol-hive/assembly';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SPEC_PATH = resolve(HERE, '../../docs/specs/045-assembly-conversation-wiring.md');
-const ASSEMBLY_PATH = resolve(HERE, '../assembly.ts');
+// Spec 050 promoted the assembly into `@evol-hive/assembly` — the audited
+// source moved with it.
+const ASSEMBLY_PATH = resolve(HERE, '../../packages/assembly/src/assembly.ts');
 
 const ROOM = 'garden';
 
@@ -134,7 +136,7 @@ describe('spec 045 draft integrity (PR #171)', () => {
 
 // ── 2. AC-6 static invariants (grep assertion) ───────────────────────────────
 
-describe('AC-6 (R3) — examples assembly static invariants', () => {
+describe('AC-6 (R3) — promoted-assembly static invariants (spec 050 file)', () => {
   const source = readFileSync(ASSEMBLY_PATH, 'utf8');
 
   it('constructs at most one SocialManager path and never a ConversationManagerImpl', () => {

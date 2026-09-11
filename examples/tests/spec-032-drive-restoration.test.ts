@@ -43,7 +43,7 @@ import {
 import type { EngineCore } from '@evol-hive/engine';
 import { ExecuteServiceImpl } from '@evol-hive/cognition';
 import { DYNAMIC_WORLD_SCENE, createDynamicWorldHandlers } from '../dynamic-world.ts';
-import { assembleCognitionStack, buildMemorySubsystem } from '../assembly.ts';
+import { assembleCognitionStack, buildMemorySubsystem } from '@evol-hive/assembly';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

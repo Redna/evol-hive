@@ -22,7 +22,7 @@ import {
 } from '@evol-hive/cognition';
 
 import { buildCoffeeShopEngine, CoffeeShopMockLLMClient } from '../coffee-shop.ts';
-import { assembleCognitionStack, buildMemorySubsystem } from '../assembly.ts';
+import { assembleCognitionStack, buildMemorySubsystem } from '@evol-hive/assembly';
 import {
   startVisualizerDemo,
   checkLLMHealth,
@@ -240,9 +240,14 @@ async function waitFor(
   }
 }
 
-// ── AC-1: Shared assembly helper exists; coffee-shop delegates to it ─────────
+// ── AC-1: promoted assembler exists; coffee-shop delegates to it (spec 050) ──
 
-describe('AC-1: shared assembly helper (examples/assembly.ts)', () => {
+// Spec 050 amended this suite: the shared assembly helper moved from
+// `examples/assembly.ts` into the new `@evol-hive/assembly` package (the
+// composition root), and `buildCoffeeShopEngine()` now delegates to the
+// one-call `assembleWorld()` — the delegation assertion tracks the promoted
+// API while the no-direct-construction invariant is unchanged.
+describe('AC-1: shared assembly helper (@evol-hive/assembly, spec 050)', () => {
   it('exports assembleCognitionStack and buildMemorySubsystem', () => {
     expect(typeof assembleCognitionStack).toBe('function');
     expect(typeof buildMemorySubsystem).toBe('function');
@@ -253,7 +258,7 @@ describe('AC-1: shared assembly helper (examples/assembly.ts)', () => {
     expect(source).not.toMatch(/new OpenAICompatibleLLMClient/);
     expect(source).not.toMatch(/new GuardrailEngineImpl/);
     expect(source).not.toMatch(/createPPEROrchestrator\(/);
-    expect(source).toMatch(/assembleCognitionStack\(/);
+    expect(source).toMatch(/assembleWorld\(/);
   });
 
   it('buildCoffeeShopEngine keeps the CoffeeShopAssembledEngine shape (mock mode)', async () => {
