@@ -69,15 +69,11 @@ import type {
   AgentProfile,
   EngineConfig,
   PPEROrchestratorPort,
-  PPERCycleOutcome,
-  PPERPhase,
   SmartObject,
 } from '@evol-hive/shared';
 import { defaultDecayScaling } from '@evol-hive/shared';
 import {
-  createEngineCore,
   loadScene,
-  assembleGameLoop,
   autoRegisterHandlers,
   clearHandlerPlugins,
   registerHandlerPlugin,
@@ -87,7 +83,7 @@ import {
 import type { EngineCore } from '@evol-hive/engine';
 import type { AffordanceHandler } from '@evol-hive/engine';
 import { VisualizerServer } from '@evol-hive/visualizer';
-import { assembleCognitionStack, assembleSystem1, buildMemorySubsystem } from './assembly.ts';
+import { assembleWorld } from '@evol-hive/assembly';
 import {
   DYNAMIC_WORLD_SCENE,
   createCarryEffect,
@@ -109,17 +105,6 @@ function makeConfig(): EngineConfig {
     // ENGINE_MAX_CONCURRENT_LLM above.
     decayScaling: defaultDecayScaling(),
   };
-}
-
-/** Minimal no-op orchestrator for mock mode (parity with visualizer-demo). */
-class NoopOrchestrator implements PPEROrchestratorPort {
-  async runCycle(): Promise<PPERCycleOutcome> {
-    // Mock mode runs no cycles — nothing was ever applied.
-    return { appliedDriveChanges: false };
-  }
-  getPhase(): PPERPhase {
-    return 'perceive';
-  }
 }
 
 /** The apprentice profile, spawned mid-run (spec 030, Req 6).
@@ -283,94 +268,75 @@ async function main(): Promise<void> {
   const log = (msg: string): void => console.log(msg);
 
   const config = makeConfig();
-  const memory = useRealLLM ? buildMemorySubsystem() : undefined;
-  const core = createEngineCore(config, memory?.memoryStore, memory?.vectorStore);
-  loadScene(core, DYNAMIC_WORLD_SCENE);
 
-  // Handler registration: builtin plugins + carry/gate handlers (spec 030).
-  clearHandlerPlugins();
-  for (const plugin of createBuiltinPlugins()) {
-    registerHandlerPlugin(plugin);
-  }
-  autoRegisterHandlers(core, DYNAMIC_WORLD_SCENE);
-  for (const [effect, handler] of Object.entries(createDynamicWorldHandlers())) {
-    core.affordanceRegistry.registerHandler(effect, handler);
-  }
-  // Diagnostic wrapper: every affordance execution is visible in the log —
-  // this is how we verify the drive→affordance → execute → driveChanges loop
-  // end-to-end in live runs.
-  const logged =
-    (effectId: string, handler: AffordanceHandler): AffordanceHandler =>
-    async (objectId, agentId, state) => {
-      const r = await handler(objectId, agentId, state);
-      log(
-        `[affordance] ${agentId} ${effectId} @ ${objectId} → ` +
-          (r.success
-            ? `ok${r.driveChanges ? ' drives=' + JSON.stringify(r.driveChanges) : ''}`
-            : `FAILED: ${r.failureReason ?? '?'}`),
+  // One call, fully wired (spec 050): the promoted assembler owns ALL wiring —
+  // engine core, cognition stack (real LLM when USE_REAL_LLM=true), memory
+  // subsystem (R5), System 1 heads, and the game loop. Mock mode (no env, no
+  // mock client) gets the no-op orchestrator parity: no cycles, no memory.
+  // Scene data (scene load + handlers) stays caller-side via sceneSetup.
+  const world = assembleWorld({
+    config,
+    ...(useRealLLM
+      ? {
+          system1: {
+            // System 1 trainable heads (spec 035) — fail-open until an artifact
+            // lands; session logs accumulate outcome samples for the first dream
+            // update. Env-overridable like coffee-shop (grand-validation wiring,
+            // issue #139 follow-up arc).
+            ...(process.env['SYSTEM1_GATE_ARTIFACT'] !== undefined
+              ? { gateArtifactPath: process.env['SYSTEM1_GATE_ARTIFACT'] }
+              : {}),
+            ...(process.env['SYSTEM1_SESSION_LOG_DIR'] !== undefined
+              ? { sessionLogDir: process.env['SYSTEM1_SESSION_LOG_DIR'] }
+              : { sessionLogDir: 'session-logs' }),
+          },
+        }
+      : {}),
+    sceneSetup: (core: EngineCore) => {
+      loadScene(core, DYNAMIC_WORLD_SCENE);
+
+      // Handler registration: builtin plugins + carry/gate handlers (spec 030).
+      clearHandlerPlugins();
+      for (const plugin of createBuiltinPlugins()) {
+        registerHandlerPlugin(plugin);
+      }
+      autoRegisterHandlers(core, DYNAMIC_WORLD_SCENE);
+      for (const [effect, handler] of Object.entries(createDynamicWorldHandlers())) {
+        core.affordanceRegistry.registerHandler(effect, handler);
+      }
+      // Diagnostic wrapper: every affordance execution is visible in the log —
+      // this is how we verify the drive→affordance → execute → driveChanges loop
+      // end-to-end in live runs.
+      const logged =
+        (effectId: string, handler: AffordanceHandler): AffordanceHandler =>
+        async (objectId, agentId, state) => {
+          const r = await handler(objectId, agentId, state);
+          log(
+            `[affordance] ${agentId} ${effectId} @ ${objectId} → ` +
+              (r.success
+                ? `ok${r.driveChanges ? ' drives=' + JSON.stringify(r.driveChanges) : ''}`
+                : `FAILED: ${r.failureReason ?? '?'}`),
+          );
+          return r;
+        };
+      for (const [effect, handler] of Object.entries(createDynamicWorldHandlers())) {
+        core.affordanceRegistry.registerHandler(effect, logged(effect, handler));
+      }
+      core.affordanceRegistry.registerHandler(
+        'carry',
+        logged('carry', createCarryEffect(core.mutationService)),
       );
-      return r;
-    };
-  for (const [effect, handler] of Object.entries(createDynamicWorldHandlers())) {
-    core.affordanceRegistry.registerHandler(effect, logged(effect, handler));
-  }
-  core.affordanceRegistry.registerHandler(
-    'carry',
-    logged('carry', createCarryEffect(core.mutationService)),
-  );
-  for (const [effect, handler] of Object.entries(createGateHandlers(core.mutationService))) {
-    core.affordanceRegistry.registerHandler(effect, logged(effect, handler));
-  }
+      for (const [effect, handler] of Object.entries(createGateHandlers(core.mutationService))) {
+        core.affordanceRegistry.registerHandler(effect, logged(effect, handler));
+      }
+    },
+  });
 
-  // Cognition stack (real LLM) or no-op orchestrator (mock), + game loop.
-  let orchestrator: PPEROrchestratorPort;
-  let tokenReporter:
-    | { getTotalUsage(): { promptTokens: number; completionTokens: number; totalTokens: number } }
-    | undefined;
-  if (useRealLLM && memory !== undefined) {
-    const stack = assembleCognitionStack(core, undefined, { memory });
-    orchestrator = stack.orchestrator;
-
-    // System 1 trainable heads (spec 035) — fail-open until an artifact
-    // lands; session logs accumulate outcome samples for the first dream
-    // update. Env-overridable like coffee-shop (grand-validation wiring,
-    // issue #139 follow-up arc).
-    const system1 = assembleSystem1(core, memory, {
-      ...(process.env['SYSTEM1_GATE_ARTIFACT'] !== undefined
-        ? { gateArtifactPath: process.env['SYSTEM1_GATE_ARTIFACT'] }
-        : {}),
-      ...(process.env['SYSTEM1_SESSION_LOG_DIR'] !== undefined
-        ? { sessionLogDir: process.env['SYSTEM1_SESSION_LOG_DIR'] }
-        : { sessionLogDir: 'session-logs' }),
-    });
-
-    assembleGameLoop(
-      core,
-      stack.orchestrator,
-      stack.memoryDecayService !== undefined
-        ? {
-            memoryDecayService: stack.memoryDecayService,
-            ...(stack.reflectionLoop !== undefined ? { reflectionLoop: stack.reflectionLoop } : {}),
-            decayConfig: stack.decayConfig,
-          }
-        : undefined,
-      undefined,
-      undefined,
-      {
-        gate: system1.gate,
-        outcomeRecorder: system1.outcomeRecorder,
-        featureRefresher: system1.featureRefresher,
-        ...(system1.identityTrigger !== undefined
-          ? { identityTrigger: system1.identityTrigger }
-          : {}),
-      },
-    );
-    // Reporter is cumulative — read totals at END of run.
-    tokenReporter = stack.tokenUsageReporter;
-  } else {
-    orchestrator = new NoopOrchestrator();
-    assembleGameLoop(core, orchestrator);
-  }
+  const core = world.core;
+  let orchestrator: PPEROrchestratorPort = world.orchestrator;
+  // Reporter is cumulative — read totals at END of run (real-LLM runs only).
+  const tokenReporter = world.stack?.tokenUsageReporter;
+  const memory = world.memory;
 
   // Visualizer: adapter + server (live structural rendering, spec 030 Req 15).
   const scenes = new Map([['dynamic-world', DYNAMIC_WORLD_SCENE]]);
