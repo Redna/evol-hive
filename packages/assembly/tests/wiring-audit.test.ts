@@ -36,6 +36,8 @@ function exampleEntryFiles(): string[] {
   const dir = resolve(REPO, 'examples');
   return readdirSync(dir)
     .filter((f) => f.endsWith('.ts'))
+    // Build/tooling config files are not consumers.
+    .filter((f) => !f.endsWith('.config.ts'))
     .map((f) => resolve(dir, f));
 }
 
@@ -137,9 +139,18 @@ describe('AC-1/AC-3 — consumer entry points are thin: assembleWorld + scene da
 
   it('every consumer entry point that assembles a world calls the promoted assembler', () => {
     // The five R3 consumers (plus the three legacy demo scenes) must all go
-    // through the composition root. Files that never built an engine
-    // (scene-data-only modules) are exempt.
-    const SCENE_DATA_ONLY = new Set(['dynamic-world.ts', 'scene-helpers.ts']);
+    // through the composition root. Files that never build an engine
+    // (scene-data-only modules, the CLI's command dispatcher and scene
+    // scaffolding/validation commands) are exempt.
+    const SCENE_DATA_ONLY = new Set([
+      'dynamic-world.ts',
+      'scene-helpers.ts',
+      'cli.ts',
+      'create-scene.ts',
+      'validate-scene.ts',
+      // cli package barrels / command modules that never assemble an engine
+      'index.ts',
+    ]);
     const assemblers = consumers.filter((c) => !SCENE_DATA_ONLY.has(c.path.split('/').pop()!));
     for (const consumer of assemblers) {
       expect(read(consumer.path), rel(consumer.path)).toContain('assembleWorld');

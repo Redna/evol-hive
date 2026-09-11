@@ -6,9 +6,8 @@
  * renderer at `http://localhost:<port>/`.
  *
  * Spec 027 (issue #106): when `USE_REAL_LLM=true`, the demo builds a real
- * `PPEROrchestrator` via the shared `assembleCognitionStack()` helper (the
- * same wiring `buildCoffeeShopEngine()` uses — one source of truth for
- * LLM/guardrail/tool-executor assembly), loads the coffee-shop scene from
+ * `PPEROrchestrator` via the promoted assembler (spec 050 — one wiring source
+ * of truth for LLM/guardrail/tool-executor assembly), loads the coffee-shop scene from
  * `coffee-shop.scene.yaml` (the same YAML the headless CLI runs), registers
  * affordance handlers via the spec-022 plugin path, and performs a startup LLM
  * health check. Agents then execute full perceive→plan→execute→reflect cycles
@@ -281,7 +280,7 @@ export interface StartVisualizerDemoOptions {
  * adapter, engine core, orchestrator, port, and a `stop()` function.
  *
  * With `USE_REAL_LLM=true` the demo builds a real `PPEROrchestrator` via
- * `assembleCognitionStack()` (spec 027, Req 3), loads the coffee-shop scene
+ * `assembleWorld()` (spec 050 R2/R3), loads the coffee-shop scene
  * from YAML (Req 5), and registers the same affordance handlers the validation
  * scene uses via the spec-022 plugin path (Req 4). Otherwise the default
  * no-op `MockOrchestrator` and minimal scene are used — unchanged from
