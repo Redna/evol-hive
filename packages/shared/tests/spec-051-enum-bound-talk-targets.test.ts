@@ -115,9 +115,9 @@ describe('SocialActionBridge.enumerateTalkTargets (R3 — source pin)', () => {
     const source = readFileSync(COGNITION_TYPES_PATH, 'utf8');
     const start = source.indexOf('export interface SocialActionBridge');
     expect(start).toBeGreaterThan(-1);
-    // Cut at the next interface declaration so the assertion cannot match an
-    // unrelated block.
-    const block = source.slice(start, source.indexOf('}', source.indexOf('{', start)));
+    // Cut at the interface's closing brace — the first line that is exactly
+    // `}` after the declaration (doc-comment braces never start a line).
+    const block = source.slice(start, source.indexOf('\n}', start));
     expect(block).toContain('enumerateTalkTargets?(');
     // The spec 046 method stays REQUIRED — no interface break.
     expect(block).toContain('resolveAgentId(requesterAgentId: string, nameOrId: string): string | null;');

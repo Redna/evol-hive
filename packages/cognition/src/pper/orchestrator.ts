@@ -44,6 +44,7 @@ import {
   ReflectBuilderImpl,
 } from './index.js';
 import { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
+import { logTalkEnumDiagnostic } from './talk-enum.js';
 import type { BatchPlanService } from './batch-plan-service.js';
 
 /** Dependencies for {@link PPEROrchestratorImpl}. */
@@ -181,11 +182,15 @@ export class PPEROrchestratorImpl {
     // renders — so "hint never rendered" is distinguishable from "hint
     // rendered and the LLM chose silence". Zero LLM calls, one line, and
     // wrapped so a logging failure can never break the cycle (R1/AC-2).
+    // Spec 051 (R4): the per-cycle `[talk-enum]` line rides the same seam —
+    // the evidence base for the deferred monologue-reward decision (R5) and
+    // live validation (AC-10).
     try {
       const provider = this.perceptionProvider;
       const currentTick =
         typeof provider.getCurrentTick === 'function' ? provider.getCurrentTick() : undefined;
       logSocialUrgeDiagnostic(agentId, perception, currentTick);
+      logTalkEnumDiagnostic(agentId, perception);
     } catch {
       // Diagnostics must never break a cycle (spec 049 Constraints).
     }

@@ -231,7 +231,12 @@ describe('spec 047 — production stack: urge-gated urgency, asymmetric reward',
     expect(stable).toContain('You can call talk_to, observe_agent, help, or ignore directly');
     expect(stable).not.toContain(NO_OUTLET);
 
-    // Influence, not force: talk_to is still in the tool list.
+    // Spec 051 (R1/R2 — issue #186): with every present agent past the cap,
+    // the talk_to value space is EMPTY — the tool is omitted entirely (a
+    // capped target is no longer a valid choice, not merely un-promoted).
+    // The sibling social tools still render (AC-4). (Supersedes the spec 047
+    // "talk_to is still in the tool list" assertion: the cap now closes the
+    // value space itself, the executor choke point remains the backstop.)
     const payload = await (async () => {
       const stubClassifier: AffordanceClassifier = {
         prune: async (_driveLabel: string, affordances: Affordance[]) => affordances,
@@ -242,7 +247,9 @@ describe('spec 047 — production stack: urge-gated urgency, asymmetric reward',
       });
       return new PerceptionBuilderImpl().build(await service.perceive('agent-alice'));
     })();
-    expect(payload.tools.map((t) => t.function.name)).toContain('talk_to');
+    const names = payload.tools.map((t) => t.function.name);
+    expect(names).not.toContain('talk_to');
+    expect(names).toEqual(expect.arrayContaining(['observe_agent', 'help', 'ignore']));
   });
 
   // ── AC-7 — backward compat: fresh relationships keep today's behavior ───────

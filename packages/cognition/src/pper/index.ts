@@ -324,6 +324,8 @@ export { PPEROrchestratorImpl, createPPEROrchestrator } from './orchestrator.js'
 export type { PPEROrchestratorOptions } from './orchestrator.js';
 export { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
 export { classifySocialUrgeLine } from './perception-builder.js';
+export { computeTalkEnum, logTalkEnumDiagnostic } from './talk-enum.js';
+export type { TalkEnumOutcome } from './talk-enum.js';
 export {
   BatchPlanService,
   type BatchPlanServiceOptions,

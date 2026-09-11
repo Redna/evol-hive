@@ -208,6 +208,46 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
   }
 
   /**
+   * Spec 051 (R3): last-resort value-space validation at the spec 046 choke
+   * point — a resolved target OUTSIDE the engine's per-cycle enumeration
+   * (`enumerateTalkTargets`) is refused with the standard structured tool
+   * failure (spec 046 AC-8 pattern) and NOTHING is written (no queue message,
+   * no conversation, no relationship delta, no reciprocity counter, no drive
+   * grant). The enum the LLM sees is built from perception, but the engine is
+   * the source of truth for validity — a transient disagreement resolves to a
+   * structured tool error, never a write. The message is actionable (Req 17
+   * self-correction): it names the target, the unanswered-cap policy, and the
+   * reply-driven recovery path (Decision 2 — no cooldown timer).
+   *
+   * Bridges predating spec 051 may not carry `enumerateTalkTargets` — for
+   * those, the membership check is skipped and the raw resolution passes
+   * through bit-for-bit (spec 046 AC-10 `typeof` guard pattern, AC-7).
+   */
+  private excludedTalkTargetResult(targetAgentId: string): SocialToolResult {
+    const targetName = this.socialBridge?.getAgentSummary(targetAgentId)?.name ?? targetAgentId;
+    return {
+      success: false,
+      message:
+        `You've sent too many unanswered messages to ${targetName} (${targetAgentId}) — give them space. ` +
+        `They'll be available to talk to again after they reply.`,
+      relationshipUpdated: false,
+    };
+  }
+
+  /**
+   * Spec 051 (R3): validate a RESOLVED target against the engine's per-cycle
+   * enumeration at call time. Returns null when the bridge predates spec 051
+   * (no `enumerateTalkTargets` — check skipped, AC-7), otherwise the list of
+   * valid targets for the requester.
+   */
+  private enumerateTalkTargets(agentId: string): string[] | null {
+    const bridge = this.socialBridge;
+    if (bridge === undefined) return null;
+    if (typeof bridge.enumerateTalkTargets !== 'function') return null;
+    return bridge.enumerateTalkTargets(agentId);
+  }
+
+  /**
    * Spec 046 (AC-8): structured failure for an unresolvable talk_to target —
    * the message is actionable (Req 17 self-correction) and NOTHING is written
    * under any key. When a conversation bridge is wired, its `openOrContribute`
@@ -277,6 +317,14 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       return this.unresolvableTalkToResult(agentId, targetAgentId, message, taggedSentiment);
     }
     const target = resolvedTarget;
+    // Spec 051 (R3): the resolved target must be inside the engine's per-cycle
+    // valid-target enumeration — the last-resort value-space validator behind
+    // the enum (Ollama/gemma tool calling does not hard-enforce enums). A
+    // capped target fails here WITHOUT any write.
+    const validTargets = this.enumerateTalkTargets(agentId);
+    if (validTargets !== null && !validTargets.includes(target)) {
+      return this.excludedTalkTargetResult(target);
+    }
     try {
       // Spec 033 (R1/R3): talk_to maps to open-or-contribute — the exchange
       // joins the ongoing conversation thread (or opens one).

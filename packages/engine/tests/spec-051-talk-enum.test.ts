@@ -143,7 +143,9 @@ describe('SocialActionBridge.enumerateTalkTargets optionality (AC-7 pin)', () =>
   it('the shared interface declares the method optional — pre-051 bridges stay assignable', () => {
     const source = readFileSync(COGNITION_TYPES_PATH, 'utf8');
     const start = source.indexOf('export interface SocialActionBridge');
-    const block = source.slice(start, source.indexOf('}', source.indexOf('{', start)));
+    // Cut at the interface's closing brace — the first line that is exactly
+    // `}` after the declaration (doc-comment braces never start a line).
+    const block = source.slice(start, source.indexOf('\n}', start));
     expect(block).toContain('enumerateTalkTargets?(');
   });
 });

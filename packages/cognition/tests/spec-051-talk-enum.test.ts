@@ -253,12 +253,17 @@ describe('the spec 047 cap participates in enum construction (R2, AC-3)', () => 
   });
 
   it('the exclusion is per-target: a fresh target survives while the capped one is removed', () => {
+    const healthyIris = assessment('agent-iris', {
+      personaSeed: 0.9,
+      socialDrive: 10,
+      relationship: { trust: 50, familiarity: 0 },
+    });
     const cappedMaren = assessment('agent-maren', {
       personaSeed: 0.5,
       socialDrive: 80,
       relationship: { sentCount: 3, receivedCount: 0, trust: 50, familiarity: 0 },
     });
-    const payload = builder.build(makePerceptionResult({ socialUrges: [healthyMaren(), cappedMaren] }));
+    const payload = builder.build(makePerceptionResult({ socialUrges: [healthyIris, cappedMaren] }));
     const talkTo = toolByName(payload.tools, 'talk_to')!;
     expect(talkTo.function.parameters.properties.targetAgentId.enum).toEqual(['agent-iris']);
   });

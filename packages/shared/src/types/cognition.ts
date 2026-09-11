@@ -291,6 +291,22 @@ export interface SocialActionBridge {
    * TypeScript over profiles/states, no LLM anywhere.
    */
   resolveAgentId(requesterAgentId: string, nameOrId: string): string | null;
+  /**
+   * The per-cycle valid talk targets for the requester (spec 051, R3 —
+   * issue #186): co-located, active agents minus any target whose
+   * `sentCount − receivedCount` is at or above `SOCIAL_TALK_CAP` for that
+   * relationship. Computed engine-side where agent-state and reciprocity
+   * counters live (same ADR layering as `resolveAgentId`) — this is the
+   * runtime value-space the executor's choke point validates against (the
+   * enum the LLM sees is built from perception, but the ENGINE is the source
+   * of truth for validity; a transient disagreement resolves to a structured
+   * tool error, never a write).
+   *
+   * OPTIONAL for backward compatibility: bridges predating spec 051 may not
+   * carry the method — the executor skips the membership check for those via
+   * a `typeof` guard, preserving spec 046 behavior bit-for-bit (AC-7).
+   */
+  enumerateTalkTargets?(requesterAgentId: string): string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────
