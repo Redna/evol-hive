@@ -11,6 +11,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@9.39.5(supports-color@7.2.0))
+      '@evol-hive/assembly':
+        specifier: workspace:*
+        version: link:packages/assembly
       '@evol-hive/cognition':
         specifier: workspace:*
         version: link:packages/cognition
@@ -50,6 +53,9 @@ importers:
 
   examples:
     dependencies:
+      '@evol-hive/assembly':
+        specifier: workspace:*
+        version: link:../packages/assembly
       '@evol-hive/cognition':
         specifier: workspace:*
         version: link:../packages/cognition
@@ -73,8 +79,36 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
 
+  packages/assembly:
+    dependencies:
+      '@evol-hive/cognition':
+        specifier: workspace:*
+        version: link:../cognition
+      '@evol-hive/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@evol-hive/memory':
+        specifier: workspace:*
+        version: link:../memory
+      '@evol-hive/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(postcss@8.5.25)(supports-color@7.2.0)(tsx@4.23.12)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.20.1)(supports-color@7.2.0)
+
   packages/cli:
     dependencies:
+      '@evol-hive/assembly':
+        specifier: workspace:*
+        version: link:../assembly
       '@evol-hive/cognition':
         specifier: workspace:*
         version: link:../cognition

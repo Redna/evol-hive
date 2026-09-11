@@ -24,6 +24,7 @@
     "@evol-hive/engine": "workspace:*",
     "@evol-hive/cognition": "workspace:*",
     "@evol-hive/memory": "workspace:*",
+    "@evol-hive/assembly": "workspace:*",
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.0",
     "eslint": "^9.0.0",

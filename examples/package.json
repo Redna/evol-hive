@@ -7,6 +7,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@evol-hive/assembly": "workspace:*",
     "@evol-hive/shared": "workspace:*",
     "@evol-hive/engine": "workspace:*",
     "@evol-hive/cognition": "workspace:*",
