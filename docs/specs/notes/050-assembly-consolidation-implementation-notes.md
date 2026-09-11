@@ -110,7 +110,7 @@ Branch `feature/050-assembly-consolidation` (from main after #184's spec PR).
 The deterministic clauses of AC-2 are covered by
 `packages/assembly/tests/assembly.test.ts` (production executor → thread in
 the core's `ConversationManagerImpl`, pending-address query + rendered line,
-spec 044 reciprocity). The *live-LLM* run clause (real backend, full sim)
+spec 044 reciprocity). The _live-LLM_ run clause (real backend, full sim)
 remains manual evidence for QA/merge — same pattern spec 045 followed
 (live-run clauses tracked as todos/evidence notes).
 
@@ -127,9 +127,49 @@ loop:
 - CI on PR #185 all four checks **SUCCESS**: Type Check & Lint, Build, Test,
   GitGuardian. `mergeable: MERGEABLE`, no reviews yet.
 
+## QA coverage verification — PR #185 (session 3, post-review commit `f7abef3`)
+
+QA agent pass. Verdict: **APPROVE from QA** — QA report posted as a PR comment
+(`issuecomment-5630844524`); label `Status: In Review/QA` added; YAAM node
+`qa-note-spec-050-pr-185` upserted.
+
+Coverage map (AC → tests, all green):
+
+- **AC-1/AC-3** — `packages/assembly/tests/wiring-audit.test.ts` (deletion,
+  `FORBIDDEN_IN_CONSUMERS` across consumer entry points, import-graph audit).
+- **AC-2** — `assembly.test.ts` AC-2 suite (production-executor identity, spec 043
+  pending-address query + rendered line, spec 044 reciprocity).
+- **AC-4** — all 7 named E2E suites (coffee-shop, spec-031/032/034/046/047/048) present
+  and passing; full suite green.
+- **AC-6** — shared `overrideSchedulerConfig` tests + scheduler-forwarding behavioral
+  bound (`maxInFlight ≤ 2` / `≤ 1` under env override).
+
+Gaps found and closed (commit `f7abef3`, 6 new tests):
+
+1. `USE_REAL_EMBEDDINGS` classifier selection through the assembler was never asserted
+   → now asserted: env set ⇒ `stack.classifier instanceof AffordanceClassifierImpl`
+   (construction lazy — no network/model load); env unset ⇒ the assembler's mock.
+2. System 1 through `assembleWorld` (`system1` option) was untested → 3 tests: mock-LLM
+   mode wires gate/heads/feature service/outcome recorder/salience + `core.system1Tracker`;
+   no-op mode builds the memory subsystem for the heads (provable via `core.persistence`,
+   per the `AssembledWorld` interface contract that `memory` stays `undefined` in no-op
+   mode); default-off shape untouched.
+3. AC-1's literal grep tokens `buildMemorySubsystem|new SocialManager` weren't audited
+   against `shared`/`memory`/`cognition` src → audit extended; `new SocialManager` added
+   to the engine-only audit (repo-wide the only constructor call is
+   `packages/engine/src/assembly.ts` — the assembler reuses the core's instance, the #165
+   drift shape structurally pinned).
+
+Fresh verification: `pnpm test` **2,534 passed / 0 failed** (assembly 59, was 53);
+`pnpm typecheck` / `pnpm lint` / `pnpm build` clean.
+
+Non-blocking residual: AC-2's live-LLM run clause remains manual evidence (spec 045
+pattern, unchanged).
+
 ## Remaining for full done
 
-- Merge PR #185 (reviewer sign-off) + QA coverage pass.
+- ~~QA coverage pass~~ → done this session (see QA coverage verification above).
+- Merge PR #185 (reviewer sign-off).
 - After merge: flip INDEX row 050 → ✅ Done.
 
 ## Environment notes
