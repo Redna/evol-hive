@@ -28,10 +28,10 @@ describe('AC-3: defaultPPERSchedulerConfig (Req 4)', () => {
     }
   });
 
-  it('returns maxConcurrentCycles: 1 when ENGINE_MAX_CONCURRENT_LLM is unset', () => {
+  it('returns maxConcurrentCycles: 3 when ENGINE_MAX_CONCURRENT_LLM is unset (#170: cc=3 validated)', () => {
     delete process.env['ENGINE_MAX_CONCURRENT_LLM'];
     const config = defaultPPERSchedulerConfig();
-    expect(config.maxConcurrentCycles).toBe(1);
+    expect(config.maxConcurrentCycles).toBe(3);
   });
 
   it('returns maxConcurrentCycles: 8 when ENGINE_MAX_CONCURRENT_LLM=8', () => {

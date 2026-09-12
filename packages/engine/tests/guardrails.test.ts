@@ -70,7 +70,7 @@ describe('AC-24: Engine config loader reads guardrail env vars', () => {
     const config = loadEngineConfig();
     expect(config.fps).toBe(60);
     expect(config.spatialDebounceSeconds).toBe(5);
-    expect(config.maxConcurrentLLM).toBe(8);
+    expect(config.maxConcurrentLLM).toBe(3);
   });
 });
 

@@ -85,12 +85,14 @@ export interface PPERSchedulerConfig {
 }
 
 /**
- * Default PPER scheduler config — `maxConcurrentCycles` of `1` when
- * `ENGINE_MAX_CONCURRENT_LLM` is unset (spec 022, Req 4, AC-3). When the env
+ * Default PPER scheduler config — `maxConcurrentCycles` of `3` when
+ * `ENGINE_MAX_CONCURRENT_LLM` is unset (#170: validated at cc=3 across four
+ * live runs — 2× throughput, zero 429s, stable failure rate; spec 022 Req 4
+ * AC-3's original 1 remains reachable by setting the env var). When the env
  * var is set, that value is used.
  */
 export function defaultPPERSchedulerConfig(): PPERSchedulerConfig {
-  const maxConcurrentCycles = Number(process.env['ENGINE_MAX_CONCURRENT_LLM'] ?? 1);
+  const maxConcurrentCycles = Number(process.env['ENGINE_MAX_CONCURRENT_LLM'] ?? 3);
   return { maxConcurrentCycles };
 }
 

@@ -70,7 +70,7 @@ export function loadEngineConfig(): EngineConfig {
   return {
     fps: Number(process.env['ENGINE_FPS'] ?? 60),
     spatialDebounceSeconds: Number(process.env['ENGINE_SPATIAL_DEBOUNCE_SECONDS'] ?? 5),
-    maxConcurrentLLM: Number(process.env['ENGINE_MAX_CONCURRENT_LLM'] ?? 8),
+    maxConcurrentLLM: Number(process.env['ENGINE_MAX_CONCURRENT_LLM'] ?? 3),
     guardrailsEnabled,
     guardrails,
     driveDecayRate: Number(process.env['ENGINE_DRIVE_DECAY_RATE'] ?? 0.1),
