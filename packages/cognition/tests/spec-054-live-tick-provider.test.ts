@@ -217,6 +217,30 @@ describe('AC-1: default tick source (R1/R2)', () => {
     await executor.executeTalkTo('agent-a', 'agent-b', 'hello', 'neutral');
     expect(stampOn(social, 'agent-a', 'agent-b')).toBe(5000);
   });
+
+  it('two calls separated by time produce non-decreasing stamps (AC-1 wording)', async () => {
+    const T0 = 1_700_000_000_000;
+    vi.setSystemTime(T0);
+    const { executor, social } = makeExecutor(); // no tickProvider, no currentTick
+
+    await executor.executeTalkTo('agent-a', 'agent-b', 'first', 'neutral');
+    expect(stampOn(social, 'agent-a', 'agent-b')).toBe(T0);
+
+    // Time moves BETWEEN the two calls — the second stamp must move with it
+    // (the epoch-ms bug froze a construction-time capture: second call would
+    // stamp T0 again instead of T0 + 250). stampOn reads the FIRST write, so
+    // the second call's stamp is read from the second update entry.
+    vi.setSystemTime(T0 + 250);
+    await executor.executeTalkTo('agent-a', 'agent-b', 'second', 'neutral');
+
+    const stamps = social.updates
+      .filter((u) => u.agentId === 'agent-a' && u.other === 'agent-b')
+      .map((u) => u.updates['lastInteraction'] as number);
+    expect(stamps.length).toBe(2);
+    expect(stamps[0]).toBe(T0);
+    expect(stamps[1]).toBe(T0 + 250);
+    expect(stamps[0]!).toBeLessThanOrEqual(stamps[1]!);
+  });
 });
 
 // ── AC-2 — live tick provider: talk_to stamps turns + both relationships ─────
@@ -305,6 +329,28 @@ describe('AC-3: sentinel 424242 proves every stamp site uses the provider (R3)',
     const { executor, social } = makeExecutor({ tickProvider: () => SENTINEL_TICK });
     await executor.executeIgnore('agent-a', 'agent-b');
     expect(stampOn(social, 'agent-a', 'agent-b')).toBe(SENTINEL_TICK);
+  });
+});
+
+// ── Constraint — a throwing provider fails fast, never swallowed ─────────────
+
+describe('Constraint: a throwing provider surfaces — not swallowed, no partial writes', () => {
+  it('the provider error surfaces through the existing failure channel, nothing stamped', async () => {
+    const { executor, social } = makeExecutor({
+      tickProvider: () => {
+        throw new Error('tick source broken');
+      },
+    });
+
+    // The executor's error surface is unchanged (spec 054 constraint): the
+    // tool-call failure result carries the provider's error verbatim — it is
+    // NOT swallowed into a generic message — and no relationship write is
+    // attempted with a broken tick source.
+    const result = await executor.executeTalkTo('agent-a', 'agent-b', 'hello', 'neutral');
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('tick source broken');
+    expect(result.relationshipUpdated).toBe(false);
+    expect(social.updates).toHaveLength(0);
   });
 });
 
