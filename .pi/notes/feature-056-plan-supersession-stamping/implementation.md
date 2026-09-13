@@ -84,3 +84,38 @@ plan path, `clearPlanIfComplete`, Reflect-phase `stampPlanOutcome` (engine
 - Note: `[plan-create]` does not emit the plan id — id-carry-clock determinism
   stays pinned by AC-6 unit tests; live evidence = supersession/repeat lines.
 - `docs/specs/INDEX.md` status → 🔍 In Review (done in this session).
+
+## Session 3 (resume) — Req 7 completion
+
+- Live run still executing on this machine (PID tree from session 2; log
+  `/tmp/live-run-056.log` growing). Findings so far:
+  - **Plan-memory renders > 0 — DIRECT prompt evidence**: the run's own
+    `[llm-raw]` malformed-args dump (`/tmp/empty-args-apprentice-1.json`)
+    contains a real built plan prompt rendering
+    `Your last plan was "wait, repot_seedlings, …" — it succeeded.` — the
+    spec-055 render path works live.
+  - `[plan-repeat]` = 0 ✓ (third Req 7 clause).
+  - `[plan-superseded]` = 0 — **mechanistic finding**: the wired single-agent
+    path early-returns on ANY `currentPlan` (spec 002) and Reflect clears only
+    completed plans, so `createPlan` only ever sees `currentPlan === null` in
+    live runs. The supersession seam (plan REPLACED mid-flight) is reachable
+    only via the batch path (`BatchPlanService.processBatch` → `storePlan`),
+    which no production wiring enables (batching is opt-in, never wired). The
+    issue's 055-run premise ("batch plan path re-formulates every cycle")
+    misattributed the mechanism — nothing wires batching.
+- **Gap-fill (055-QA precedent, deterministic E2E)**:
+  `examples/tests/spec-056-batch-supersession-e2e.test.ts` — real
+  `PlanManagerImpl` (fake clock) + real `BatchPlanService` (scripted client,
+  zero LLM) + real `PlanBuilderImpl`: replaced in-flight plan → stamped
+  `{superseded: true, 1 of 3, targetAffordance-when-bound steps}` → exactly
+  one `[plan-superseded]` line → NEXT prompt renders `Your last plan was
+  "water_plants, repot_seedlings, eat_herbs" — superseded after 1 of 3
+  steps.` dynamic-section-only; new plan id `plan_gardener-1_12345_1`
+  (injected clock).
+- Verified: examples suite 241 ✓ (+1 new), spec-055 regression 32/32 ✓,
+  spec-056 suites 20 ✓, `pnpm typecheck` ✅ `pnpm lint` ✅ `format:check` ✅
+  (file prettier-formatted; CI format glob doesn't cover examples/tests).
+- Pushed `95a446f` to PR #203 head. Full monorepo suite green.
+- TODO this session: wait for live run end (~18:25), extract final counts,
+  attach evidence comment to #201, check CI on new head (app-token PRs may
+  need `gh run rerun`), final YAAM note.
