@@ -73,7 +73,9 @@ describe('spec 056 Req 3 / AC-5: superseded verdict in the plan prompt', () => {
 
   it('appends drive deltas after the verdict in the existing formatDriveDeltas form', () => {
     const payload = builder.build(
-      makePerception({ lastPlanOutcome: { ...SUPERSEDED_OUTCOME, driveChanges: { curiosity: 10 } } }),
+      makePerception({
+        lastPlanOutcome: { ...SUPERSEDED_OUTCOME, driveChanges: { curiosity: 10 } },
+      }),
     );
     expect(payload.perceptionContext).toContain(
       'Your last plan was "go_to_greenhouse, water_plants, repot_seedlings" — superseded after 1 of 3 steps (curiosity +10).',
