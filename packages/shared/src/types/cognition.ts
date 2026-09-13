@@ -29,6 +29,7 @@ import type {
   PlanStep,
   AgentProfile,
   Relationship,
+  LastPlanOutcome,
 } from './agent.js';
 import type { MemoryType } from './memory.js';
 
@@ -131,6 +132,14 @@ export interface PerceptionResult {
    * or when no agents are present.
    */
   socialUrges?: SocialUrgeAssessment[];
+  /**
+   * The agent's most recently completed-or-failed plan outcome (spec 055,
+   * Req 4 — issue #198). Populated by `PerceptionServiceImpl` via the
+   * optional `provider.getLastPlanOutcome` — `undefined` for legacy
+   * providers (no last-plan lines rendered). Dynamic-section data only
+   * (spec 021 KV-cache discipline).
+   */
+  lastPlanOutcome?: LastPlanOutcome;
 }
 
 /** Active observation result (Section 6.2) — deep JSON state of a target object. */
@@ -212,6 +221,31 @@ export interface CognitiveTool {
 export interface FormulatePlanResult {
   description: string;
   steps: { description: string; targetAffordance?: string; targetArea?: string }[];
+}
+
+/**
+ * The default plan step cap (spec 055, Req 6 — issue #198). The 2–3-step plan
+ * shape was prompt-shaped; this bounds the VALUE SPACE via
+ * `formulatePlanSchemaFor`'s `steps.maxItems` and the plan-service shape
+ * validation. Default 6 keeps every existing 2–3-step plan valid (no
+ * behavioral regression) while permitting hours-horizon chains; prompt cost
+ * grows O(PLAN_MAX_STEPS).
+ */
+export const DEFAULT_PLAN_MAX_STEPS = 6;
+
+/**
+ * The effective plan step cap (spec 055, Req 6): the `PLAN_MAX_STEPS` env var
+ * overrides {@link DEFAULT_PLAN_MAX_STEPS} at call time (the spec-052
+ * waitSuppression env→config plumbing pattern). Non-numeric, non-positive,
+ * or fractional-below-one values fall back to the default — the cap is
+ * always a legal positive integer, never an illegal schema constraint.
+ */
+export function defaultPlanMaxSteps(): number {
+  const raw = process.env['PLAN_MAX_STEPS'];
+  if (raw === undefined || raw.length === 0) return DEFAULT_PLAN_MAX_STEPS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_PLAN_MAX_STEPS;
+  return Math.floor(parsed);
 }
 
 /** Result of the query_memory tool (active recall). */
@@ -655,6 +689,14 @@ export interface PerceptionDataProvider {
    * neutral (pair novelty from counters still applies).
    */
   getCurrentTick?(): number | undefined;
+  /**
+   * The agent's most recently completed-or-failed plan outcome (spec 055,
+   * Req 4 — issue #198). Optional so legacy providers compile unchanged —
+   * when absent, `PerceptionResult.lastPlanOutcome` stays `undefined` and
+   * the plan prompt renders no last-plan lines (byte-identical behavior,
+   * the established spec-039/052 additive pattern).
+   */
+  getLastPlanOutcome?(agentId: string): LastPlanOutcome | undefined;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -886,6 +928,15 @@ export interface ReflectDataProvider {
   setThinking(agentId: string, isThinking: boolean): void;
   /** The agent's full profile (including persona fields), or `null` if the agent does not exist (spec 012, Req 5). */
   getAgentProfile(agentId: string): AgentProfile | null;
+  /**
+   * Stamp the outcome of the agent's most recently completed-or-failed plan
+   * (spec 055, Req 4 — issue #198). Called by `ReflectServiceImpl` at the
+   * moment the outcome data exists (plan description/steps, execution
+   * success, drive deltas, whether reflection stored a memory). Optional so
+   * legacy implementations compile unchanged — when absent, no outcome is
+   * recorded and the plan prompt renders no last-plan lines.
+   */
+  stampLastPlanOutcome?(agentId: string, outcome: LastPlanOutcome): void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

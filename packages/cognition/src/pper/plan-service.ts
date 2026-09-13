@@ -18,7 +18,7 @@ import type {
   PlanDataProvider,
   FormulatePlanResult,
 } from '@evol-hive/shared';
-import { WAIT_AFFORDANCE } from '@evol-hive/shared';
+import { WAIT_AFFORDANCE, defaultPlanMaxSteps } from '@evol-hive/shared';
 import type { LLMClient, PlanBuilder, GuardrailEngine, LLMContextPayload } from '../index.js';
 import { LLMResponseError } from '../llm/index.js';
 import { checkWaitSuppression } from '../guardrails/wait-guard.js';
@@ -190,6 +190,12 @@ export function checkPlanBinding(
   availableIds: string[],
   /** Spec 039, R1 — the agent's known areas (targetArea value space). */
   knownAreas?: string[],
+  /**
+   * Spec 055, Req 6 — the plan step cap (steps.maxItems value space).
+   * Defaults to `defaultPlanMaxSteps()` (the PLAN_MAX_STEPS env var or 6),
+   * read at validation time so the env override applies end-to-end.
+   */
+  maxSteps?: number,
 ): PlanBindingVerdict {
   // (1) Shape — hard fail, NO retry (§7 / Req 15): malformed responses are
   // treated as a failure rather than repaired.
@@ -201,6 +207,24 @@ export function checkPlanBinding(
       violations: ['missing description or steps'],
       feedback:
         'Your response was not a valid plan: it needs a non-empty "description" and a non-empty "steps" array where every step has a description.',
+    };
+  }
+
+  // (2b) Spec 055, Req 6 (issue #198): the plan-length cap — a RETRYABLE
+  // violation (the spec-037 one-retry-with-feedback path), not a hard §7
+  // shape failure: the plan is well-formed, just too long. The schema's
+  // steps.maxItems is the value-space bound; this validation is the
+  // enforcement + recovery route for backends that ignore maxItems.
+  const cap = maxSteps ?? defaultPlanMaxSteps();
+  if (result.steps.length > cap) {
+    return {
+      valid: false,
+      shapeValid: true,
+      bound: 0,
+      violations: [`plan has ${result.steps.length} steps (cap ${cap})`],
+      feedback:
+        `Your previous plan had ${result.steps.length} steps; the cap is ${cap}. ` +
+        `Resubmit a plan with at most ${cap} steps.`,
     };
   }
 

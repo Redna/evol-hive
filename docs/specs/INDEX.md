@@ -61,8 +61,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      62
 ✅ Done:          36
 🔨 In Development: 0
-🔍 In Review:      21
-📝 Drafted:        3
+🔍 In Review:      22
+📝 Drafted:        2
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -106,4 +106,4 @@ Architecture sections fully implemented: 11/11
 | [052](052-greenhouse-drive-restoration-diagnostics.md) | Greenhouse Drive Bottoming-Out — Restoration Pruning Exemption, Critical-Drive Wait Guard & Drive-Hint Run Observability | §3, §4, §5, §6, §10 | 🔍 In Review | [#183](https://github.com/Redna/evol-hive/issues/183) | [#189](https://github.com/Redna/evol-hive/pull/189), [#190](https://github.com/Redna/evol-hive/pull/190) | cognition, shared, examples |
 | [053](053-conversation-overhearing.md) | Room-Perceivable Conversation Content — Bystanders Overhear Turns Without Joining (Passive Overheard Perception, `observe` Full History, `[overheard]` Diagnostic) | §4, §6 | 🔍 In Review | [#192](https://github.com/Redna/evol-hive/issues/192) | [#194](https://github.com/Redna/evol-hive/pull/194) | shared, engine, cognition |
 | [054](054-live-tick-provider.md) | Live Tick Provider for CognitiveToolExecutor — Fix Epoch-ms Turn/Relationship Stamps (Freshness Always-True, Negative Pending Ages) | §6, §8 | 🔍 In Review | [#195](https://github.com/Redna/evol-hive/issues/195) | [#197](https://github.com/Redna/evol-hive/pull/197) | cognition, assembly |
-| [055](055-world-saturation-plan-memory-horizon.md) | World Saturation + Plan Memory + Hours-Horizon — Watering Must Deplete, the Agent Sees Its Last Plans, longTermGoals Reach the Plan Prompt | §3, §4, §6, §7, §10 | 📝 Drafted | [#198](https://github.com/Redna/evol-hive/issues/198) | — | shared, engine, cognition, examples |
+| [055](055-world-saturation-plan-memory-horizon.md) | World Saturation + Plan Memory + Hours-Horizon — Watering Must Deplete, the Agent Sees Its Last Plans, longTermGoals Reach the Plan Prompt | §3, §4, §6, §7, §10 | 🔍 In Review | [#198](https://github.com/Redna/evol-hive/issues/198) | [#200](https://github.com/Redna/evol-hive/pull/200) | shared, engine, cognition, examples |

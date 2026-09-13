@@ -10,6 +10,7 @@
 import type {
   AgentInternalState,
   AgentProfile,
+  LastPlanOutcome,
   MemoryEntryInput,
   ReflectDataProvider,
 } from '@evol-hive/shared';
@@ -61,6 +62,16 @@ export class ReflectDataProviderImpl implements ReflectDataProvider {
 
   getAgentProfile(agentId: string): AgentProfile | null {
     return this.agentManager.getProfile(agentId);
+  }
+
+  /**
+   * Stamp the outcome of the agent's most recently completed-or-failed plan
+   * (spec 055, Req 4 — issue #198). One write at the moment the data exists:
+   * persists across orchestrator instances/restarts, and the next cycle's
+   * perception surfaces it via `getLastPlanOutcome`.
+   */
+  stampLastPlanOutcome(agentId: string, outcome: LastPlanOutcome): void {
+    this.agentManager.updateState(agentId, { lastPlanOutcome: outcome });
   }
 }
 

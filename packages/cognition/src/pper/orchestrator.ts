@@ -47,7 +47,12 @@ import { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
 import { logOverheardDiagnostic } from './overheard-diagnostic.js';
 import { logTalkEnumDiagnostic } from './talk-enum.js';
 import { logDriveHintDiagnostic } from './drive-hint-diagnostic.js';
+import { PlanRepeatTracker } from './plan-repeat-diagnostic.js';
 import type { BatchPlanService } from './batch-plan-service.js';
+
+// Spec 055 (Req 7): the plan-repeat diagnostic primitives ride the
+// orchestrator's export surface — the diagnostic's home.
+export { PlanRepeatTracker, planFingerprint } from './plan-repeat-diagnostic.js';
 
 /** Dependencies for {@link PPEROrchestratorImpl}. */
 export interface PPEROrchestratorOptions {
@@ -97,6 +102,8 @@ export class PPEROrchestratorImpl {
   private readonly batchPlanService: BatchPlanService | undefined;
   /** Optional per-cycle start hook (spec 030, Req 14a). */
   private readonly onCycleStart: ((agentId: string) => void) | undefined;
+  /** Consecutive-identical-plan diagnostic state (spec 055, Req 7 — issue #198). */
+  private readonly planRepeatTracker = new PlanRepeatTracker();
 
   /** Current phase per agent (defaults to 'perceive' = idle). */
   private readonly phases = new Map<string, PPERPhase>();
@@ -232,6 +239,19 @@ export class PPEROrchestratorImpl {
       this.setPhase(agentId, 'perceive');
       // Plan failed — execute/reflect never ran → nothing was applied.
       return { appliedDriveChanges: false };
+    }
+
+    // Spec 055 (Req 7 — issue #198): the per-cycle consecutive-identical-plan
+    // diagnostic, after the plan phase so the formulated plan's fingerprint
+    // rides the SAME seam as `[plan-failed]`/`[drive-hint]`. One line per
+    // cycle on a matching re-formulation, carrying the consecutive count —
+    // the #191 356× signature becomes auditable from logs (AC-8 judges the
+    // live-run bound from these lines). Zero LLM calls, wrapped so a logging
+    // failure can never break the cycle (spec 049 discipline).
+    try {
+      this.planRepeatTracker.record(agentId, plan.plan!);
+    } catch {
+      // Diagnostics must never break a cycle (spec 049 Constraints).
     }
 
     // (3) Execute — deterministic affordance execution.

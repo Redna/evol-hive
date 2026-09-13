@@ -119,6 +119,23 @@ export class PlanBuilderImpl implements PlanBuilder {
       `Drives: ${driveSummary}`,
     ];
 
+    // Plan memory (spec 055, Req 4 — issue #198): the agent's last plan + its
+    // outcome — the self-visibility defense against the #191 356× identical
+    // -plan signature. Dynamic section only (spec 021 KV-cache discipline);
+    // absent record → no lines (never fabricate history on cycle 1).
+    if (perceptionResult.lastPlanOutcome !== undefined) {
+      const outcome = perceptionResult.lastPlanOutcome;
+      const stepList = outcome.steps.join(', ');
+      const deltas = formatDriveDeltas(outcome.driveChanges);
+      const verdict = outcome.success ? `it succeeded${deltas}` : `it failed${deltas}`;
+      dynamicLines.push(`Your last plan was "${stepList}" — ${verdict}.`);
+      if (outcome.reflected) {
+        dynamicLines.push(
+          'You already reflected on that plan — what you learned is in your memory.',
+        );
+      }
+    }
+
     // Social context messages are dynamic (incoming messages change per tick).
     if (passive.socialContext !== undefined && passive.socialContext.length > 0) {
       for (const msg of passive.socialContext) {
@@ -180,6 +197,14 @@ export class PlanBuilderImpl implements PlanBuilder {
         dynamicLines.push(`a door to '${area}' — unexplored`);
       }
     }
+
+    // Hours-horizon directive (spec 055, Req 5 — issue #198): plans may chain
+    // several steps and connect to what the agent intends over the coming
+    // hours. Horizon FRAMING, not a forced schedule — the LLM keeps the
+    // decision. Dynamic section only (spec 021).
+    dynamicLines.push(
+      'Horizon: your plan may chain several steps toward what you intend over the coming hours — e.g. a morning of watering, harvesting and trading, an afternoon of rest and talk. This is framing, not a schedule: the choice stays yours.',
+    );
 
     // Append system feedback (prior action failures) per §9.2.
     if (passive.systemFeedback !== undefined) {
@@ -254,8 +279,17 @@ function buildSystemPrompt(
     'When other agents are present and your social drive is urgent, call talk_to, observe_agent, help, or ignore directly — do not use formulate_plan for social actions.';
   if (persona) {
     const personaText = formatPersona(persona);
+    // Spec 055, Req 5 (issue #198): the Aspirations line renders immediately
+    // after the persona text. The system prompt is already stable per persona
+    // (spec 021, Req 1) and goals are persona-stable, so the KV-cache prefix
+    // still hits per persona — the stable line is persona-adjacent by
+    // construction. Agents without goals render byte-identical prompts.
+    const aspirationsLine =
+      persona.longTermGoals !== undefined && persona.longTermGoals.length > 0
+        ? ` Aspirations: ${persona.longTermGoals.join('; ')}.`
+        : '';
     const base = [
-      `You are ${persona.name}, ${personaText}.`,
+      `You are ${persona.name}, ${personaText}.${aspirationsLine}`,
       'You must formulate a plan to satisfy your most urgent drive.',
       'Use the formulate_plan cognitive tool to break your goal into a sequence of actionable steps.',
       'EVERY step in your plan MUST set targetAffordance to one of the enum values in the formulate_plan tool schema (the affordances available to you right now). ' +
@@ -282,6 +316,21 @@ function formatDrives(drives: Record<string, number>): string {
   return Object.entries(drives)
     .map(([name, value]) => `${name}=${Math.round(value)}`)
     .join(', ');
+}
+
+/**
+ * Render drive deltas for the last-plan line (spec 055, Req 4): explicit
+ * signs, `curiosity +10, comfort +5` — or the empty string when the outcome
+ * carried no deltas.
+ */
+function formatDriveDeltas(driveChanges: Record<string, number> | undefined): string {
+  if (driveChanges === undefined) return '';
+  const entries = Object.entries(driveChanges);
+  if (entries.length === 0) return '';
+  const rendered = entries
+    .map(([name, value]) => `${name} ${value >= 0 ? '+' : ''}${value}`)
+    .join(', ');
+  return ` (${rendered})`;
 }
 
 /**

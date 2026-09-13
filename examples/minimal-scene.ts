@@ -226,6 +226,11 @@ export function buildMinimalEngine(): AssembledEngine & {
     // The social surface the assembler wired (spec 019): the core's own
     // SocialManager — the single instance holding both bridge roles.
     socialManager: core.socialManager,
+    conversationManager: core.conversationManager,
+    selfModelManager: core.selfModelManager,
+    mutationService: core.mutationService,
+    dormantStore: core.dormantStore,
+    yaamEventLog: core.yaamEventLog,
     // Exposed so tests can observe a completed PPER cycle end-to-end (the
     // Reflect phase stores a memory node in the assembler's store).
     vectorStore: world.memory!.vectorStore,

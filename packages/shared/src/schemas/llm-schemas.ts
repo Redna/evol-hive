@@ -6,6 +6,8 @@
  * `parameters` via the OpenAI-compatible `tools` parameter (spec 011).
  */
 
+import { defaultPlanMaxSteps } from '../types/cognition.js';
+
 /** The LLM action response schema (Section 7). */
 export const llmActionResponseSchema = {
   type: 'object',
@@ -94,8 +96,19 @@ export const WAIT_AFFORDANCE = 'wait';
  * When `availableAffordanceIds` is empty (e.g., guardrail masking, spec
  * 016), the affordance enum collapses to `['wait']` — the only legal
  * physical binding is a no-op.
+ *
+ * Spec 055, Req 6 (issue #198): plan steps are bounded by
+ * `steps.maxItems = maxSteps` (default `defaultPlanMaxSteps()` — the
+ * `PLAN_MAX_STEPS` env var or 6). The 2–3-step plan shape was prompt-shaped;
+ * the cap is a value-space constraint the backend tool-calling path enforces,
+ * with the plan-service rejection + one-retry-with-feedback as the recovery
+ * route. An explicit `maxSteps` argument overrides the env default.
  */
-export function formulatePlanSchemaFor(availableAffordanceIds: string[], knownAreas?: string[]) {
+export function formulatePlanSchemaFor(
+  availableAffordanceIds: string[],
+  knownAreas?: string[],
+  maxSteps: number = defaultPlanMaxSteps(),
+) {
   const enumValues =
     availableAffordanceIds.length > 0
       ? [...availableAffordanceIds, WAIT_AFFORDANCE]
@@ -113,6 +126,8 @@ export function formulatePlanSchemaFor(availableAffordanceIds: string[], knownAr
       },
       steps: {
         type: 'array',
+        // Spec 055, Req 6: the plan-length value-space bound.
+        maxItems: maxSteps,
         items: {
           type: 'object',
           properties: {
@@ -152,6 +167,7 @@ export function formulatePlanSchemaFor(availableAffordanceIds: string[], knownAr
 export function formulatePlanToolFor(
   availableAffordanceIds: string[],
   knownAreas?: string[],
+  maxSteps: number = defaultPlanMaxSteps(),
 ): ToolDefinition {
   return {
     type: 'function',
@@ -162,7 +178,7 @@ export function formulatePlanToolFor(
         (knownAreas !== undefined && knownAreas.length > 0
           ? ' Steps may also set targetArea to one of the KNOWN areas to navigate there first — the affordance executes on arrival.'
           : ''),
-      parameters: formulatePlanSchemaFor(availableAffordanceIds, knownAreas),
+      parameters: formulatePlanSchemaFor(availableAffordanceIds, knownAreas, maxSteps),
     },
   };
 }

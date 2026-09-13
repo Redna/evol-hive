@@ -205,6 +205,20 @@ export class PerceptionServiceImpl {
       unexploredAreas = undefined;
     }
 
+    // Plan-memory perception (spec 055, Req 4 — issue #198): the agent's last
+    // completed-or-failed plan outcome rides the optional provider method —
+    // legacy providers keep `undefined` (no last-plan lines rendered, the
+    // established spec-039/052 additive pattern). A throwing read degrades
+    // to `undefined` — never breaks the perceive path.
+    let lastPlanOutcome: import('@evol-hive/shared').LastPlanOutcome | undefined;
+    try {
+      if (typeof this.options.provider.getLastPlanOutcome === 'function') {
+        lastPlanOutcome = this.options.provider.getLastPlanOutcome(agentId);
+      }
+    } catch {
+      lastPlanOutcome = undefined;
+    }
+
     // Social urge model (spec 044, R3/R4). Both surfaces are optional
     // provider extensions — legacy providers keep `undefined` (no lines
     // rendered, no ranking shift) and never break the perceive path.
@@ -312,6 +326,7 @@ export class PerceptionServiceImpl {
       ...(pendingAddresses !== undefined ? { pendingAddresses } : {}),
       ...(overheard !== undefined ? { overheard } : {}),
       ...(socialUrges !== undefined ? { socialUrges } : {}),
+      ...(lastPlanOutcome !== undefined ? { lastPlanOutcome } : {}),
     };
   }
 }
@@ -350,6 +365,11 @@ export type { PPEROrchestratorOptions } from './orchestrator.js';
 export { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
 export { logOverheardDiagnostic } from './overheard-diagnostic.js';
 export { logDriveHintDiagnostic } from './drive-hint-diagnostic.js';
+export {
+  PlanRepeatTracker,
+  planFingerprint,
+  hashPlanDescription,
+} from './plan-repeat-diagnostic.js';
 export { classifySocialUrgeLine } from './perception-builder.js';
 export { computeTalkEnum, logTalkEnumDiagnostic } from './talk-enum.js';
 export type { TalkEnumOutcome } from './talk-enum.js';

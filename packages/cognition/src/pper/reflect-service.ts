@@ -32,6 +32,7 @@
 
 import type {
   ExecuteResult,
+  LastPlanOutcome,
   MemoryEntryInput,
   MemoryType,
   ReflectDataProvider,
@@ -76,8 +77,19 @@ export class ReflectServiceImpl {
       };
     }
 
+    // Spec 055 (Req 4): capture the plan reference at entry — the Reflect
+    // phase CLEARS the plan (clearPlanIfComplete) before the finally-block
+    // stamp runs, and a live-reference provider state would then read `null`.
+    const planAtEntry = agentState.currentPlan;
+
     // Set isThinking = true before the LLM call (§9.1).
     dataProvider.setThinking(agentId, true);
+
+    // Spec 055 (Req 4 — issue #198): whether the Reflect phase wrote a memory
+    // node for this cycle — the `reflected` half of the stamped plan outcome.
+    // Hoisted above the try so the finally-block stamp sees it on every exit
+    // path (success, memory-store failure, LLM garbage, exception).
+    let memoryStored = false;
 
     try {
       // Retrieve the agent's persona profile (spec 012, Req 12).
@@ -118,7 +130,6 @@ export class ReflectServiceImpl {
       // Track which updates were applied.
       let drivesUpdated = false;
       let goalUpdated = false;
-      let memoryStored = false;
 
       // (1) Apply drive overrides if present and non-empty.
       // Issue #134: LLM-supplied deltas are sanitized — non-finite entries
@@ -185,7 +196,64 @@ export class ReflectServiceImpl {
     } finally {
       // Always reset isThinking — on success, failure, and exception paths (§9.1).
       dataProvider.setThinking(agentId, false);
+      stampPlanOutcome(dataProvider, agentState.agentId, planAtEntry, executeResult, memoryStored);
     }
+  }
+}
+
+/**
+ * Stamp the plan outcome at the moment the data exists (spec 055, Req 4 —
+ * issue #198): the agent's plan just COMPLETED (all steps executed — the
+ * Reflect phase is about to clear it) or FAILED (an execution failure reached
+ * the Reflect phase — the deviation-rejection path, spec 016). Per-cycle step
+ * progress on a still-active plan is NOT a plan outcome and never stamps.
+ *
+ * The stamp rides the OPTIONAL `ReflectDataProvider.stampLastPlanOutcome` —
+ * legacy providers keep `undefined` state and the plan prompt renders no
+ * last-plan lines (the established spec-039/052 additive pattern). Stamping
+ * is wrapped so a provider failure can never break the Reflect phase
+ * (diagnostic-grade data, spec-049 discipline).
+ *
+ * Runs in the caller's `finally` so every exit path stamps: a memory-store
+ * failure stamps with `reflected: false` (the outcome was real even though
+ * reflection failed); an LLM-garbage reflect stamps `reflected: false` too.
+ */
+function stampPlanOutcome(
+  dataProvider: ReflectDataProvider,
+  agentId: string,
+  plan: import('@evol-hive/shared').AgentPlan | null,
+  executeResult: ExecuteResult,
+  memoryStored: boolean,
+): void {
+  try {
+    if (typeof dataProvider.stampLastPlanOutcome !== 'function') return;
+    if (plan === null) return;
+    const planJustCompleted = plan.currentStepIndex >= plan.steps.length;
+    const planFailed = executeResult.success === false;
+    if (!planJustCompleted && !planFailed) return;
+
+    const driveChanges = executeResult.result?.driveChanges;
+    // AffordanceResult.driveChanges is Partial<Record<string, number>> —
+    // sanitize to a clean Record (drop non-finite/undefined entries) so the
+    // stamped outcome carries exact numbers (the spec-041 sanitize pattern).
+    let cleanDriveChanges: Record<string, number> | undefined;
+    if (driveChanges !== undefined) {
+      const clean: Record<string, number> = {};
+      for (const [name, value] of Object.entries(driveChanges)) {
+        if (typeof value === 'number' && Number.isFinite(value)) clean[name] = value;
+      }
+      if (Object.keys(clean).length > 0) cleanDriveChanges = clean;
+    }
+    const outcome: LastPlanOutcome = {
+      planDescription: plan.description,
+      steps: plan.steps.map((step) => step.targetAffordance ?? step.description),
+      success: executeResult.success === true,
+      ...(cleanDriveChanges !== undefined ? { driveChanges: cleanDriveChanges } : {}),
+      reflected: memoryStored,
+    };
+    dataProvider.stampLastPlanOutcome(agentId, outcome);
+  } catch {
+    // Stamping must never break the Reflect phase.
   }
 }
 

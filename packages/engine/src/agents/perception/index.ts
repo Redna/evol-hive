@@ -340,6 +340,18 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
   getCurrentTick(): number | undefined {
     return this.tickSource?.();
   }
+
+  // ── Plan-memory perception (spec 055, Req 4 — issue #198) ────────────────
+
+  /**
+   * The agent's most recently completed-or-failed plan outcome, or
+   * `undefined` (spec 055, Req 4). Reads the engine-stamped
+   * `AgentInternalState.lastPlanOutcome` — the same state the Reflect phase's
+   * data layer writes.
+   */
+  getLastPlanOutcome(agentId: string): import('@evol-hive/shared').LastPlanOutcome | undefined {
+    return this.agentManager.getState(agentId)?.lastPlanOutcome;
+  }
 }
 
 export {};

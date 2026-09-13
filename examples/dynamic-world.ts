@@ -101,6 +101,11 @@ function makeObject(
   type: string,
   roomId: string,
   affordances: ReturnType<typeof aff>[],
+  // Spec 055, Req 1 (issue #198): resource-bearing objects declare their
+  // initialized state — an uninitialized field a handler reads (`?? 0`) is
+  // exactly the phantom-economy class the spec's audit fences off. Defaults
+  // to `{}` for stateless objects (backward compatible).
+  state: Record<string, unknown> = {},
 ): SmartObject {
   // Spec 034: stamp owning-object attribution on every affordance so the
   // cognition drive→affordance hints can name the object that offers each
@@ -111,7 +116,7 @@ function makeObject(
     objectId: id,
     objectName: name,
   }));
-  return { id, name, type, state: {}, affordances: attributed, roomId };
+  return { id, name, type, state, affordances: attributed, roomId };
 }
 
 const garden: SceneDefinition['rooms'][number] = {
@@ -124,6 +129,8 @@ const garden: SceneDefinition['rooms'][number] = {
   connections: ['workshop', 'greenhouse'],
   objectIds: [
     'planter-1',
+    'water-butt-1',
+    'watering-can-1',
     'gate-1',
     'toolbox-1',
     'garden-bench-1',
@@ -167,50 +174,99 @@ export const DYNAMIC_WORLD_SCENE: SceneDefinition = {
     //   (vegetables >= 1, hunger +25). `harvest` and `eat` are gated by
     //   declarative `AffordanceCondition`s — no ObjectDependency needed when
     //   the gate lives on the same object.
-    makeObject('planter-1', 'Planter', 'furniture', 'garden', [
-      // Drive-economy validation (issue #139 arc): the labels ARE the model's
-      // world knowledge — the plan → harvest → eat chain must be discoverable
-      // from tool descriptions alone, because harvest/eat stay invisible
-      // (declarative conditions) until 3 seeds are planted. Without the
-      // label hints the model rationally plants once and waits forever.
-      // Spec 048, Req 3: `plant_seeds` declares hunger-chain progress — it
-      // restores NO drive the matcher can bind (its +12 curiosity is handler
-      // driveChanges, and hunger has no declared effect), so without
-      // `progresses` the mid-chain step was invisible to the hint system
-      // exactly when hunger was critical (the 2/3-seeds stall, issue #168).
-      aff(
-        'plant_seeds',
-        'Plant seeds (after 3 plantings, vegetables ripen for harvest)',
-        [],
-        {},
-        undefined,
-        {
-          drive: 'hunger',
-          note: 'harvest → eat restores hunger',
-        },
-      ),
-      aff(
-        'harvest',
-        'Harvest vegetables (requires 3 seeds planted)',
-        [],
-        { curiosity: 10, comfort: 5 },
-        [{ field: 'seeds_planted', operator: '>=', value: 3 }],
-        // Spec 048, Req 3: harvest is ALSO a mid-chain step — `eat` (the
-        // actual restoration) is gated on `vegetables >= 1`.
-        { drive: 'hunger', note: 'eat restores hunger once a vegetable is ripe' },
-      ),
-      aff('eat', 'Eat a vegetable', [], { hunger: 25 }, [
-        { field: 'vegetables', operator: '>=', value: 1 },
-      ]),
-      aff('observe', 'Observe'),
-    ]),
+    makeObject(
+      'planter-1',
+      'Planter',
+      'furniture',
+      'garden',
+      [
+        // Drive-economy validation (issue #139 arc): the labels ARE the model's
+        // world knowledge — the plan → harvest → eat chain must be discoverable
+        // from tool descriptions alone, because harvest/eat stay invisible
+        // (declarative conditions) until 3 seeds are planted. Without the
+        // label hints the model rationally plants once and waits forever.
+        // Spec 048, Req 3: `plant_seeds` declares hunger-chain progress — it
+        // restores NO drive the matcher can bind (its +12 curiosity is handler
+        // driveChanges, and hunger has no declared effect), so without
+        // `progresses` the mid-chain step was invisible to the hint system
+        // exactly when hunger was critical (the 2/3-seeds stall, issue #168).
+        aff(
+          'plant_seeds',
+          'Plant seeds (after 3 plantings, vegetables ripen for harvest)',
+          [],
+          {},
+          undefined,
+          {
+            drive: 'hunger',
+            note: 'harvest → eat restores hunger',
+          },
+        ),
+        // Spec 055, Req 1 (issue #198): the world can now say NO. `water_plants`
+        // was an ORPHANED handler (registered, declared by no object) reading an
+        // UNINITIALIZED `water_level` (`?? 0` → always failing) — the dream5
+        // run's 29× "successful" phantom watering. Declared here with the
+        // spec-018 declarative availability condition: at `water_level <= 0` the
+        // affordance LEAVES the enum (perception-time gating, no LLM exposure)
+        // and the agent must plan the refill chain (Req 2). The declared
+        // `effects` mirror the handler `driveChanges` (spec 032, Req 6) so tool
+        // descriptions and the spec-034 matcher see the real economy.
+        aff(
+          'water_plants',
+          'Water the plants (draws from the planter reservoir)',
+          [],
+          { curiosity: 10, comfort: 5 },
+          [{ field: 'water_level', operator: '>', value: 0 }],
+        ),
+        aff(
+          'harvest',
+          'Harvest vegetables (requires 3 seeds planted)',
+          [],
+          { curiosity: 10, comfort: 5 },
+          [{ field: 'seeds_planted', operator: '>=', value: 3 }],
+          // Spec 048, Req 3: harvest is ALSO a mid-chain step — `eat` (the
+          // actual restoration) is gated on `vegetables >= 1`.
+          { drive: 'hunger', note: 'eat restores hunger once a vegetable is ripe' },
+        ),
+        aff('eat', 'Eat a vegetable', [], { hunger: 25 }, [
+          { field: 'vegetables', operator: '>=', value: 1 },
+        ]),
+        aff('observe', 'Observe'),
+      ],
+      // Spec 055, Req 1: EVERY resource-bearing object declares initialized
+      // state — the phantom economy's other half (`water_level` was never
+      // initialized; the handler's `?? 0` made watering always-fail).
+      { water_level: 5, seeds_planted: 0, vegetables: 0 },
+    ),
     // Referenced by garden.objectIds — was missing (the runtime move_object
     // proposal was rejected with "no object with ID 'toolbox-1'").
     makeObject('toolbox-1', 'Toolbox', 'tool', 'garden', [
       aff('take_tool', 'Take a tool'),
       aff('observe', 'Observe'),
     ]),
-    makeObject('gate-1', 'Gate', 'doorway', 'garden', [aff('open_gate', 'Open gate')]),
+    makeObject('gate-1', 'Gate', 'doorway', 'garden', [
+      aff('open_gate', 'Open gate'),
+      // Spec 055, Req 3 (audit fix): `close_gate` was registered by
+      // `createGateHandlers` (the sim wires it) but declared by no object —
+      // a registered-but-undeclared phantom handler. The gate can now be
+      // closed again; the handler was already there.
+      aff('close_gate', 'Close gate'),
+    ]),
+    // Spec 055, Req 2 (issue #198): the water SOURCE that closes the loop.
+    // `water_plants` depletes `planter-1.water_level` → the affordance leaves
+    // the enum at 0 → the agent must plan `fill_watering_can` here to restore
+    // it (spec-018 `crossObjectStateChanges`, Req 9). The barrel is an
+    // UNBOUNDED SOURCE (not a sink) — saturation lives at the planter (the
+    // issue's "watering gets full → it stops working"); no availability
+    // condition on the barrel by design (Architect Decision 2).
+    makeObject('water-butt-1', 'Rain Barrel', 'furniture', 'garden', [
+      aff('fill_watering_can', 'Refill the planter reservoir from the rain barrel', [], {}),
+      aff('observe', 'Observe'),
+    ]),
+    // Spec 055, Req 3 (audit fix): `carry` was registered by the sim
+    // (`createCarryEffect`) but declared by no scene object — the
+    // `portableObject` helper existed unused. A watering can joins the new
+    // water economy (carry it to the barrel) and closes the phantom.
+    portableObject('watering-can-1', 'Watering Can', 'garden'),
     // Garden bench (spec 032, Req 1): builtin furniture `sit_outside` and
     // `relax` restore energy + comfort — the garden's rest affordance.
     makeObject('garden-bench-1', 'Garden Bench', 'furniture', 'garden', [
@@ -399,12 +455,27 @@ export function createDynamicWorldHandlers(): Record<string, AffordanceHandler> 
     water_plants: async (_objectId, _agentId, state) => {
       const water = (state['water_level'] as number) ?? 0;
       if (water <= 0) {
+        // Execution-time defense in depth (spec 055, Req 1): the declarative
+        // `water_level > 0` condition already removes the affordance from the
+        // enum at 0 — this branch catches races and direct invocations.
         return { success: false, failureReason: 'The watering can is empty.' };
       }
       return {
         success: true,
         newState: { ...state, water_level: water - 1 },
         driveChanges: { curiosity: 10, comfort: 5 },
+      };
+    },
+    // Spec 055, Req 2 (issue #198): the refill path closes the water loop —
+    // the planter's reservoir is restored via `crossObjectStateChanges`
+    // (spec 018, Req 9 patch semantics). The barrel itself is an unbounded
+    // source: saturation lives at the planter, not here (Architect Decision
+    // 2). No driveChanges — the economy action moves a resource, not a drive.
+    fill_watering_can: async (_objectId, _agentId, state) => {
+      return {
+        success: true,
+        newState: state,
+        crossObjectStateChanges: [{ objectId: 'planter-1', statePatch: { water_level: 5 } }],
       };
     },
     // Spec 034, Req 5: harvest closes the growth half of the hunger chain.
