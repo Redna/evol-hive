@@ -71,11 +71,16 @@ plan path, `clearPlanIfComplete`, Reflect-phase `stampPlanOutcome` (engine
   produces dists (build-order artifact, pre-existing; spec-011/onnx failures
   on unbuilt trees are NOT regressions).
 
-## Outstanding
+## Session 2 (resume) — in progress
 
-- **Req 7 live-run evidence**: the 30-min real-LLM protocol
-  (`USE_REAL_LLM=true SCENE_DURATION_MS=1800000 npx tsx examples/dynamic-world-sim.ts`)
-  is the acceptance instrument — plan-memory renders > 0, `superseded after
-  N of M steps` lines appear, `[plan-repeat]` stays 0-firing, `[plan-create]`
-  ids carry the injected clock. Evidence to be attached to #201 (QA).
+- CI on PR head `0d0091f` was `action_required` (app-token PR) → `gh run rerun`
+  → **all green** (Type Check & Lint ✅, Build ✅, Test ✅).
+- Local re-verification on a clean tree: `pnpm build` / `typecheck` / `lint` ✅.
+- **Req 7 live-run in flight**: Ollama Cloud wiring verified with a 90s smoke
+  (`LLM_BASE_URL=https://ollama.com/v1 LLM_API_KEY=$OLLAMA_API_KEY
+  LLM_MODEL=glm-5.3-flash` — real LLM, 3 multi-step plans, exit 0). Full 30-min
+  acceptance run launched (`SCENE_DURATION_MS=1800000`, log `/tmp/live-run-056.log`),
+  evidence to be attached to #201.
+- Note: `[plan-create]` does not emit the plan id — id-carry-clock determinism
+  stays pinned by AC-6 unit tests; live evidence = supersession/repeat lines.
 - `docs/specs/INDEX.md` status → 🔍 In Review (done in this session).
