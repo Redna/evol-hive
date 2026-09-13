@@ -63,6 +63,18 @@ export interface LastPlanOutcome {
   driveChanges?: Record<string, number>;
   /** `true` when the Reflect phase wrote a memory node for the outcome. */
   reflected: boolean;
+  /**
+   * `true` when the plan never completed — the engine stamped this outcome at
+   * the moment the plan was REPLACED mid-flight (spec 056, Req 1 — issue
+   * #201), the abandonment pattern the plan prompt renders for self-visibility.
+   * Absent on legacy stamps and Reflect-phase completion/failure stamps —
+   * those render byte-identically (additive-optional discipline).
+   */
+  superseded?: boolean;
+  /** Steps completed when the plan was replaced (only read when `superseded`). */
+  stepsCompleted?: number;
+  /** Total steps the replaced plan had (only read when `superseded`). */
+  stepsTotal?: number;
 }
 
 /** The full internal state of an agent at any point in time. */

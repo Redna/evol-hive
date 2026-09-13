@@ -127,7 +127,16 @@ export class PlanBuilderImpl implements PlanBuilder {
       const outcome = perceptionResult.lastPlanOutcome;
       const stepList = outcome.steps.join(', ');
       const deltas = formatDriveDeltas(outcome.driveChanges);
-      const verdict = outcome.success ? `it succeeded${deltas}` : `it failed${deltas}`;
+      // Spec 056 (Req 3 — issue #201): a superseded outcome renders the
+      // abandonment verdict — the engine stamped the plan as replaced
+      // mid-flight. stepsCompleted/stepsTotal are only read when superseded
+      // (they are always stamped together, Req 1); outcomes without
+      // `superseded` render exactly as before (spec 055).
+      const verdict = outcome.superseded
+        ? `superseded after ${outcome.stepsCompleted ?? 0} of ${outcome.stepsTotal ?? 0} steps${deltas}`
+        : outcome.success
+          ? `it succeeded${deltas}`
+          : `it failed${deltas}`;
       dynamicLines.push(`Your last plan was "${stepList}" — ${verdict}.`);
       if (outcome.reflected) {
         dynamicLines.push(

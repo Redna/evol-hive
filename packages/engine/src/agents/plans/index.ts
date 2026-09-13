@@ -22,8 +22,10 @@ export type SimulationClock = () => number;
 
 /**
  * Concrete PlanManager backed by an AgentManager. Plan ids are generated
- * as `plan_${agentId}_${Date.now()}` to guarantee uniqueness per creation
- * event (Req 18).
+ * as `plan_${agentId}_${clock()}` to guarantee uniqueness per creation
+ * event (Req 18) — the constructor-injected `SimulationClock` is the only
+ * time source (spec 056, Req 4: deterministic under fixed-clock tests,
+ * consistent with sim time — the spec-054 epoch-stamp family).
  */
 export class PlanManagerImpl implements PlanManager {
   /** Monotonic counter to guarantee unique plan ids within the same millisecond. */
@@ -35,8 +37,11 @@ export class PlanManagerImpl implements PlanManager {
   ) {}
 
   createPlan(agentId: string, result: FormulatePlanResult): AgentPlan {
-    const id = `plan_${agentId}_${Date.now()}_${PlanManagerImpl.planCounter++}`;
+    const id = `plan_${agentId}_${this.clock()}_${PlanManagerImpl.planCounter++}`;
     const createdAt = this.clock();
+
+    this.stampSupersededOutcome(agentId);
+
     // Diagnostic (issue #130 arc): what did the LLM actually bind?
     console.error(
       `[plan-create] agent=${agentId} steps=` +
@@ -75,6 +80,53 @@ export class PlanManagerImpl implements PlanManager {
 
     this.agentManager.updateState(agentId, { currentPlan: plan });
     return plan;
+  }
+
+  /**
+   * Stamp a superseded outcome for a still in-flight plan BEFORE the new
+   * plan replaces it (spec 056, Req 1 — issue #201). The dominant batch plan
+   * path re-formulates every cycle and unconditionally overwrites
+   * `currentPlan`, so multi-step plans die mid-flight — the Reflect-phase
+   * stamp (`stampPlanOutcome`, spec 055 Req 4) only fires on plans that just
+   * completed or failed, a condition the dominant path almost never reaches.
+   * Stamping at the REPLACEMENT moment gives the next cycle's plan prompt the
+   * abandonment self-visibility (the #191 repetition signature defense).
+   *
+   * Guard: only plans still in flight (`currentStepIndex < steps.length`) are
+   * stamped — a replaced plan that already completed belongs to the Reflect
+   * stamp (Req 6: no double-stamping with a misleading `success: false`).
+   * Wrapped in try/catch (spec-049 discipline): a stamping or diagnostic
+   * failure must never break plan creation.
+   */
+  private stampSupersededOutcome(agentId: string): void {
+    try {
+      const oldPlan = this.agentManager.getState(agentId)?.currentPlan ?? null;
+      if (!oldPlan || oldPlan.currentStepIndex >= oldPlan.steps.length) return;
+
+      this.agentManager.updateState(agentId, {
+        lastPlanOutcome: {
+          planDescription: oldPlan.description,
+          // Per-step rendered identity, in plan order: the step's
+          // `targetAffordance` when bound, else its description — the same
+          // rendering `stampPlanOutcome` uses (spec 055 Req 4).
+          steps: oldPlan.steps.map((step) => step.targetAffordance ?? step.description),
+          success: false,
+          superseded: true,
+          stepsCompleted: oldPlan.currentStepIndex,
+          stepsTotal: oldPlan.steps.length,
+          reflected: false, // no reflection ever happened for the abandoned plan
+        },
+      });
+
+      // Spec 056, Req 5: one zero-LLM stderr line per supersession.
+      console.error(
+        `[plan-superseded] agent=${agentId}: superseded after ` +
+          `${oldPlan.currentStepIndex} of ${oldPlan.steps.length} steps ` +
+          `("${oldPlan.description.slice(0, 40)}")`,
+      );
+    } catch {
+      // Diagnostic-grade data: never break the cycle over it.
+    }
   }
 
   advanceStep(agentId: string): void {
