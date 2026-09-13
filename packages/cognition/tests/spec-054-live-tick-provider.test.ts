@@ -134,8 +134,7 @@ function makeSocialBridge(resolver?: (target: string) => string | null): SocialA
   const updates: Array<{ agentId: string; other: string; updates: Partial<Relationship> }> = [];
   return {
     updates,
-    resolveAgentId: (_agentId: string, target: string) =>
-      resolver ? resolver(target) : target,
+    resolveAgentId: (_agentId: string, target: string) => (resolver ? resolver(target) : target),
     queueMessage: () => undefined,
     updateRelationship(agentId: string, other: string, partial: Partial<Relationship>) {
       updates.push({ agentId, other, updates: partial });
@@ -150,9 +149,7 @@ function makeSocialBridge(resolver?: (target: string) => string | null): SocialA
   };
 }
 
-function makeExecutor(
-  overrides: Partial<CognitiveToolExecutorOptions> = {},
-): {
+function makeExecutor(overrides: Partial<CognitiveToolExecutorOptions> = {}): {
   executor: CognitiveToolExecutorImpl;
   social: ReturnType<typeof makeSocialBridge>;
   conversations: ReturnType<typeof makeConversationBridge>;
@@ -167,7 +164,11 @@ function makeExecutor(
   return { executor, social, conversations };
 }
 
-function stampOn(social: ReturnType<typeof makeSocialBridge>, agentId: string, other: string): number {
+function stampOn(
+  social: ReturnType<typeof makeSocialBridge>,
+  agentId: string,
+  other: string,
+): number {
   const entry = social.updates.find((u) => u.agentId === agentId && u.other === other);
   expect(entry, `expected a relationship write ${agentId}→${other}`).toBeDefined();
   return entry!.updates['lastInteraction'] as number;
@@ -325,21 +326,19 @@ describe('AC-5 (unit): fresh vs stale discrimination in tick units (R5)', () => 
     expect(age).toBe(ageTicks);
     expect(age).toBeGreaterThanOrEqual(0);
 
-    return builder
-      .build({
-        passive: {
-          roomId: 'garden',
-          objectsPresent: [],
-          drives: { energy: 50, hunger: 50, social: 60, comfort: 50, curiosity: 50 },
-          agentsPresent: [
-            { agentId: 'agent-a', name: 'Alice', currentActivity: 'idle', isThinking: false },
-          ],
-        },
-        prunedAffordances: [],
-        primaryDriveLabel: 'low energy',
-        pendingAddresses: [pending],
-      })
-      .perceptionContext;
+    return builder.build({
+      passive: {
+        roomId: 'garden',
+        objectsPresent: [],
+        drives: { energy: 50, hunger: 50, social: 60, comfort: 50, curiosity: 50 },
+        agentsPresent: [
+          { agentId: 'agent-a', name: 'Alice', currentActivity: 'idle', isThinking: false },
+        ],
+      },
+      prunedAffordances: [],
+      primaryDriveLabel: 'low energy',
+      pendingAddresses: [pending],
+    }).perceptionContext;
   }
 
   it('100 ticks old → fresh → FRESH:-promoted as the first dynamic line', () => {
