@@ -143,3 +143,26 @@ plan path, `clearPlanIfComplete`, Reflect-phase `stampPlanOutcome` (engine
   wired): wiring `BatchPlanService` in production so supersession fires live;
   `[plan-create]` emitting the plan id (diagnostic form change, spec-049
   discipline — would need its own spec line).
+
+## QA session (2026-09-13) — test-coverage verification of PR #203
+
+**Verdict: coverage complete — 8/8 ACs mapped to tests; all suites green.
+Recommend approve/merge. QA added no tests (none missing).**
+
+- Independent verification on PR head `e45e653` (fresh checkout + `pnpm build`
+  first — bare `pnpm test` on an unbuilt tree fails on package resolution,
+  pre-existing): `pnpm test` 8/8 projects green, exit 0 (shared 379, memory
+  101, visualizer 48, cognition 1077, engine 865, assembly 76, examples 241,
+  cli 15); spec-056 suites 21/21 (engine 10, cognition 7, shared 3, E2E 1);
+  spec-055 regression 40/40 (all four suites — AC-8 names two of them);
+  `pnpm typecheck` ✅ `pnpm lint` ✅; CI green on `e45e653` (run 34774661766).
+- AC→test mapping + gaps recorded in
+  `docs/specs/notes/056-plan-supersession-stamping-qa-notes.md` (YAAM-indexed).
+- QA report on PR #203: https://github.com/Redna/evol-hive/pull/203#issuecomment-5655311573
+- Issue #201 label `Status: In Review/QA` added (kept `Status: Ready for Dev`,
+  matching the #198 precedent).
+- Gaps judged acceptable (documented, not coverage gaps of this PR): AC-8 live
+  superseded-line clause — wired path provably cannot produce it (early-return
+  on any `currentPlan`, batch path unwired); satisfied via deterministic E2E
+  per the 055-QA precedent. `[plan-create]`-ids clause not observable live;
+  pinned by AC-6 unit tests + E2E.
