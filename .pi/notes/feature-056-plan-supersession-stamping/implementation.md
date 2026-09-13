@@ -119,3 +119,27 @@ plan path, `clearPlanIfComplete`, Reflect-phase `stampPlanOutcome` (engine
 - TODO this session: wait for live run end (~18:25), extract final counts,
   attach evidence comment to #201, check CI on new head (app-token PRs may
   need `gh run rerun`), final YAAM note.
+
+## Session 3 final state (2026-09-13 18:26)
+
+- **Live run COMPLETE** (17:54:54–18:24:54 UTC, exit 0, 502K tokens, 142
+  memory nodes): plan-memory renders **> 0** — direct prompt evidence in the
+  run's `[llm-raw]` dump (`Your last plan was "wait, repot_seedlings, …" — it
+  succeeded.`); `[plan-repeat]` **0** ✓; `[plan-superseded]` 0 (mechanism:
+  single-agent path early-returns on any currentPlan; batch path unwired —
+  supersession seam unreachable live on current wiring); `[plan-create]` 27,
+  `[plan-failed]` 3 (bounded recovery), `[step-skip]` 2 (spec-037 guard).
+- **Evidence comment on #201**: https://github.com/Redna/evol-hive/issues/201#issuecomment-5655203603
+- **PR #203 body refreshed** with final state (live-run outcome + E2E + test
+  counts). CI green on head `89c9405` (run 34773880673, 2m43s, after
+  `gh run rerun` — app-token PRs need manual rerun).
+- **Commits this session**: `95a446f` (E2E gap-fill), `89c9405` (breadcrumb).
+- INDEX.md: 056 stays 🔍 In Review (verified, no edit needed).
+- Spec-056 AC status: AC-1..AC-7 unit-pinned ✅; AC-8: spec-055 regression
+  32/32 ✅, live-run renders>0 + repeat=0 ✅, supersession-line clause
+  satisfied via deterministic E2E (live wiring cannot produce it — documented
+  on #201).
+- Not done (out of scope / for a future spec if the batch path is ever
+  wired): wiring `BatchPlanService` in production so supersession fires live;
+  `[plan-create]` emitting the plan id (diagnostic form change, spec-049
+  discipline — would need its own spec line).
