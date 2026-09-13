@@ -62,3 +62,52 @@ independent of the bot run.
 
 1. Flip `docs/specs/INDEX.md` spec-054 status 🔍 In Review → ✅ Done
 2. Close issue #195 (PR body has `Closes #195`)
+
+## Session 2 — independent re-verification (QA head `30ac391`)
+
+Second QA pass, re-run from scratch on top of the session-1 record
+(`b3b9c1b`) + QA test additions (`30ac391`). Everything re-confirmed:
+
+- **Red-check performed** (session 1 asserted red-runs from history; session 2
+  reproduced them live): reverting the two src files to pre-fix `faf8c97`
+  makes **11/14 cognition + 4/4 assembly** spec-054 tests fail — epoch-ms
+  stamps under sentinel equality, wiring assertions, freshness E2E. The 3
+  cognition survivors are exactly the tests that SHOULD pass on both sides:
+  the legacy `currentTick` seam (spec 018 AC-25) and the two pure
+  perception-builder AC-5 unit tests (shared-side semantics, untouched by the
+  fix). Restored to HEAD → green again. Tests detect the bug for the right
+  reason.
+- **2 QA test additions** (commit `30ac391`, tests only — no implementation
+  touched):
+  1. AC-1 literal wording — two calls separated by fake-time advance produce
+     non-decreasing stamps (`T0` then `T0+250`; frozen construction capture
+     stamps `T0` twice). Note: `stampOn()` returns the FIRST write; second
+     call read via `.filter(...)[1]` (same pattern as the AC-2 rewire test).
+  2. Constraint pin — a THROWING provider surfaces through the executor's
+     existing failure channel: `success:false`, message carries the provider
+     error verbatim (`Failed to send message: tick source broken.`),
+     `relationshipUpdated:false`, zero relationship writes. Closes the spec's
+     "Do NOT widen the error surface / not be swallowed" constraint gap. The
+     executor does NOT reject — its try/catch (line ~427) is the surface.
+- **Full gates re-run (build→test order, per CI):** `pnpm test` 2,706 passed /
+  0 failed (shared 367, visualizer 48, memory 101, cognition **1030** = 1028
+  + 2 QA additions, engine 855, assembly 76, examples 214, cli 15);
+  `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build` all exit 0.
+- **CI on PR #197:** all 4 jobs SUCCESS (Type Check & Lint, Build, Test,
+  GitGuardian; run `34753125929` on head `b3b9c1b`).
+
+### Operational finding — build→test order is REQUIRED locally
+
+`pnpm test` without a prior `pnpm build` fails transiently in `cognition`:
+its vitest config resolves `@evol-hive/shared` / `@evol-hive/memory` package
+entries, so missing `dist` fails file COLLECTION (not assertions):
+`onnx-embedding-provider.test.ts` (needs memory dist) and 4
+`spec-011-coverage.test.ts` MockLLMClient cases (needs shared dist). CI is
+immune — the Test job runs `pnpm build` first ("required for test resolution").
+First session's clean numbers are consistent; any future local
+"pre-existing failure" in those two files is this, not a regression.
+
+### Verdict (session 2)
+
+Unchanged: **coverage complete for AC-1..AC-6; all gates green; recommend
+approve/merge.** No further gaps found.
