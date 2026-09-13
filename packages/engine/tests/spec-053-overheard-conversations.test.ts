@@ -17,16 +17,23 @@
  * - AC-4 (R2): a conversation with 8 turns yields exactly 3 overheard lines,
  *   latest turn first (`availableLines` = 8); a 1-turn conversation yields
  *   exactly 1.
+ * - R1 wiring (QA pass): the pass-through seams — `SocialManager` bridge and
+ *   the `PerceptionDataProviderImpl` pass-through, incl. the unwired-manager
+ *   `?? []` legacy fallbacks (the spec 044/050 three-layer pattern).
  * - AC-9: the provider path is pure TypeScript — no LLM anywhere.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AgentManagerImpl } from '../src/agents/state/index.js';
+import { DriveSystemImpl } from '../src/agents/drives/index.js';
+import { SystemFeedbackStore } from '../src/agents/feedback/index.js';
+import { PerceptionDataProviderImpl } from '../src/agents/perception/index.js';
 import { SmartObjectRegistryImpl } from '../src/world/objects/index.js';
 import { SceneManagerImpl } from '../src/world/scenes/index.js';
 import {
   ConversationManagerImpl,
   defaultConversationManagerConfig,
 } from '../src/social/conversation-manager.js';
+import { SocialManager } from '../src/social/social-manager.js';
 import type { AgentProfile, ConversationSentiment } from '@evol-hive/shared';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -312,5 +319,81 @@ describe('spec 053 R3 — observe returns the full rolling window (AC-2)', () =>
     const eligible = world.manager.getEligibleAffordances(id, 'agent-c');
     expect(eligible).toEqual(['join', 'observe']);
     expect(eligible).not.toContain('contribute');
+  });
+});
+
+// ── R1 — the pass-through wiring (spec 044/050 three-layer pattern) ──────────
+//
+// `getConversationsAwaitingAgentReply` (spec 044) is tested at all three
+// wiring layers: the conversation manager, the SocialManager bridge, and the
+// perception provider pass-through. The overheard scan rides the same shape
+// (spec 053 R1) — these tests pin each seam, including the unwired-manager
+// `?? []` legacy fallbacks on both hops.
+
+describe('spec 053 R1 — pass-through wiring (ConversationManager → SocialManager → perception provider)', () => {
+  let world: ReturnType<typeof buildWorld>;
+  let socialManager: SocialManager;
+  let provider: PerceptionDataProviderImpl;
+  let legacyProvider: PerceptionDataProviderImpl; // no SocialManager wired
+
+  beforeEach(() => {
+    world = buildWorld();
+    socialManager = new SocialManager(world.agentManager);
+    socialManager.setConversationManager(world.manager);
+    provider = new PerceptionDataProviderImpl(
+      world.agentManager,
+      world.registry,
+      new DriveSystemImpl(world.agentManager),
+      new SystemFeedbackStore(),
+    );
+    provider.setSocialManager(socialManager);
+    legacyProvider = new PerceptionDataProviderImpl(
+      world.agentManager,
+      world.registry,
+      new DriveSystemImpl(world.agentManager),
+      new SystemFeedbackStore(),
+    );
+  });
+
+  it('the SocialManager delegates to the conversation manager (same bridge, spec 044 shape)', () => {
+    seedConversation(world, [
+      ['agent-a', 'agent-b', 'the pump is clogged again', 'negative'],
+      ['agent-b', '', 'I will bring a wrench', 'positive'],
+    ]);
+    const viaSocial = socialManager.getOverheardConversations('agent-c');
+    expect(viaSocial).toEqual(world.manager.getOverheardConversations('agent-c'));
+    expect(viaSocial).toHaveLength(1);
+    expect(viaSocial[0]!.lines.map((l) => l.content)).toEqual([
+      'I will bring a wrench',
+      'the pump is clogged again',
+    ]);
+  });
+
+  it('the SocialManager returns [] when the conversation manager is unwired (legacy double)', () => {
+    const bare = new SocialManager(world.agentManager);
+    expect(bare.getOverheardConversations('agent-c')).toEqual([]);
+  });
+
+  it('the perception provider surfaces the overheard scan through the wired SocialManager', () => {
+    seedConversation(world, [['agent-a', 'agent-b', 'the pump is clogged again', 'negative']]);
+    const viaProvider = provider.getOverheardConversations('agent-c');
+    expect(viaProvider).toEqual(world.manager.getOverheardConversations('agent-c'));
+    expect(viaProvider).toHaveLength(1);
+    expect(viaProvider[0]!.conversationId).toBe(
+      world.manager.listConversationsInRoom(GARDEN)[0]!.id,
+    );
+  });
+
+  it('the perception provider returns [] with no SocialManager wired (legacy — no lines, no failure)', () => {
+    seedConversation(world, [['agent-a', 'agent-b', 'hello', 'neutral']]);
+    expect(legacyProvider.getOverheardConversations('agent-c')).toEqual([]);
+  });
+
+  it('room walls and participant exclusion hold through the full provider chain', () => {
+    seedConversation(world, [['agent-a', 'agent-b', 'garden things', 'neutral']]);
+    world.agentManager.updateState('agent-c', { location: KITCHEN });
+    expect(provider.getOverheardConversations('agent-c')).toEqual([]); // other room (R4)
+    expect(provider.getOverheardConversations('agent-a')).toEqual([]); // participant (R5)
+    expect(provider.getOverheardConversations('agent-b')).toEqual([]); // participant (R5)
   });
 });

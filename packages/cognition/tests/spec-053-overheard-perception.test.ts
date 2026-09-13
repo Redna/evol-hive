@@ -456,3 +456,74 @@ describe('spec 053 R6 — [overheard] diagnostic at the perceive→plan seam (AC
     expect(result).toBeDefined();
   });
 });
+
+// ── AC-7 (R6) — per-conversation counts with multiple conversations ──────────
+// QA pass: AC-7 requires PER-CONVERSATION counts; the suites above exercise a
+// single conversation only. These pin the joined multi-entry format, the
+// provider order, and the empty-lines entry filtering.
+
+describe('spec 053 R6 — [overheard] per-conversation counts, multi-conversation (AC-7)', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    logSpy.mockRestore();
+  });
+
+  function overheardLines(): string[] {
+    return logSpy.mock.calls
+      .map((args) => args.map(String).join(' '))
+      .filter((line) => line.includes('[overheard]'));
+  }
+
+  it('two overheard conversations produce one line carrying both counts in provider order', () => {
+    const overheard: OverheardConversation[] = [
+      {
+        conversationId: 'conv-A',
+        topic: 'pump repairs',
+        availableLines: 8,
+        lines: [
+          { speakerId: 'agent-b', addresseeId: 'agent-a', content: 'turn-8' },
+          { speakerId: 'agent-a', addresseeId: 'agent-b', content: 'turn-7' },
+          { speakerId: 'agent-b', addresseeId: 'agent-a', content: 'turn-6' },
+        ],
+      },
+      {
+        conversationId: 'conv-B',
+        topic: 'fence',
+        availableLines: 1,
+        lines: [{ speakerId: 'agent-c', addresseeId: 'agent-d', content: 'only' }],
+      },
+    ];
+    logOverheardDiagnostic('agent-c', makePerceptionResult({ overheard }), 900);
+    const lines = overheardLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('agent=agent-c');
+    expect(lines[0]).toContain('tick=900');
+    expect(lines[0]).toContain('conv-A|rendered=3|available=8');
+    expect(lines[0]).toContain('conv-B|rendered=1|available=1');
+    const aIdx = lines[0]!.indexOf('conv-A');
+    const bIdx = lines[0]!.indexOf('conv-B');
+    expect(aIdx).toBeGreaterThan(-1);
+    expect(bIdx).toBeGreaterThan(aIdx); // provider order preserved
+  });
+
+  it('an entry with zero rendered lines contributes nothing to the counts', () => {
+    const overheard: OverheardConversation[] = [
+      { conversationId: 'conv-empty', topic: 't', availableLines: 0, lines: [] },
+      {
+        conversationId: 'conv-B',
+        topic: 't',
+        availableLines: 1,
+        lines: [{ speakerId: 'agent-a', addresseeId: 'agent-b', content: 'x' }],
+      },
+    ];
+    logOverheardDiagnostic('agent-c', makePerceptionResult({ overheard }), 900);
+    const lines = overheardLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).not.toContain('conv-empty');
+    expect(lines[0]).toContain('conv-B|rendered=1|available=1');
+  });
+});
