@@ -1,0 +1,7 @@
+{
+  "name": "feature-055-world-saturation-plan-memory-horizon",
+  "description": "World saturation (water_plants declared + depleting + condition-gated, fill_watering_can refill loop), plan memory (lastPlanOutcome surfaced into the plan context), and hours-horizon planning (longTermGoals + horizon directive in the plan prompt, PLAN_MAX_STEPS cap). Issue #198.",
+  "createdAt": "2026-09-13T12:56:00Z",
+  "specIssue": 198,
+  "specFile": "docs/specs/055-world-saturation-plan-memory-horizon.md"
+}
