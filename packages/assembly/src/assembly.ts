@@ -378,6 +378,17 @@ export function assembleCognitionStack(
         // for unwired contexts, spec 033 AC-14).
         conversationBridge: core.conversationManager,
         maxSceneMutationsPerCycle: guardrailConfig.maxSceneMutationsPerCycle ?? 1,
+        // Spec 054 (R4 — issue #195): a LIVE tick source in ENGINE TICKS —
+        // read per invocation, never cached at construction. The unit must be
+        // the discrete tickNumber (matching SOCIAL_PENDING_FRESH_TICKS = 3600
+        // and `Relationship.lastInteraction: 0` initializers), NOT
+        // `simulationTime` (seconds — the reflection-loop clock at line ~432);
+        // epoch-ms Date.now() here produced `age=-1789292161245` in the 053
+        // run's [social-urge] diagnostics and a permanently-true FRESH:
+        // promotion. Same provider/clock pattern as the assembler's existing
+        // provider/clock style — but in TICKS (the perception bridge's tick
+        // source is the engine-side analog).
+        tickProvider: () => core.gameLoop.currentTick().tickNumber,
       })
     : undefined;
 
