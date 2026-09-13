@@ -20,6 +20,7 @@ import type {
 } from './affordance.js';
 import type { ConversationObject, ConversationSentiment } from './conversation.js';
 import type { PendingAddressInfo, SocialUrgeAssessment } from './social-urge.js';
+import type { OverheardConversation } from './conversation.js';
 import type { SelfModel, IdentityChangeDelta, IdentityChangeAudit } from './identity.js';
 import type { ModifySceneToolResult, AffordanceGuard } from './mutations.js';
 import type {
@@ -115,6 +116,14 @@ export interface PerceptionResult {
    * state, never stable lines (spec 021). `undefined` for legacy providers.
    */
   pendingAddresses?: PendingAddressInfo[];
+  /**
+   * Open/active conversations in the agent's room the agent does NOT
+   * participate in (spec 053, R1 — issue #192): the bystander OVERHEARS the
+   * actual recent turns. Rendered as `INFORMATION: Overheard` lines in the
+   * dynamic section — per-agent dynamic state, never stable lines (spec 021),
+   * never a trigger (spec 044 R5). `undefined` for legacy providers.
+   */
+  overheard?: OverheardConversation[];
   /**
    * Per-present-agent social urge assessments (spec 044, R4b/R4c), computed
    * by the pure shared urge function. Rendered as dynamic hint lines and
@@ -632,6 +641,14 @@ export interface PerceptionDataProvider {
    * when absent, no pending-address lines are rendered.
    */
   getConversationsAwaitingAgentReply?(agentId: string): ConversationObject[];
+  /**
+   * Open/active conversations in the agent's room the agent does NOT
+   * participate in (spec 053, R1 — issue #192): the overheard-turn provider
+   * scan mirroring {@link getConversationsAwaitingAgentReply}. Optional so
+   * existing implementations compile unchanged — when absent, no overheard
+   * lines are populated.
+   */
+  getOverheardConversations?(agentId: string): OverheardConversation[];
   /**
    * The current engine tick (spec 044, Decision 6) — scene-novelty input for
    * the social urge computation. Optional — when absent, scene novelty is

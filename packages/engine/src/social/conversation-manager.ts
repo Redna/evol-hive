@@ -31,10 +31,15 @@ import type {
   ConversationObject,
   ConversationObserveResult,
   ConversationSentiment,
+  ConversationTurn,
   MemoryEntryInput,
+  ObservedTurn,
+  OverheardConversation,
+  OverheardLine,
   SmartObject,
 } from '@evol-hive/shared';
 import {
+  CONVERSATION_OVERHEARD_LINES_PER_CYCLE,
   CONVERSATION_TURN_WINDOW,
   DEFAULT_CYCLE_INTERVAL_TICKS,
   SOCIAL_EXCHANGE_BONUS,
@@ -347,12 +352,21 @@ export class ConversationManagerImpl implements ConversationBridge {
     if (conversation === undefined) {
       return { success: false, message: `Conversation '${conversationId}' does not exist.` };
     }
-    // Non-participants see topic + participants, never the turn window (R3).
+    // Spec 053 (R3 — issue #192): the full rolling-window turn history rides
+    // the result (oldest first) and the message names the speakers. The
+    // spec 033 R3 privacy rule is superseded: co-location implies perception
+    // of the content — but observation is still NOT participation: the
+    // caller is never added to `participants` and nothing is persisted
+    // (derived read-only view, AC-9).
+    const speakers = [...new Set(conversation.turns.map((t) => t.agentId))];
+    const names = speakers.map((id) => this.agentManager.getProfile(id)?.name ?? id);
+    const speakerText = names.length > 0 ? ` Speakers: ${names.join(', ')}.` : '';
     return {
       success: true,
-      message: `Conversation about '${conversation.topic}' (${conversation.status}).`,
+      message: `Conversation about '${conversation.topic}' (${conversation.status}).${speakerText}`,
       topic: conversation.topic,
       participants: conversation.participants.map((p) => p.agentId),
+      turns: observeTurns(conversation.turns),
     };
   }
 
@@ -397,6 +411,41 @@ export class ConversationManagerImpl implements ConversationBridge {
       awaiting.push(conversation);
     }
     return awaiting;
+  }
+
+  /**
+   * Open/active conversations in the agent's room the agent does NOT
+   * participate in (spec 053, R1 — issue #192): the deterministic overheard
+   * provider, mirroring {@link getConversationsAwaitingAgentReply}. Pure
+   * scan of the conversation map in insertion order — no LLM, no triggers
+   * (R5: influence, not force). Gates, exactly two: non-closed status and
+   * co-location (`location === conversation.roomId`, the same gate
+   * {@link getEligibleAffordances} uses — R4: room walls are the perception
+   * boundary; no radius/adjacency model). Participation is a hard exclusion
+   * (R5): a participant's own view of their conversations is unchanged —
+   * they never receive overheard lines for them. Each entry carries the
+   * bounded window (R2): at most
+   * {@link CONVERSATION_OVERHEARD_LINES_PER_CYCLE} latest turns, latest
+   * first, plus the window count for the per-cycle diagnostic.
+   */
+  getOverheardConversations(agentId: string): OverheardConversation[] {
+    const overheard: OverheardConversation[] = [];
+    const location = this.agentManager.getState(agentId)?.location;
+    if (location === undefined || location === '') return overheard;
+    for (const conversation of this.conversations.values()) {
+      if (conversation.status === 'closed') continue;
+      if (conversation.participants.some((p) => p.agentId === agentId)) continue;
+      if (location !== conversation.roomId) continue;
+      const lines = overheardLines(conversation);
+      if (lines.length === 0) continue;
+      overheard.push({
+        conversationId: conversation.id,
+        topic: conversation.topic,
+        lines,
+        availableLines: conversation.turns.length,
+      });
+    }
+    return overheard;
   }
 
   // ── Deferred exchange restore (spec 047, R5/R6) ─────────────────────────
@@ -754,6 +803,50 @@ function participantsOwingReply(conversation: ConversationObject): string[] {
   return conversation.participants
     .map((p) => p.agentId)
     .filter((agentId) => lastSpeaker === undefined || agentId !== lastSpeaker);
+}
+
+/**
+ * The bounded overheard lines of one conversation (spec 053, R2): the
+ * window's {@link CONVERSATION_OVERHEARD_LINES_PER_CYCLE} most recent turns,
+ * LATEST first. Each line's addressee is the nearest prior turn by a
+ * DIFFERENT speaker (scanning the full window), else the first participant
+ * other than the speaker (the opening turn addresses the conversation
+ * partner); a degenerate single-participant thread addresses the speaker.
+ * Pure — a function of the already-bounded rolling window only (AC-9:
+ * nothing new is persisted, no LLM anywhere).
+ */
+function overheardLines(conversation: ConversationObject): OverheardLine[] {
+  const participants = conversation.participants.map((p) => p.agentId);
+  const capped = conversation.turns.slice(-CONVERSATION_OVERHEARD_LINES_PER_CYCLE);
+  const lines: OverheardLine[] = [];
+  for (let i = 0; i < capped.length; i++) {
+    const turn = capped[i];
+    if (turn === undefined) continue;
+    const absoluteIndex = conversation.turns.length - capped.length + i;
+    let addresseeId: string | undefined;
+    for (let j = absoluteIndex - 1; j >= 0; j--) {
+      const prior = conversation.turns[j];
+      if (prior !== undefined && prior.agentId !== turn.agentId) {
+        addresseeId = prior.agentId;
+        break;
+      }
+    }
+    if (addresseeId === undefined) {
+      addresseeId = participants.find((id) => id !== turn.agentId) ?? turn.agentId;
+    }
+    lines.push({ speakerId: turn.agentId, addresseeId, content: turn.content });
+  }
+  return lines.reverse();
+}
+
+/** Project the rolling window to the observe-result shape, oldest first (spec 053, R3). */
+function observeTurns(turns: ConversationTurn[]): ObservedTurn[] {
+  return turns.map((t) => ({
+    agentId: t.agentId,
+    content: t.content,
+    sentiment: t.sentiment,
+    tick: t.tick,
+  }));
 }
 
 /** JSON-safe deep copy for plain data. */

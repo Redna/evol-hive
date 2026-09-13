@@ -319,6 +319,18 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
     return this.socialManager?.getConversationsAwaitingAgentReply(agentId) ?? [];
   }
 
+  /**
+   * Open/active conversations in the agent's room the agent does NOT
+   * participate in (spec 053, R1 — issue #192): the data behind the
+   * `INFORMATION: Overheard` perception lines. Delegates to the conversation
+   * manager via the SocialManager ConversationBridge — the same pass-through
+   * shape as {@link getConversationsAwaitingAgentReply}. Empty when the
+   * manager is unwired (legacy) — no lines, no failure.
+   */
+  getOverheardConversations(agentId: string): import('@evol-hive/shared').OverheardConversation[] {
+    return this.socialManager?.getOverheardConversations(agentId) ?? [];
+  }
+
   /** Wire the tick source (spec 044) — lazily captures the game loop. */
   setTickSource(tickSource: () => number | undefined): void {
     this.tickSource = tickSource;

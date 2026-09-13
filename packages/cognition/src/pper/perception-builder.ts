@@ -164,6 +164,27 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       }
     }
 
+    // Overheard conversation lines (spec 053, R1 — issue #192): a co-located
+    // non-participant perceives the actual recent turns of every open/active
+    // conversation in their room — no affordance, no action; co-location is
+    // the only gate. INFORMATION lines, dynamic section only (spec 021
+    // KV-cache rules — per-agent, per-tick state); never a trigger and never
+    // an owed reply (spec 044 R5, influence-not-force; the spec 049 FRESH:
+    // promotion does NOT apply — overhearing is ambient). Display names
+    // resolve via `agentsPresent` with the agent-ID fallback (spec 046 R4
+    // pattern) — the engine carries agent IDs only.
+    if (perceptionResult.overheard !== undefined) {
+      for (const conversation of perceptionResult.overheard) {
+        for (const line of conversation.lines) {
+          const speaker = resolvePresentName(passive.agentsPresent, line.speakerId);
+          const addressee = resolvePresentName(passive.agentsPresent, line.addresseeId);
+          dynamicLines.push(
+            `INFORMATION: Overheard — ${speaker} to ${addressee}: "${line.content}"`,
+          );
+        }
+      }
+    }
+
     // Social urge hint lines (spec 044, R4b): a high urge toward a present
     // agent renders the approach hint; a decayed urge (learned non-responsiveness)
     // renders the let-them-be hint instead. Dynamic section only (spec 021).

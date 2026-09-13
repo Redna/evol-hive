@@ -95,7 +95,7 @@ describe('AC-1: loadScene maxConcurrentCycles (Req 1, Req 2)', () => {
     }
   });
 
-  it('when scene has no maxConcurrentCycles, the default (1) is used', () => {
+  it('when scene has no maxConcurrentCycles, the default (3) is used (#170: cc=3 validated)', () => {
     delete process.env['ENGINE_MAX_CONCURRENT_LLM'];
     const core = createEngineCore(makeConfig());
     const scene: SceneDefinition = {
@@ -107,7 +107,7 @@ describe('AC-1: loadScene maxConcurrentCycles (Req 1, Req 2)', () => {
     };
     loadScene(core, scene);
     assembleGameLoop(core, new FakeOrchestrator());
-    expect(core.scheduler?.maxConcurrentCycles).toBe(1);
+    expect(core.scheduler?.maxConcurrentCycles).toBe(3);
   });
 });
 
@@ -121,10 +121,10 @@ describe('AC-2: createEngine & assembleGameLoop schedulerConfig (Req 2, Req 3)',
     expect(engine.scheduler?.maxConcurrentCycles).toBe(5);
   });
 
-  it('createEngine uses defaultPPERSchedulerConfig (1) when schedulerConfig omitted', () => {
+  it('createEngine uses defaultPPERSchedulerConfig (3) when schedulerConfig omitted (#170: cc=3 validated)', () => {
     delete process.env['ENGINE_MAX_CONCURRENT_LLM'];
     const engine = createEngine(makeConfig(), new FakeOrchestrator());
-    expect(engine.scheduler?.maxConcurrentCycles).toBe(1);
+    expect(engine.scheduler?.maxConcurrentCycles).toBe(3);
   });
 
   it('assembleGameLoop uses an explicit schedulerConfig override', () => {
