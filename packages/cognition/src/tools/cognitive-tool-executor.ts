@@ -40,8 +40,23 @@ export interface CognitiveToolExecutorOptions {
   stateDataProvider?: CognitiveToolDataProvider;
   /** Optional social bridge for agent-to-agent social tools (spec 018, Req 24). */
   socialBridge?: SocialActionBridge;
-  /** Optional current simulation tick for relationship timestamps (spec 018, Req 41). */
+  /**
+   * Optional current simulation tick for relationship timestamps (spec 018, Req 41).
+   * Legacy static seam — existing tests inject it (spec 018 AC-25 et al.). Kept
+   * for backward compatibility; precedence is `tickProvider ?? currentTick ??
+   * Date.now()` (spec 054, R2) when a live provider is also supplied.
+   */
   currentTick?: number;
+  /**
+   * Optional LIVE tick source, evaluated per invocation (spec 054, R1 — issue
+   * #195). The executor reads the tick through this provider at every stamp
+   * site — never caching it at construction — so conversation turn ticks and
+   * `Relationship.lastInteraction` carry the engine's current `tickNumber` for
+   * the process lifetime. Wired by the assembler as
+   * `() => core.gameLoop.currentTick().tickNumber`; unwired test contexts keep
+   * the legacy `currentTick` option or the call-time `Date.now()` fallback.
+   */
+  tickProvider?: () => number;
   /**
    * Optional mutation port for the modify_scene tool (spec 030, Req 13).
    * Implemented by the engine (`SceneMutationService`); per ADR-0001 the
@@ -82,7 +97,14 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
   private readonly socialBridge: SocialActionBridge | undefined;
   private readonly conversationBridge: ConversationBridge | undefined;
   private readonly selfModelBridge: SelfModelBridge | undefined;
-  private readonly currentTick: number;
+  /**
+   * Legacy static tick (spec 018, Req 41) — `undefined` when not injected, so
+   * the default falls through to a call-time `Date.now()` read instead of a
+   * construction-time capture (spec 054, R2 — issue #195).
+   */
+  private readonly currentTick: number | undefined;
+  /** Live tick source (spec 054, R1) — evaluated per invocation, never cached. */
+  private readonly tickProvider: (() => number) | undefined;
   private readonly mutationPort: SceneMutationPort | undefined;
   private readonly maxSceneMutationsPerCycle: number;
   /** modify_scene proposals used this cycle, per agent (spec 030, Req 14a). */
@@ -94,9 +116,21 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
     this.socialBridge = options.socialBridge;
     this.conversationBridge = options.conversationBridge;
     this.selfModelBridge = options.selfModelBridge;
-    this.currentTick = options.currentTick ?? Date.now();
+    this.currentTick = options.currentTick;
+    this.tickProvider = options.tickProvider;
     this.mutationPort = options.mutationPort;
     this.maxSceneMutationsPerCycle = options.maxSceneMutationsPerCycle ?? 1;
+  }
+
+  /**
+   * The tick for THIS invocation (spec 054, R1–R3): the live provider when
+   * wired, else the legacy static `currentTick` option, else `Date.now()`
+   * evaluated at CALL time (the epoch-ms bug was the construction-time
+   * capture — even a correct construction value is wrong minutes later; the
+   * executor lives for the whole process lifetime).
+   */
+  private getTick(): number {
+    return this.tickProvider?.() ?? this.currentTick ?? Date.now();
   }
 
   async executeQueryMemory(
@@ -269,7 +303,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
         targetAgentId,
         message,
         sentiment,
-        this.currentTick,
+        this.getTick(),
       );
       if (!refusal.success) {
         return { success: false, message: refusal.message, relationshipUpdated: false };
@@ -335,7 +369,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
           target,
           message,
           taggedSentiment,
-          this.currentTick,
+          this.getTick(),
         );
         if (result.success && result.conversation !== undefined) {
           // Spec 033 (R6/AC-7): the relationship delta is a pure deterministic
@@ -361,7 +395,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       this.socialBridge.updateRelationship(agentId, target, {
         familiarity: delta.familiarity,
         trust: delta.trust,
-        lastInteraction: this.currentTick,
+        lastInteraction: this.getTick(),
         // Spec 044 (R2/AC-7): the speaker's reciprocity counter toward the
         // target — an additive delta on the same bridge call (Decision 3).
         sentCount: 1,
@@ -369,7 +403,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       this.socialBridge.updateRelationship(target, agentId, {
         familiarity: delta.familiarity,
         trust: delta.trust,
-        lastInteraction: this.currentTick,
+        lastInteraction: this.getTick(),
         // Spec 044 (R2/AC-7): the target's received counter — exactly once
         // per exchange, next to the trust/familiarity delta.
         receivedCount: 1,
@@ -473,7 +507,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       const drives = this.socialBridge.getAgentDrives(target);
       this.socialBridge.updateRelationship(agentId, target, {
         familiarity: 1,
-        lastInteraction: this.currentTick,
+        lastInteraction: this.getTick(),
       });
       return {
         success: true,
@@ -515,12 +549,12 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       this.socialBridge.updateRelationship(agentId, target, {
         familiarity: 10,
         trust: 5,
-        lastInteraction: this.currentTick,
+        lastInteraction: this.getTick(),
       });
       this.socialBridge.updateRelationship(target, agentId, {
         familiarity: 10,
         trust: 5,
-        lastInteraction: this.currentTick,
+        lastInteraction: this.getTick(),
       });
       if (this.stateDataProvider !== undefined) {
         this.stateDataProvider.applyDriveChanges(agentId, { social: 15 });
@@ -577,7 +611,7 @@ export class CognitiveToolExecutorImpl implements CognitiveToolExecutor {
       this.socialBridge.updateRelationship(agentId, target, {
         familiarity: -2,
         trust: -1,
-        lastInteraction: this.currentTick,
+        lastInteraction: this.getTick(),
       });
       if (this.stateDataProvider !== undefined) {
         this.stateDataProvider.applyDriveChanges(agentId, { social: -5 });
