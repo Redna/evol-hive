@@ -232,7 +232,11 @@ function makeServiceProvider(opts: ServiceProviderOptions): PerceptionDataProvid
 }
 
 function makeClassifier(): AffordanceClassifier {
-  return { async prune(_drive, affordances) { return affordances; } } as AffordanceClassifier;
+  return {
+    async prune(_drive, affordances) {
+      return affordances;
+    },
+  } as AffordanceClassifier;
 }
 
 describe('spec 053 R1 — PerceptionServiceImpl population (AC-1, AC-9)', () => {

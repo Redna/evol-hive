@@ -360,8 +360,7 @@ export class ConversationManagerImpl implements ConversationBridge {
     // (derived read-only view, AC-9).
     const speakers = [...new Set(conversation.turns.map((t) => t.agentId))];
     const names = speakers.map((id) => this.agentManager.getProfile(id)?.name ?? id);
-    const speakerText =
-      names.length > 0 ? ` Speakers: ${names.join(', ')}.` : '';
+    const speakerText = names.length > 0 ? ` Speakers: ${names.join(', ')}.` : '';
     return {
       success: true,
       message: `Conversation about '${conversation.topic}' (${conversation.status}).${speakerText}`,

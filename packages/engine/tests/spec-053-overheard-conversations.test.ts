@@ -56,8 +56,14 @@ function buildWorld(): {
   const sceneManager = new SceneManagerImpl(
     agentManager,
     new Map([
-      [GARDEN, { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] }],
-      [KITCHEN, { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] }],
+      [
+        GARDEN,
+        { id: GARDEN, name: GARDEN, description: '', connections: [KITCHEN], objectIds: [] },
+      ],
+      [
+        KITCHEN,
+        { id: KITCHEN, name: KITCHEN, description: '', connections: [GARDEN], objectIds: [] },
+      ],
     ]),
   );
   const manager = new ConversationManagerImpl({
@@ -80,16 +86,12 @@ function buildWorld(): {
  */
 function seedConversation(
   world: ReturnType<typeof buildWorld>,
-  script: Array<[speaker: string, other: string, content: string, sentiment: ConversationSentiment]>,
+  script: Array<
+    [speaker: string, other: string, content: string, sentiment: ConversationSentiment]
+  >,
 ): string {
   const [first, ...rest] = script;
-  const opened = world.manager.openOrContribute(
-    first![0],
-    first![1],
-    first![2],
-    first![3],
-    100,
-  );
+  const opened = world.manager.openOrContribute(first![0], first![1], first![2], first![3], 100);
   expect(opened.success).toBe(true);
   const id = opened.conversationId!;
   let tick = 101;
@@ -136,9 +138,7 @@ describe('spec 053 R1 — passive overheard provider (AC-1)', () => {
   });
 
   it('an agent whose location is unknown receives nothing (no room, no overhearing)', () => {
-    seedConversation(world, [
-      ['agent-a', 'agent-b', 'hello', 'neutral'],
-    ]);
+    seedConversation(world, [['agent-a', 'agent-b', 'hello', 'neutral']]);
     const ghost = 'agent-ghost';
     world.agentManager.spawn(makeProfile(ghost, GARDEN));
     world.agentManager.updateState(ghost, { location: '' });
@@ -165,9 +165,7 @@ describe('spec 053 R4 — room-wall scope (AC-3)', () => {
   });
 
   it('the same conversation is absent from the result of an agent in a different room', () => {
-    seedConversation(world, [
-      ['agent-a', 'agent-b', 'garden things', 'neutral'],
-    ]);
+    seedConversation(world, [['agent-a', 'agent-b', 'garden things', 'neutral']]);
     world.agentManager.updateState('agent-c', { location: KITCHEN });
     expect(world.manager.getOverheardConversations('agent-c')).toHaveLength(0);
   });
@@ -208,17 +206,11 @@ describe('spec 053 R2 — bounded rolling scope (AC-4)', () => {
     expect(entry.availableLines).toBe(8);
     // Latest first: the window's three most recent turns, newest at the front.
     expect(entry.lines.map((l) => l.content)).toEqual(['turn-8', 'turn-7', 'turn-6']);
-    expect(entry.lines.map((l) => l.speakerId)).toEqual([
-      'agent-b',
-      'agent-a',
-      'agent-b',
-    ]);
+    expect(entry.lines.map((l) => l.speakerId)).toEqual(['agent-b', 'agent-a', 'agent-b']);
   });
 
   it('a conversation with 1 turn renders exactly 1 overheard line', () => {
-    seedConversation(world, [
-      ['agent-a', 'agent-b', 'only turn', 'neutral'],
-    ]);
+    seedConversation(world, [['agent-a', 'agent-b', 'only turn', 'neutral']]);
     const entry = world.manager.getOverheardConversations('agent-c')[0]!;
     expect(entry.lines).toHaveLength(1);
     expect(entry.availableLines).toBe(1);
@@ -309,9 +301,7 @@ describe('spec 053 R3 — observe returns the full rolling window (AC-2)', () =>
   });
 
   it('does NOT add the observer to participants; eligibility stays join/observe only', () => {
-    const id = seedConversation(world, [
-      ['agent-a', 'agent-b', 'hello', 'neutral'],
-    ]);
+    const id = seedConversation(world, [['agent-a', 'agent-b', 'hello', 'neutral']]);
     const before = world.manager.getConversation(id)!.participants.map((p) => p.agentId);
     world.manager.observe('agent-c', id);
     const after = world.manager.getConversation(id)!.participants.map((p) => p.agentId);
