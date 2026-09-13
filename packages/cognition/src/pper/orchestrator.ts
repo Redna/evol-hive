@@ -44,6 +44,7 @@ import {
   ReflectBuilderImpl,
 } from './index.js';
 import { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
+import { logOverheardDiagnostic } from './overheard-diagnostic.js';
 import { logTalkEnumDiagnostic } from './talk-enum.js';
 import { logDriveHintDiagnostic } from './drive-hint-diagnostic.js';
 import type { BatchPlanService } from './batch-plan-service.js';
@@ -192,6 +193,12 @@ export class PPEROrchestratorImpl {
         typeof provider.getCurrentTick === 'function' ? provider.getCurrentTick() : undefined;
       logSocialUrgeDiagnostic(agentId, perception, currentTick);
       logTalkEnumDiagnostic(agentId, perception);
+      // Spec 053 (R6 — issue #192): the per-cycle overheard diagnostic rides
+      // the same seam — one `[overheard]` line whenever the perception
+      // includes at least one overheard line; silence when nothing is
+      // overheard is itself meaningful. Zero LLM calls, wrapped so a logging
+      // failure can never break the cycle (spec 049 discipline).
+      logOverheardDiagnostic(agentId, perception, currentTick);
     } catch {
       // Diagnostics must never break a cycle (spec 049 Constraints).
     }

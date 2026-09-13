@@ -16,6 +16,7 @@ import type {
   ConversationObject,
   ConversationObserveResult,
   ConversationSentiment,
+  OverheardConversation,
 } from '@evol-hive/shared';
 import { isSocialTalkGapCapped } from '@evol-hive/shared';
 import type { AgentManager } from '../agents/index.js';
@@ -370,6 +371,16 @@ export class SocialManager implements SocialActionBridge, ConversationBridge {
   /** Conversations where the agent owes a reply (spec 044, Decision 4). */
   getConversationsAwaitingAgentReply(agentId: string): ConversationObject[] {
     return this.conversationManager?.getConversationsAwaitingAgentReply(agentId) ?? [];
+  }
+
+  /**
+   * Open/active conversations in the agent's room the agent does NOT
+   * participate in (spec 053, R1 — issue #192): the overheard-turn provider
+   * scan, delegated to the conversation manager. Empty when conversations
+   * are unavailable — no lines, no failure (influence, not force).
+   */
+  getOverheardConversations(agentId: string): OverheardConversation[] {
+    return this.conversationManager?.getOverheardConversations(agentId) ?? [];
   }
 }
 

@@ -325,7 +325,7 @@ describe('affordance eligibility (AC-2, R3)', () => {
     expect(outsiderEligible).toEqual(['join', 'observe']);
   });
 
-  it('join adds a co-located non-participant; observe returns topic + participants only', () => {
+  it('join adds a co-located non-participant; observe returns topic + participants + the full window (spec 053 R3 supersedes the 033 R3 privacy rule)', () => {
     const first = world.manager.openOrContribute(
       'agent-a',
       'agent-b',
@@ -338,8 +338,12 @@ describe('affordance eligibility (AC-2, R3)', () => {
     expect(observed.success).toBe(true);
     expect(observed.topic).toBe('roses');
     expect(observed.participants!.sort()).toEqual(['agent-a', 'agent-b']);
-    // non-participants do NOT see the full turn window (R3)
-    expect(observed).not.toHaveProperty('turns');
+    // Spec 053 (R3 — issue #192) supersedes the spec 033 R3 privacy rule:
+    // observation now carries the full rolling-window turn history (oldest
+    // first) — while still NOT adding the observer to participants.
+    expect(observed.turns).toEqual([
+      { agentId: 'agent-a', content: 'hi', sentiment: 'neutral', tick: 11 },
+    ]);
   });
 
   it('join is rejected for agents in other rooms (co-location rule)', () => {

@@ -28,7 +28,15 @@ Each requirement is tagged with the acceptance criterion (AC) that verifies it.
   - `contribute` — participants only; carries the message text plus an LLM-tagged `sentiment` (`positive` / `neutral` / `negative`);
   - `leave` — participants only;
   - `observe` — non-participants see `topic` + participants (not the full turn window).
-  
+
+  > **⚠️ SUPERSEDED (spec 053 — issue #192):** the R3 privacy rule — "non-participants
+  > see `topic` + participants, not turns" — is superseded by
+  > [053-conversation-overhearing.md](053-conversation-overhearing.md): a co-located
+  > non-participant now passively perceives the recent turns (bounded, latest-first) and
+  > `observe` returns the full rolling-window turn history. Observation is still not
+  > participation: the observer is never added to `participants`, and the affordance set
+  > and its eligibility rules are unchanged.
+
   `talk_to` maps to *open-or-contribute*: if the target agent shares an open conversation with the speaker, it contributes to that conversation; otherwise it opens one. (AC-1, AC-2, AC-3)
 - **R4 — State schema with a bounded rolling window.** Turns carry `{ agentId, role, content, sentiment, tick }`. Participants get derived roles (`initiator` / `active contributor` / `listener`, by turn count) and per-participant sentiment aggregates. The object stores only the **last ~8 turns**; full history exists only in close-time consolidation. No unbounded growth (same bug class as Redna/yaam#124). (AC-3, AC-6)
 - **R5 — Close-time consolidation.** When a conversation closes, each participant receives a structured `interaction` memory summarizing their derived role, the exchange, and the per-participant sentiment summary. (AC-4)

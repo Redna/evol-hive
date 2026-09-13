@@ -87,6 +87,16 @@ export interface ConversationObject {
 /** The rolling window cap (spec 033, R4 — "last ~8 turns"). */
 export const CONVERSATION_TURN_WINDOW = 8;
 
+/**
+ * Per-conversation per-cycle overheard render cap (spec 053, R2 — issue #192).
+ * Bounded prompt budget: a conversation whose rolling window holds more turns
+ * than this renders only its latest {@link CONVERSATION_OVERHEARD_LINES_PER_CYCLE}
+ * turns, latest first. Never exceeds {@link CONVERSATION_TURN_WINDOW} — the
+ * overheard scope is that already-bounded window (Redna/yaam#124 bug class:
+ * no new unbounded state).
+ */
+export const CONVERSATION_OVERHEARD_LINES_PER_CYCLE = 3;
+
 /** Configuration for the conversation lifecycle (spec 033, R2). */
 export interface ConversationConfig {
   /** Ticks of inactivity before an open/active conversation auto-closes. */
@@ -249,12 +259,73 @@ export interface ConversationActionResult {
   conversation?: ConversationObject;
 }
 
-/** Result of `observe` — non-participants see topic + participants, not turns (R3). */
+/** Result of `observe` — full rolling-window history since spec 053 (R3). */
 export interface ConversationObserveResult {
   success: boolean;
   message: string;
   topic?: string;
   participants?: string[];
+  /**
+   * The full rolling-window turn history (spec 053, R3): one entry per
+   * {@link ConversationTurn} in the bounded window, OLDEST first. A pure,
+   * derived read-only view — observing never adds the caller to
+   * `participants` and persists nothing (no `SAVE_FORMAT_VERSION` bump).
+   */
+  turns?: ObservedTurn[];
+}
+
+/** One rendered `observe` turn (spec 053, R3) — `ConversationTurn` minus the derived role. */
+export interface ObservedTurn {
+  /** The speaking agent. */
+  agentId: string;
+  /** The message text. */
+  content: string;
+  /** LLM-tagged sentiment of this turn (tagged at write time). */
+  sentiment: ConversationSentiment;
+  /** Engine tick at which the turn was appended. */
+  tick: number;
+}
+
+// ── Overheard perception (spec 053, R1 — issue #192) ───────────────────────
+
+/**
+ * One overheard line (spec 053, R1): a single recent turn of a conversation
+ * the perceiving agent co-locates with but does not participate in. Carries
+ * AGENT IDs — display-name resolution is a cognition-side rendering concern
+ * (spec 046 R4 pattern); the engine never renders names.
+ */
+export interface OverheardLine {
+  /** The agent speaking this turn. */
+  speakerId: string;
+  /**
+   * The agent the turn addresses: the nearest prior turn by a DIFFERENT
+   * speaker in the window, else the first participant other than the speaker
+   * (the opening turn addresses the conversation partner). Deterministic.
+   */
+  addresseeId: string;
+  /** The turn's message text. */
+  content: string;
+}
+
+/**
+ * A non-closed conversation the perceiving agent co-locates with but does not
+ * participate in (spec 053, R1). Derived at read time from the existing
+ * rolling window — nothing new is persisted (AC-9).
+ */
+export interface OverheardConversation {
+  conversationId: string;
+  /** LLM-derived topic (stable after open time, spec 033 R1). */
+  topic: string;
+  /**
+   * The conversation's recent turns, LATEST first (R2), capped at
+   * {@link CONVERSATION_OVERHEARD_LINES_PER_CYCLE}.
+   */
+  lines: OverheardLine[];
+  /**
+   * Turns the rolling window held at selection time (≥ `lines.length`) —
+   * the cap's evidence for the per-cycle `[overheard]` diagnostic (R6).
+   */
+  availableLines: number;
 }
 
 /**
@@ -303,4 +374,16 @@ export interface ConversationBridge {
    * keeps the decision (R5).
    */
   getConversationsAwaitingAgentReply(agentId: string): ConversationObject[];
+  /**
+   * Open/active conversations in this agent's room that the agent does NOT
+   * participate in (spec 053, R1 — issue #192): the co-location gate is the
+   * ONLY gate — no affordance, no classifier. Pure engine-side scan over the
+   * bounded rolling window, latest turns first, capped at
+   * {@link CONVERSATION_OVERHEARD_LINES_PER_CYCLE} per conversation. Room
+   * walls are the perception boundary (R4): agents in other rooms receive
+   * nothing. Optional — implementations without the overheard scan (legacy
+   * doubles) compile unchanged; the perception service treats it exactly
+   * like {@link getConversationsAwaitingAgentReply}.
+   */
+  getOverheardConversations?(agentId: string): OverheardConversation[];
 }

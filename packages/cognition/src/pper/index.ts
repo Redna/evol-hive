@@ -13,6 +13,7 @@ import type {
   PerceptionDataProvider,
   CompoundAction,
   ObjectDependency,
+  OverheardConversation,
   PendingAddressInfo,
   SocialUrgeAssessment,
 } from '@evol-hive/shared';
@@ -209,6 +210,9 @@ export class PerceptionServiceImpl {
     // rendered, no ranking shift) and never break the perceive path.
     let pendingAddresses: PendingAddressInfo[] | undefined;
     let socialUrges: SocialUrgeAssessment[] | undefined;
+    // Spec 053 (R1 — issue #192): the overheard-turn scan rides the same
+    // optional-provider extension pattern (mirrors the pending-address read).
+    let overheard: OverheardConversation[] | undefined;
     try {
       const provider = this.options.provider;
       // Spec 049 (R3): the current tick feeds BOTH the pending-address age
@@ -236,6 +240,13 @@ export class PerceptionServiceImpl {
             };
           });
         }
+      }
+
+      // Spec 053 (R1 — issue #192): the overheard-turn scan — co-location is
+      // the only gate; the provider returns the bounded latest-first lines.
+      if (typeof provider.getOverheardConversations === 'function') {
+        const scanned = provider.getOverheardConversations(agentId);
+        if (scanned.length > 0) overheard = scanned;
       }
 
       // R4b/R4c: per-present-agent urge assessment via the pure shared
@@ -283,6 +294,7 @@ export class PerceptionServiceImpl {
       // The urge path must never break perception (influence, not force).
       pendingAddresses = undefined;
       socialUrges = undefined;
+      overheard = undefined;
     }
 
     return {
@@ -298,6 +310,7 @@ export class PerceptionServiceImpl {
       ...(knownAreas !== undefined ? { knownAreas } : {}),
       ...(unexploredAreas !== undefined ? { unexploredAreas } : {}),
       ...(pendingAddresses !== undefined ? { pendingAddresses } : {}),
+      ...(overheard !== undefined ? { overheard } : {}),
       ...(socialUrges !== undefined ? { socialUrges } : {}),
     };
   }
@@ -335,6 +348,7 @@ export type { ReflectServiceOptions } from './reflect-service.js';
 export { PPEROrchestratorImpl, createPPEROrchestrator } from './orchestrator.js';
 export type { PPEROrchestratorOptions } from './orchestrator.js';
 export { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
+export { logOverheardDiagnostic } from './overheard-diagnostic.js';
 export { logDriveHintDiagnostic } from './drive-hint-diagnostic.js';
 export { classifySocialUrgeLine } from './perception-builder.js';
 export { computeTalkEnum, logTalkEnumDiagnostic } from './talk-enum.js';
