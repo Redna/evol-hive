@@ -82,8 +82,7 @@ describe('spec 055 Req 6: formulatePlanSchemaFor emits steps.maxItems = PLAN_MAX
 
   it('the factory emits steps.maxItems = 6 with no arguments beyond the enum', () => {
     const schema = formulatePlanSchemaFor(['water_plants', 'harvest']) as Record<string, unknown>;
-    const steps = (schema as { properties: { steps: Record<string, unknown> } }).properties
-      .steps;
+    const steps = (schema as { properties: { steps: Record<string, unknown> } }).properties.steps;
     expect(steps['maxItems']).toBe(6);
   });
 

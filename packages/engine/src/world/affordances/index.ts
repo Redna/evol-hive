@@ -98,6 +98,16 @@ export class AffordanceRegistryImpl implements AffordanceRegistry {
     return this.handlers.get(affordanceId) ?? null;
   }
 
+  /**
+   * Every registered affordance-handler id, sorted (spec 055, Req 3 — issue
+   * #198). The phantom-affordance audit reads the REAL registry — the same
+   * source physics dispatches through — instead of recomputing registration
+   * from plugin/scene sources.
+   */
+  getRegisteredHandlerIds(): string[] {
+    return [...this.handlers.keys()].sort();
+  }
+
   /** Register a precondition checker keyed by its name (e.g., `"has_water"`). */
   registerPreconditionChecker(name: string, checker: PreconditionChecker): void {
     this.preconditionCheckers.set(name, checker);

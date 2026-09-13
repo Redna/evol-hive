@@ -58,6 +58,7 @@ function makeConfig(): import('@evol-hive/shared').EngineConfig {
     spatialDebounceSeconds: 5,
     maxConcurrentLLM: 8,
     guardrailsEnabled: false,
+    guardrails: { affordanceMasking: false, contextualForcing: false, planValidation: false },
   };
 }
 
@@ -215,7 +216,11 @@ describe('spec 055 Req 2 / AC-2: water-butt-1 refill closes the loop', () => {
     });
     // Through the REAL physics execution path — the patch lands via
     // SmartObjectRegistry.applyStatePatch (spec 018, Req 9 mechanics).
-    const result = await core.physics.executeAffordance('water-butt-1', 'fill_watering_can', GARDENER);
+    const result = await core.physics.executeAffordance(
+      'water-butt-1',
+      'fill_watering_can',
+      GARDENER,
+    );
     expect(result.success).toBe(true);
     expect(core.smartObjectRegistry.get('planter-1')!.state['water_level']).toBe(5);
   });
@@ -273,15 +278,16 @@ class WaterCycleLLM implements LLMClient {
   }
 }
 
+/** Pass-through classifier stub (deterministic, no embeddings). */
+const classifier = {
+  prune: async (_q: string, affordances: import('@evol-hive/shared').Affordance[]) => affordances,
+} as unknown as AffordanceClassifier;
+
 describe('spec 055 Req 4: the engine stamps lastPlanOutcome through the real stack', () => {
   async function runFullCycle(
     core: EngineCore,
     planResult: FormulatePlanResult,
   ): Promise<PerceptionResult> {
-    const classifier = {
-      prune: async (_q: string, affordances: import('@evol-hive/shared').Affordance[]) =>
-        affordances,
-    } as unknown as AffordanceClassifier;
     const llm = new WaterCycleLLM(planResult);
 
     const perception = await new PerceptionServiceImpl({
@@ -330,10 +336,6 @@ describe('spec 055 Req 4: the engine stamps lastPlanOutcome through the real sta
     expect(core.bridges.perception.getLastPlanOutcome!(GARDENER)).toBeDefined();
 
     // The next cycle's plan context carries the last-plan line (Req 4 seam).
-    const classifier = {
-      prune: async (_q: string, affordances: import('@evol-hive/shared').Affordance[]) =>
-        affordances,
-    } as unknown as AffordanceClassifier;
     const perception = await new PerceptionServiceImpl({
       provider: core.bridges.perception,
       classifier,
@@ -344,24 +346,45 @@ describe('spec 055 Req 4: the engine stamps lastPlanOutcome through the real sta
     expect(payload.perceptionContext).toContain('(curiosity +10, comfort +5)');
   });
 
-  it('a depleted reservoir drives the NEXT plan context to the refill chain (self-visibility)', async () => {
+  it('the depleted reservoir + self-visibility drive the NEXT plan context to the refill chain', async () => {
     const core = wireCore();
+    // Cycle 1: a successful watering — the stamp records success + deltas and
+    // the reservoir drops 5 → 4 (Req 1 depletion + Req 4 stamping).
+    const perception1 = await runFullCycle(core, {
+      description: 'Water the plants',
+      steps: [{ description: 'Water the plants', targetAffordance: 'water_plants' }],
+    });
+    const outcome = core.agentManager.getState(GARDENER)!.lastPlanOutcome;
+    expect(outcome!.success).toBe(true);
+    expect(outcome!.reflected).toBe(true);
+    expect(core.smartObjectRegistry.get('planter-1')!.state['water_level']).toBe(4);
+
+    // Drain the reservoir completely — the world now says NO: the affordance
+    // left the available set (Req 1 saturation, perception-time gating).
     core.smartObjectRegistry.updateState('planter-1', {
       water_level: 0,
       seeds_planted: 0,
       vegetables: 0,
     });
-    // A water_plants plan against an empty reservoir: execution fails, the
-    // stamp records the failure — the agent sees its failed plan next cycle.
-    await runFullCycle(core, {
-      description: 'Water the plants',
-      steps: [{ description: 'Water the plants', targetAffordance: 'water_plants' }],
-    });
-    const outcome = core.agentManager.getState(GARDENER)!.lastPlanOutcome;
-    expect(outcome!.success).toBe(false);
-    expect(outcome!.reflected).toBe(true);
-
-    // The affordance left the enum (saturation), so the replan cannot bind it.
     expect(availableInGarden(core)).not.toContain('water_plants');
+
+    // The NEXT cycle's perception still carries the last plan + outcome
+    // (Req 4 self-visibility): the agent sees what it just did while the
+    // enum refuses the exhausted action — the plan context steers toward the
+    // refill chain (fill_watering_can stays available; it is an unbounded
+    // source, Req 2).
+    const perception2 = await new PerceptionServiceImpl({
+      provider: core.bridges.perception,
+      classifier,
+    }).perceive(GARDENER);
+    expect(perception2.lastPlanOutcome).toEqual(outcome);
+    expect(perception1.lastPlanOutcome).toBeUndefined(); // cycle 1 predates the stamp
+    const payload = new PlanBuilderImpl().build(perception2);
+    expect(payload.perceptionContext).toContain('Your last plan was "water_plants" — it succeeded');
+    // The enum the LLM plans over excludes the saturated affordance…
+    const enumIds = payload.availableAffordances.map((a) => a.id);
+    expect(enumIds).not.toContain('water_plants');
+    // …but keeps the refill path available (the loop is closable).
+    expect(enumIds).toContain('fill_watering_can');
   });
 });

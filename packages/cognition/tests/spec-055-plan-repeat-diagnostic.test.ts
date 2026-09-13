@@ -214,7 +214,9 @@ describe('spec 055 Req 7: plan fingerprint', () => {
   });
 
   it('separates identical step sets with different descriptions', () => {
-    expect(planFingerprint(WATER_PLAN)).not.toBe(planFingerprint({ ...WATER_PLAN, description: 'x' }));
+    expect(planFingerprint(WATER_PLAN)).not.toBe(
+      planFingerprint({ ...WATER_PLAN, description: 'x' }),
+    );
   });
 
   it('falls back to the step description when no targetAffordance is bound', () => {
@@ -336,8 +338,13 @@ describe('spec 055 Req 7 / AC-7: the orchestrator emits [plan-repeat] per cycle'
   it('a diagnostic failure cannot break the cycle (AC-7 resilience)', async () => {
     const state = makeState();
     const orchestrator = makeOrchestrator(state, ScriptedPlanLLM.looping(WATER_PLAN));
-    vi.mocked(console.error).mockImplementation(() => {
-      throw new Error('logging blew up');
+    // A logging failure on the [plan-repeat] emission itself must not break
+    // the cycle — other stderr lines ([plan-bind], [plan-create]) stay inert
+    // so the cycle reaches its normal phases.
+    vi.mocked(console.error).mockImplementation((...args: unknown[]) => {
+      if (args.some((a) => String(a).includes('[plan-repeat]'))) {
+        throw new Error('logging blew up');
+      }
     });
     await expect(orchestrator.runCycle('a1')).resolves.toEqual({
       appliedDriveChanges: true,
@@ -345,8 +352,9 @@ describe('spec 055 Req 7 / AC-7: the orchestrator emits [plan-repeat] per cycle'
     await expect(orchestrator.runCycle('a1')).resolves.toEqual({
       appliedDriveChanges: true,
     });
-    // The cycle still formulated, executed, and reflected — the plan is stored.
-    expect(state.currentPlan).toBeNull(); // cleared by reflect after completion
+    // The cycle still formulated, executed, and reflected — the plan is stored
+    // and cleared by reflect after completion.
+    expect(state.currentPlan).toBeNull();
   });
 });
 

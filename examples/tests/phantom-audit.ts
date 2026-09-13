@@ -40,9 +40,15 @@ export const GO_TO_PATTERN = /^go_to_.+$/;
 export const STATELESS_BY_DESIGN: ReadonlyMap<string, string> = new Map([
   // Coffee-shop / greenhouse "the shelf is full of herbs" — bounded by fiction
   // (spec 052 validated the greenhouse restoration path over these).
-  ['pick_herbs', 'the seed shelf is described as full of herbs — picking consumes no modeled resource'],
+  [
+    'pick_herbs',
+    'the seed shelf is described as full of herbs — picking consumes no modeled resource',
+  ],
   ['eat_herbs', 'herbs are unmodeled fiction (the shelf never empties) — drive-only hunger +20'],
-  ['rest_among_seedlings', 'resting among the potting-table seedlings consumes nothing — energy/comfort only'],
+  [
+    'rest_among_seedlings',
+    'resting among the potting-table seedlings consumes nothing — energy/comfort only',
+  ],
   ['repot_seedlings', 'potting supplies are unmodeled — drive-only curiosity/comfort'],
   // Observation / rest / movement — no resource anywhere.
   ['observe', 'pure perception — no state, no drives'],
@@ -59,7 +65,10 @@ export const STATELESS_BY_DESIGN: ReadonlyMap<string, string> = new Map([
   ['take_tool', 'records tool attribution (taken_by) — the toolbox never empties'],
   ['work', 'increments a tasks_completed counter — energy-negative, consumes nothing'],
   ['build_planter', 'increments a planters_built counter — consumes no modeled material'],
-  ['plant_seeds', 'increments the seeds_planted growth counter (gates harvest) — plants no depletable resource'],
+  [
+    'plant_seeds',
+    'increments the seeds_planted growth counter (gates harvest) — plants no depletable resource',
+  ],
   ['brainstorm', 'increments an ideas_generated counter — drive-only'],
   ['small_talk', 'drive-only social/energy — consumes nothing'],
   ['hold_meeting', 'increments a meetings_held counter — drive-only'],
@@ -70,7 +79,46 @@ export const STATELESS_BY_DESIGN: ReadonlyMap<string, string> = new Map([
   ['carry', 'moves a portable object between rooms via the mutation service — no resource'],
   // Spec 055: the rain barrel is an UNBOUNDED SOURCE by design (Architect
   // Decision 2) — saturation lives at the planter; the source depletes nothing.
-  ['fill_watering_can', 'refills the planter reservoir via crossObjectStateChanges — the barrel is an unbounded source (not a sink)'],
+  [
+    'fill_watering_can',
+    'refills the planter reservoir via crossObjectStateChanges — the barrel is an unbounded source (not a sink)',
+  ],
+  // Spec 033 conversation affordances: the ASSEMBLER registers these handlers
+  // (engine/assembly.ts) and the declaring objects are DYNAMICALLY SPAWNED
+  // ConversationObjects at runtime — static scenes never declare them, and
+  // they consume no resource (the conversation lifecycle is not an economy).
+  [
+    'conversation_join',
+    'declared by dynamically-spawned ConversationObjects (spec 033, R3) — social +5 only, no resource',
+  ],
+  [
+    'conversation_leave',
+    'declared by dynamically-spawned ConversationObjects (spec 033, R3) — no drive changes, no resource',
+  ],
+  [
+    'conversation_observe',
+    'declared by dynamically-spawned ConversationObjects (spec 033, R3) — read-only observation, no resource',
+  ],
+  [
+    'conversation_contribute',
+    'declared by dynamically-spawned ConversationObjects (spec 033, R3) — args-free guidance stub, no resource',
+  ],
+]);
+
+/**
+ * Affordances the ENGINE declares at runtime — the spec-033 conversation
+ * family: the assembler registers the handlers and dynamically-spawned
+ * `ConversationObject`s declare the affordances, so no STATIC scene lists
+ * them. The audit counts these as declared (checks 1 and 4) while the
+ * stateless accounting (check 3) still requires their allowlist entry. Any
+ * NEW runtime-declared handler must be added here with a justification —
+ * an unlisted id fails the audit exactly like a static phantom.
+ */
+export const DYNAMICALLY_DECLARED: ReadonlyMap<string, string> = new Map([
+  ['conversation_join', 'ConversationObject affordance (spec 033, R3) — spawned at runtime'],
+  ['conversation_leave', 'ConversationObject affordance (spec 033, R3) — spawned at runtime'],
+  ['conversation_observe', 'ConversationObject affordance (spec 033, R3) — spawned at runtime'],
+  ['conversation_contribute', 'ConversationObject affordance (spec 033, R3) — spawned at runtime'],
 ]);
 
 /** A violation reported by the audit. */
@@ -135,7 +183,7 @@ export function auditScenes(input: AuditInput): AuditViolation[] {
     for (const id of ids) allHandlerIds.add(id);
   }
   for (const handlerId of [...allHandlerIds].sort()) {
-    if (!declared.has(handlerId)) {
+    if (!declared.has(handlerId) && !DYNAMICALLY_DECLARED.has(handlerId)) {
       violations.push({
         kind: 'phantom-handler',
         detail: `handler '${handlerId}' is registered but declared by no scene object`,
@@ -180,7 +228,7 @@ export function auditScenes(input: AuditInput): AuditViolation[] {
   // The `go_to_*` pattern entry documents the movement family — not a literal id.
   for (const handlerId of STATELESS_BY_DESIGN.keys()) {
     if (GO_TO_PATTERN.test(handlerId)) continue;
-    if (!declared.has(handlerId)) {
+    if (!declared.has(handlerId) && !DYNAMICALLY_DECLARED.has(handlerId)) {
       violations.push({
         kind: 'stale-allowlist',
         detail: `STATELESS_BY_DESIGN entry '${handlerId}' is declared by no scene object — remove the stale entry`,

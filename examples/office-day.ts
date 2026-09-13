@@ -22,7 +22,7 @@ import type {
   LLMActionResponse,
   ReflectionResult,
 } from '@evol-hive/shared';
-import type { LLMClient } from '@evol-hive/cognition';
+import type { LLMClient, LLMContextPayload } from '@evol-hive/cognition';
 import { loadScene } from '@evol-hive/engine';
 import type { AssembledEngine } from '@evol-hive/engine';
 import { registerAffordanceHandlers } from './scene-helpers.ts';
@@ -327,6 +327,8 @@ export function buildOfficeDayEngine(): AssembledEngine {
 
   const core = world.core;
 
+  // The full AssembledEngine surface (spec 033/050 fields included) — the
+  // assembler owns every wire; this is a projection of `world`.
   return {
     gameLoop: world.gameLoop,
     agentManager: core.agentManager,
@@ -335,7 +337,11 @@ export function buildOfficeDayEngine(): AssembledEngine {
     affordanceRegistry: core.affordanceRegistry,
     bridges: core.bridges,
     socialManager: core.socialManager,
-    vectorStore: world.memory!.vectorStore,
+    conversationManager: core.conversationManager,
+    selfModelManager: core.selfModelManager,
+    mutationService: core.mutationService,
+    dormantStore: core.dormantStore,
+    yaamEventLog: core.yaamEventLog,
   };
 }
 

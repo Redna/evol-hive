@@ -40,6 +40,31 @@ export interface PlanStep {
   targetArea?: string;
 }
 
+/**
+ * The outcome of the agent's most recently completed-or-failed plan
+ * (spec 055, Req 4 — issue #198). Stamped by the engine's PPER data layer at
+ * the moment the data exists (the Reflect phase) and surfaced into the NEXT
+ * cycle's plan context as dynamic-section lines — the agent's plan
+ * self-visibility, the structural defense against the #191 356× identical
+ * -plan signature.
+ */
+export interface LastPlanOutcome {
+  /** The formulated plan's description. */
+  planDescription: string;
+  /**
+   * Per-step rendered identity, in plan order: the step's `targetAffordance`
+   * when bound, else its description — the exact strings the plan-context
+   * line renders (e.g. `["go_to_greenhouse", "water_plants"]`).
+   */
+  steps: string[];
+  /** Whether the plan's final cycle executed successfully. */
+  success: boolean;
+  /** The drive deltas the plan's final execution applied (omitted when none). */
+  driveChanges?: Record<string, number>;
+  /** `true` when the Reflect phase wrote a memory node for the outcome. */
+  reflected: boolean;
+}
+
 /** The full internal state of an agent at any point in time. */
 export interface AgentInternalState {
   agentId: string;
@@ -109,6 +134,15 @@ export interface AgentInternalState {
     /** Cells explored per room ("x,y" keys) — cell-level fog (visualizer shading). */
     exploredCells?: Record<string, string[]>;
   };
+  /**
+   * The outcome of the agent's most recently completed-or-failed plan
+   * (spec 055, Req 4 — issue #198). Stamped by the engine's PPER data layer
+   * via `ReflectDataProvider.stampLastPlanOutcome`; read back by
+   * `PerceptionDataProvider.getLastPlanOutcome` for the plan prompt.
+   * `undefined` for legacy saves and agents that have never completed a
+   * plan — the plan context then renders no last-plan lines.
+   */
+  lastPlanOutcome?: LastPlanOutcome;
 }
 
 /**

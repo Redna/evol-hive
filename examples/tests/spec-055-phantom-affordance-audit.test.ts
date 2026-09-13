@@ -50,11 +50,7 @@ import { MORNING_ROUTINE_SCENE } from '../morning-routine.ts';
 import { OFFICE_DAY_SCENE } from '../office-day.ts';
 import { MINIMAL_SCENE, buildMinimalEngine } from '../minimal-scene.ts';
 import { registerAffordanceHandlers, registerCoffeeShopHandlers } from '../scene-helpers.ts';
-import {
-  auditScenes,
-  STATELESS_BY_DESIGN,
-  type AuditViolation,
-} from './phantom-audit.ts';
+import { auditScenes, STATELESS_BY_DESIGN, type AuditViolation } from './phantom-audit.ts';
 
 // ── Production wiring per exported scene ─────────────────────────────────────
 
@@ -76,6 +72,7 @@ function productionHandlerIds(scene: SceneDefinition): string[] {
     spatialDebounceSeconds: 5,
     maxConcurrentLLM: 8,
     guardrailsEnabled: false,
+    guardrails: { affordanceMasking: false, contextualForcing: false, planValidation: false },
   });
   loadScene(core, scene);
 
@@ -109,7 +106,13 @@ function productionHandlerIds(scene: SceneDefinition): string[] {
 
 /** Every exported example scene (the audit's population). */
 function allScenes(): SceneDefinition[] {
-  return [DYNAMIC_WORLD_SCENE, COFFEE_SHOP_SCENE, MORNING_ROUTINE_SCENE, OFFICE_DAY_SCENE, MINIMAL_SCENE];
+  return [
+    DYNAMIC_WORLD_SCENE,
+    COFFEE_SHOP_SCENE,
+    MORNING_ROUTINE_SCENE,
+    OFFICE_DAY_SCENE,
+    MINIMAL_SCENE,
+  ];
 }
 
 beforeEach(() => {
@@ -135,7 +138,13 @@ afterEach(() => {
 describe('spec 055 Req 3 / AC-3: the phantom-affordance audit passes over all exported scenes', () => {
   it('the audit population covers every exported example scene', () => {
     const ids = allScenes().map((s) => s.id);
-    expect(ids).toEqual(['dynamic-world', 'coffee-shop', 'morning-routine', 'office-day', 'minimal']);
+    expect(ids).toEqual([
+      'dynamic-world',
+      'coffee-shop',
+      'morning-routine',
+      'office-day',
+      'minimal',
+    ]);
   });
 
   it('each scene wiring registers handlers from the REAL registry', () => {
@@ -179,7 +188,15 @@ describe('spec 055 Req 3 / AC-3: the audit fails on injected phantoms (fixture t
     return {
       id: 'fixture',
       name: 'Fixture',
-      rooms: [{ id: 'room', name: 'Room', description: '', connections: [], objectIds: objects.map((o) => o.id) }],
+      rooms: [
+        {
+          id: 'room',
+          name: 'Room',
+          description: '',
+          connections: [],
+          objectIds: objects.map((o) => o.id),
+        },
+      ],
       objects,
       agents: [],
     };
@@ -338,9 +355,7 @@ describe('spec 055 Req 3 / AC-3: the audit fails on injected phantoms (fixture t
     // No stateless-unaccounted violation: the water_level condition gates it.
     // (Stale-allowlist violations are expected — the fixture lacks the other
     // allowlisted ids — so filter them out for this assertion.)
-    const kinds = violations
-      .filter((v) => v.kind !== 'stale-allowlist')
-      .map((v) => v.kind);
+    const kinds = violations.filter((v) => v.kind !== 'stale-allowlist').map((v) => v.kind);
     expect(kinds).toEqual([]);
   });
 });

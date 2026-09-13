@@ -55,9 +55,7 @@ function successExecute(driveChanges?: Record<string, number>): ExecuteResult {
   return {
     success: true,
     planComplete: true,
-    ...(driveChanges !== undefined
-      ? { result: { success: true, driveChanges } }
-      : {}),
+    ...(driveChanges !== undefined ? { result: { success: true, driveChanges } } : {}),
   };
 }
 

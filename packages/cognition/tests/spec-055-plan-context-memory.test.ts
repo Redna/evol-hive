@@ -82,7 +82,8 @@ const GOLDEN_CONTEXT_NO_RECORD =
   'Objects: Planter\n' +
   '---\n' +
   'Primary drive: low curiosity, need to restore curiosity\n' +
-  'Drives: energy=45, hunger=50, social=50, comfort=50, curiosity=60';
+  'Drives: energy=45, hunger=50, social=50, comfort=50, curiosity=60\n' +
+  'Horizon: your plan may chain several steps toward what you intend over the coming hours — e.g. a morning of watering, harvesting and trading, an afternoon of rest and talk. This is framing, not a schedule: the choice stays yours.';
 
 const builder = new PlanBuilderImpl();
 
@@ -141,9 +142,18 @@ describe('spec 055 Req 4 / AC-4: last plan + outcome in the plan context', () =>
     expect(stable).toBe(GOLDEN_CONTEXT_NO_RECORD.split('\n---\n')[0]);
   });
 
-  it('with no record the payload is byte-identical to the pre-change builder', () => {
+  it('with no record the payload carries NO last-plan lines (additive-optional discipline)', () => {
     const payload = builder.build(makePerception());
+    // AC-4's byte-identity claim applies to the lastPlanOutcome FEATURE: with
+    // no record, no last-plan/reflection lines render — the payload is
+    // otherwise exactly the golden (which includes the always-on Req-5
+    // horizon directive, a separate dynamic-section feature whose presence
+    // every cycle is KV-cache-safe by construction — identical line every
+    // tick, stable prefix untouched). The system prompt (no persona) IS
+    // byte-identical to pre-change.
     expect(payload.perceptionContext).toBe(GOLDEN_CONTEXT_NO_RECORD);
+    expect(payload.perceptionContext).not.toContain('Your last plan was');
+    expect(payload.perceptionContext).not.toContain('reflected on that plan');
     expect(payload.systemPrompt).toBe(GOLDEN_SYSTEM_PROMPT_NO_PERSONA);
   });
 
