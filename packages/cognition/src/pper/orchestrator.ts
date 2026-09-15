@@ -48,6 +48,7 @@ import { logOverheardDiagnostic } from './overheard-diagnostic.js';
 import { logTalkEnumDiagnostic } from './talk-enum.js';
 import { logDriveHintDiagnostic } from './drive-hint-diagnostic.js';
 import { logPlanEnumDiagnostic } from './plan-enum-diagnostic.js';
+import { logReflectOutcome } from './execute-diagnostic.js';
 import { PlanRepeatTracker } from './plan-repeat-diagnostic.js';
 import type { BatchPlanService } from './batch-plan-service.js';
 
@@ -283,6 +284,7 @@ export class PPEROrchestratorImpl {
       if (execute.deviationRejected === true) {
         this.setPhase(agentId, 'reflect');
         const reflect: ReflectResult = await this.reflectService.reflect(agentId, execute);
+        logReflectOutcome(agentId, reflect.success, reflect.error, reflect);
         if (!reflect.success) {
           // Reflect failure on a deviation is still not counted as a cycle
           // failure — the deviation itself is a recovery path, not an error.
@@ -304,6 +306,12 @@ export class PPEROrchestratorImpl {
     // (4) Reflect — LLM reflects, updates state/memory.
     this.setPhase(agentId, 'reflect');
     const reflect: ReflectResult = await this.reflectService.reflect(agentId, execute);
+    // Spec 058 follow-up (issue #206 stall): one line per Reflect call — the
+    // phase that clears a completed plan only on success. A failing reflect
+    // therefore leaves an uncleared complete plan, whose next Execute returns
+    // the silent `planComplete: true`; this line is what makes that loop
+    // visible (zero LLM, pure strings, spec-049 discipline).
+    logReflectOutcome(agentId, reflect.success, reflect.error, reflect);
     if (!reflect.success) {
       this.recordFailure(agentId, reflect.error);
       this.setPhase(agentId, 'perceive');

@@ -26,6 +26,7 @@ import type {
   AffordanceGuard,
 } from '@evol-hive/shared';
 import { WAIT_AFFORDANCE } from '@evol-hive/shared';
+import { logExecuteOutcome } from './execute-diagnostic.js';
 import type { GuardrailEngine } from '../index.js';
 
 /** Constructor options for {@link ExecuteServiceImpl}. */
@@ -70,7 +71,24 @@ export class ExecuteServiceImpl {
 
   constructor(private readonly options: ExecuteServiceOptions) {}
 
+  /**
+   * Spec 058 follow-up (issue #206 stall): the public seam wraps the phase so
+   * EVERY outcome — including the silent ones (`planComplete` on an
+   * uncleared plan, `navigating`, a first-offence failure) — emits one
+   * `[execute]` line. Diagnostic-only: the wrapped result is returned
+   * untouched.
+   */
   async execute(agentId: string): Promise<ExecuteResult> {
+    const result = await this.executeImpl(agentId);
+    logExecuteOutcome(
+      agentId,
+      this.options.dataProvider.getAgentState(agentId)?.currentPlan ?? null,
+      result,
+    );
+    return result;
+  }
+
+  private async executeImpl(agentId: string): Promise<ExecuteResult> {
     const { dataProvider } = this.options;
 
     try {

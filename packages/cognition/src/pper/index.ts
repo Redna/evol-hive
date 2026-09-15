@@ -367,6 +367,13 @@ export { logOverheardDiagnostic } from './overheard-diagnostic.js';
 export { logDriveHintDiagnostic } from './drive-hint-diagnostic.js';
 export { logPlanEnumDiagnostic } from './plan-enum-diagnostic.js';
 export {
+  executeDiagnosticLine,
+  executeOutcome,
+  logExecuteOutcome,
+  logReflectOutcome,
+  reflectDiagnosticLine,
+} from './execute-diagnostic.js';
+export {
   PlanRepeatTracker,
   planFingerprint,
   hashPlanDescription,
