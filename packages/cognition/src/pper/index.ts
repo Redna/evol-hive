@@ -348,8 +348,21 @@ export type {
   DriveAffordanceRef,
   DriveAffordanceMatch,
 } from './drive-affordance-matcher.js';
-export { PlanServiceImpl } from './plan-service.js';
-export type { PlanServiceOptions } from './plan-service.js';
+export {
+  PlanServiceImpl,
+  choosePlanFloorTarget,
+  planFloorAfterFailures,
+  DEFAULT_PLAN_FLOOR_AFTER_FAILURES,
+} from './plan-service.js';
+export type { PlanServiceOptions, PlanBindingVerdict } from './plan-service.js';
+export {
+  estimatePlanPrompt,
+  logPlanPrompt,
+  logPlanInvalid,
+  logPlanRepair,
+  logPlanFloor,
+} from './plan-shape-diagnostic.js';
+export type { PlanPromptInput, PlanPromptSize } from './plan-shape-diagnostic.js';
 export { ExecuteServiceImpl } from './execute-service.js';
 export type { ExecuteServiceOptions } from './execute-service.js';
 export { ReflectBuilderImpl } from './reflect-builder.js';

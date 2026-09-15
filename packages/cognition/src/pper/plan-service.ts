@@ -13,16 +13,75 @@
  */
 
 import type {
+  Affordance,
   PerceptionResult,
   PlanResult,
   PlanDataProvider,
   FormulatePlanResult,
+  PlanShapeReason,
 } from '@evol-hive/shared';
-import { WAIT_AFFORDANCE, defaultPlanMaxSteps } from '@evol-hive/shared';
+import { WAIT_AFFORDANCE, classifyPlanShape, defaultPlanMaxSteps } from '@evol-hive/shared';
 import type { LLMClient, PlanBuilder, GuardrailEngine, LLMContextPayload } from '../index.js';
 import { LLMResponseError } from '../llm/index.js';
-import { checkWaitSuppression } from '../guardrails/wait-guard.js';
+import { checkWaitSuppression, DRIVE_CRITICAL_THRESHOLD } from '../guardrails/wait-guard.js';
+import { HINTABLE_DRIVES } from './drive-affordance-matcher.js';
 import { logPlanMemory } from './plan-memory-diagnostic.js';
+import { estimatePlanPrompt, logPlanFloor, logPlanInvalid } from './plan-shape-diagnostic.js';
+
+/** Default consecutive-failure threshold before the fallback floor engages (spec 060, R4). */
+export const DEFAULT_PLAN_FLOOR_AFTER_FAILURES = 3;
+
+/**
+ * The effective fallback-floor threshold (spec 060, R4): the
+ * `PLAN_FLOOR_AFTER_FAILURES` env var overrides the default at call time.
+ * `0` disables the floor; non-numeric or negative values fall back to the
+ * default (the cap is always a legal non-negative integer).
+ */
+export function planFloorAfterFailures(): number {
+  const raw = process.env['PLAN_FLOOR_AFTER_FAILURES'];
+  if (raw === undefined || raw.length === 0) return DEFAULT_PLAN_FLOOR_AFTER_FAILURES;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_PLAN_FLOOR_AFTER_FAILURES;
+  return Math.floor(parsed);
+}
+
+const FLOOR_PLAN_DESCRIPTION = 'Take stock of the room';
+
+/**
+ * Choose the binding for the fallback floor (spec 060, R4), in the order
+ * `observe` → a direct restorer for a critical drive → `wait`. The `wait`
+ * branch consults the SAME predicate as the spec-052 plan-level wait guard
+ * ({@link checkWaitSuppression}), so a floor plan is never an all-`wait` plan
+ * the guard would reject on the very next line. Returns `null` when no binding
+ * survives; the caller then keeps the honest formation failure and does not
+ * reset its counter.
+ */
+export function choosePlanFloorTarget(
+  drives: Record<string, number>,
+  availableAffordances: readonly Affordance[],
+  waitSuppression?: boolean,
+): string | null {
+  if (availableAffordances.some((a) => a.id === 'observe')) {
+    return 'observe';
+  }
+  for (const drive of HINTABLE_DRIVES) {
+    const value = drives[drive];
+    if (value === undefined || !(value < DRIVE_CRITICAL_THRESHOLD)) continue;
+    const restorer = availableAffordances.find((a) => {
+      const delta = a.effects?.[drive];
+      return delta !== undefined && delta > 0;
+    });
+    if (restorer !== undefined) return restorer.id;
+  }
+  const waitPlan: FormulatePlanResult = {
+    description: FLOOR_PLAN_DESCRIPTION,
+    steps: [{ description: FLOOR_PLAN_DESCRIPTION, targetAffordance: WAIT_AFFORDANCE }],
+  };
+  if (!checkWaitSuppression(drives, availableAffordances, waitPlan, waitSuppression).rejected) {
+    return WAIT_AFFORDANCE;
+  }
+  return null;
+}
 
 /** Constructor options for {@link PlanServiceImpl}. */
 export interface PlanServiceOptions {
@@ -35,7 +94,88 @@ export interface PlanServiceOptions {
 
 /** Concrete PlanService that orchestrates plan formulation via the LLM. */
 export class PlanServiceImpl {
+  /** Consecutive shape/binding formation failures per agent (spec 060, R4). */
+  private readonly planFailureCounts = new Map<string, number>();
+
   constructor(private readonly options: PlanServiceOptions) {}
+
+  /**
+   * Record a formation failure and, once the agent has failed
+   * `PLAN_FLOOR_AFTER_FAILURES` consecutive times, try to store a trivially
+   * valid floor plan (spec 060, R4). A stored floor resets the counter; an
+   * honest failure (no binding survives) leaves it unreset.
+   */
+  private failFormation(
+    agentId: string,
+    error: string,
+    perceptionResult: PerceptionResult,
+    payload: LLMContextPayload | undefined,
+  ): PlanResult {
+    const count = (this.planFailureCounts.get(agentId) ?? 0) + 1;
+    this.planFailureCounts.set(agentId, count);
+    const threshold = planFloorAfterFailures();
+    if (threshold > 0 && count >= threshold && payload !== undefined) {
+      const floored = this.tryStoreFloor(agentId, perceptionResult, payload, count);
+      if (floored !== null) return floored;
+    }
+    return { success: false, error };
+  }
+
+  /**
+   * Synthesize and store the fallback floor plan (spec 060, R4). Returns
+   * `null` (without touching the counter) when no binding survives the
+   * `observe` → critical-drive restorer → `wait` order, so the cycle stays an
+   * honest formation failure.
+   */
+  private tryStoreFloor(
+    agentId: string,
+    perceptionResult: PerceptionResult,
+    payload: LLMContextPayload,
+    failures: number,
+  ): PlanResult | null {
+    const waitSuppression = this.options.guardrail?.config.waitSuppression;
+    const target = choosePlanFloorTarget(
+      perceptionResult.passive.drives,
+      payload.availableAffordances,
+      waitSuppression,
+    );
+    if (target === null) return null;
+
+    const floorResult: FormulatePlanResult = {
+      description: FLOOR_PLAN_DESCRIPTION,
+      steps: [{ description: FLOOR_PLAN_DESCRIPTION, targetAffordance: target }],
+    };
+
+    // Valid by construction (R1 shape + spec-037 binding), but belt-and-braces:
+    // never store a plan that would fail either contract.
+    const binding = checkPlanBinding(
+      floorResult,
+      payload.availableAffordances.map((a) => a.id),
+      payload.knownAreas,
+    );
+    if (!binding.valid) return null;
+    if (
+      checkWaitSuppression(
+        perceptionResult.passive.drives,
+        payload.availableAffordances,
+        floorResult,
+        waitSuppression,
+      ).rejected
+    ) {
+      return null;
+    }
+
+    const plan = this.options.dataProvider.storePlan(agentId, floorResult);
+    // Self-resetting safety valve (spec 060, R4): the next formation attempt
+    // consults the LLM again rather than staying floored.
+    this.planFailureCounts.delete(agentId);
+    try {
+      logPlanFloor(agentId, failures, target);
+    } catch {
+      // spec 049: a diagnostic line never breaks a cycle.
+    }
+    return { success: true, plan };
+  }
 
   async plan(agentId: string, perceptionResult: PerceptionResult): Promise<PlanResult> {
     const { planBuilder, llmClient, dataProvider } = this.options;
@@ -48,6 +188,11 @@ export class PlanServiceImpl {
 
     // Set isThinking = true before the LLM call (§9.1).
     dataProvider.setThinking(agentId, true);
+
+    // Spec 060, R4: the built payload must be reachable from the catch block
+    // so an LLMResponseError (a shape failure at the client seam) can also
+    // engage the fallback floor.
+    let failurePayload: LLMContextPayload | undefined;
 
     try {
       // Determine guardrail flags for contextual forcing (spec 016, Req 9).
@@ -64,6 +209,7 @@ export class PlanServiceImpl {
 
       const payload = planBuilder.build(perceptionResult, builderOptions);
       payload.agentId = agentId;
+      failurePayload = payload;
 
       // Spec 056 follow-up (issue #201): make the plan-memory line observable.
       // The rendered `Your last plan was "…"` line lives in the prompt (never
@@ -99,10 +245,23 @@ export class PlanServiceImpl {
         // §7 shape failure (missing description/steps): hard fail, NO retry —
         // malformed responses are treated as a failure rather than repaired.
         if (!verdict.shapeValid) {
-          return {
-            success: false,
-            error: 'LLM returned an invalid plan: missing description or steps',
-          };
+          // Spec 060, R2: the service backstop names the reason (covers
+          // non-default clients that do not repair at the client seam).
+          try {
+            logPlanInvalid(
+              agentId,
+              verdict.shapeReason ?? 'missing-description',
+              estimatePlanPrompt(payload),
+            );
+          } catch {
+            // spec 049: a diagnostic line never breaks a cycle.
+          }
+          return this.failFormation(
+            agentId,
+            'LLM returned an invalid plan: missing description or steps',
+            perceptionResult,
+            failurePayload,
+          );
         }
         // Spec 037, Req 2: binding violation — one retry with feedback. The
         // correction is appended to the (already per-cycle) perception
@@ -118,10 +277,12 @@ export class PlanServiceImpl {
             `violations=${JSON.stringify(verdict.violations)}`,
         );
         if (!verdict.valid) {
-          return {
-            success: false,
-            error: `LLM plan violates the affordance enum after retry: ${verdict.feedback}`,
-          };
+          return this.failFormation(
+            agentId,
+            `LLM plan violates the affordance enum after retry: ${verdict.feedback}`,
+            perceptionResult,
+            failurePayload,
+          );
         }
       }
 
@@ -151,12 +312,15 @@ export class PlanServiceImpl {
       }
 
       const plan = dataProvider.storePlan(agentId, result);
+      // A successful formulation resets the consecutive-failure counter (R4).
+      this.planFailureCounts.delete(agentId);
       return { success: true, plan };
     } catch (err) {
       let message = err instanceof Error ? err.message : String(err);
       // Distinguish LLM response (parse) errors from transient errors (spec 008, Req 3.2, AC-10).
       if (err instanceof LLMResponseError) {
         message = `LLM response error: ${message}`;
+        return this.failFormation(agentId, message, perceptionResult, failurePayload);
       }
       return { success: false, error: message };
     } finally {
@@ -180,6 +344,12 @@ export interface PlanBindingVerdict {
   violations: string[];
   /** Feedback string for the retry-with-feedback prompt (spec 037, Req 2). */
   feedback: string;
+  /**
+   * Spec 060, R1: the first failing §7 shape condition as a stable reason code.
+   * Additive-optional — set only on the shape branch; `violations` and
+   * `feedback` stay byte-identical to the spec-037 contract.
+   */
+  shapeReason?: PlanShapeReason;
 }
 
 /**
@@ -211,8 +381,10 @@ export function checkPlanBinding(
   maxSteps?: number,
 ): PlanBindingVerdict {
   // (1) Shape — hard fail, NO retry (§7 / Req 15): malformed responses are
-  // treated as a failure rather than repaired.
-  if (!isValidFormulatePlanResult(result)) {
+  // treated as a failure rather than repaired. Spec 060, R1: the single shared
+  // classifier supplies both the boolean and the reason code.
+  const shapeReason = classifyPlanShape(result);
+  if (shapeReason !== null) {
     return {
       valid: false,
       shapeValid: false,
@@ -220,6 +392,7 @@ export function checkPlanBinding(
       violations: ['missing description or steps'],
       feedback:
         'Your response was not a valid plan: it needs a non-empty "description" and a non-empty "steps" array where every step has a description.',
+      shapeReason,
     };
   }
 
@@ -307,23 +480,11 @@ export function checkPlanBinding(
 
 /**
  * Shape-only validation (§7 / Req 15): non-empty `description`, non-empty
- * `steps` array, per-step descriptions. Used by {@link checkPlanBinding} as
- * the hard-fail pre-check; malformed responses are treated as a failure
- * rather than repaired.
+ * `steps` array, per-step descriptions. Spec 060, R1: delegates to the shared
+ * {@link classifyPlanShape} so client and service cannot drift.
  */
-function isValidFormulatePlanResult(result: FormulatePlanResult): boolean {
-  if (typeof result.description !== 'string' || result.description.length === 0) {
-    return false;
-  }
-  if (!Array.isArray(result.steps) || result.steps.length === 0) {
-    return false;
-  }
-  for (const step of result.steps) {
-    if (typeof step.description !== 'string' || step.description.length === 0) {
-      return false;
-    }
-  }
-  return true;
+export function isValidFormulatePlanResult(result: FormulatePlanResult): boolean {
+  return classifyPlanShape(result) === null;
 }
 
 export {};

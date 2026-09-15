@@ -6,6 +6,7 @@
 export * from './types/agent.js';
 export * from './types/affordance.js';
 export * from './types/cognition.js';
+export * from './types/plan-shape.js';
 export * from './types/engine.js';
 export * from './types/memory.js';
 export * from './types/world.js';

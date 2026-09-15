@@ -28,10 +28,17 @@ import type {
   ConversationSentiment,
   MultiAgentPlanResponse,
   MultiAgentPlanEntry,
+  PlanShapeReason,
 } from '@evol-hive/shared';
-import { memoryConsolidationTool, multiAgentPlansTool } from '@evol-hive/shared';
+import { classifyPlanShape, memoryConsolidationTool, multiAgentPlansTool } from '@evol-hive/shared';
 import type { LLMContextPayload } from '../index.js';
 import type { EmbeddingProvider } from '../classifier/index.js';
+import {
+  estimatePlanPrompt,
+  logPlanInvalid,
+  logPlanPrompt,
+  logPlanRepair,
+} from '../pper/plan-shape-diagnostic.js';
 
 // ─── Error Hierarchy (Req 15) ────────────────────────────────────────────────
 
@@ -184,6 +191,76 @@ interface ConsolidationResult {
   consolidatedNodeIds?: string[];
 }
 
+// ─── Plan-shape decoding (spec 060, R1/R3) ────────────────────────────────────
+
+/**
+ * Decode raw `formulate_plan` tool arguments into a {@link FormulatePlanResult}
+ * defensively (spec 060, R1/R3): a non-array `steps` becomes `[]`, a missing or
+ * non-string `description` becomes `''`, and each step is decoded with the
+ * established alias map (spec 010/019):
+ *
+ * - `description` ← `description` | `reason` | `action` | `name`
+ * - `targetAffordance` ← `targetAffordance` | `action` | `affordance` | `target` | `tool`
+ *
+ * A bare string step is both its description and its `targetAffordance`
+ * (spec 019, Req 13). Decoding BEFORE classifying is what lets the client and
+ * the service share one shape decision (`classifyPlanShape`) without drift.
+ */
+export function decodeFormulatePlanArgs(
+  args: Record<string, unknown> | null | undefined,
+): FormulatePlanResult {
+  const raw = args ?? {};
+  const rawDescription = raw['description'];
+  const description = typeof rawDescription === 'string' ? rawDescription : '';
+  const rawSteps = raw['steps'];
+  const steps = Array.isArray(rawSteps) ? rawSteps : [];
+  return {
+    description,
+    steps: steps.map((s) => {
+      if (typeof s === 'string') {
+        return { description: s, targetAffordance: s };
+      }
+      const obj = (s ?? {}) as Record<string, unknown>;
+      const step: { description: string; targetAffordance?: string } = {
+        description: String(
+          obj['description'] ?? obj['reason'] ?? obj['action'] ?? obj['name'] ?? '',
+        ),
+      };
+      const ta =
+        obj['targetAffordance'] ??
+        obj['action'] ??
+        obj['affordance'] ??
+        obj['target'] ??
+        obj['tool'];
+      if (typeof ta === 'string') {
+        step.targetAffordance = ta;
+      }
+      return step;
+    }),
+  };
+}
+
+/** Reason-specific bounded-repair correction (spec 060, R3). */
+function buildShapeCorrection(reason: PlanShapeReason, decoded: FormulatePlanResult): string {
+  if (reason === 'empty-step-description') {
+    const index = decoded.steps.findIndex(
+      (s) => typeof s.description !== 'string' || s.description.length === 0,
+    );
+    const stepNumber = index >= 0 ? index + 1 : 1;
+    return (
+      `CORRECTION: step ${stepNumber} has an empty description; every step needs a ` +
+      'non-empty description. Call formulate_plan again with a non-empty "description" ' +
+      'for the plan and for every step, and a targetAffordance from the enum values.'
+    );
+  }
+  return (
+    'CORRECTION: your previous formulate_plan tool call had empty arguments. ' +
+    'Call formulate_plan again with a non-empty "description" string and a ' +
+    'non-empty "steps" array where every step has a description and a ' +
+    'targetAffordance from the enum values.'
+  );
+}
+
 // ─── Client ──────────────────────────────────────────────────────────────────
 
 /**
@@ -282,21 +359,35 @@ export class OpenAICompatibleLLMClient {
 
   async completePlan(payload: LLMContextPayload): Promise<FormulatePlanResult> {
     const messages = this.buildPayloadMessages(payload);
+
+    // Spec 060, R2: one `[plan-prompt]` line per plan request (the initial
+    // request only — a repair must not dilute the pre-repair invalid rate).
+    const promptSize = estimatePlanPrompt(payload);
+    try {
+      logPlanPrompt(payload.agentId, promptSize);
+    } catch {
+      // Diagnostic-grade data: never break a plan request over a log line.
+    }
+
     let { args } = await this.requestChat(messages, payload.tools, payload.agentId, 'plan');
 
-    const shapeBad = (a: Record<string, unknown>): boolean =>
-      typeof a['description'] !== 'string' ||
-      (a['description'] as string).length === 0 ||
-      !Array.isArray(a['steps']) ||
-      (a['steps'] as unknown[]).length === 0;
+    // Spec 060, R1/R3: decode defensively, then classify through the SHARED
+    // classifier, so client and service agree on every shape reason. The old
+    // top-level-only `shapeBad` check is gone — it is precisely why an
+    // empty-step-description reached the service and hard-failed.
+    let decoded = decodeFormulatePlanArgs(args);
+    const reason = classifyPlanShape(decoded);
 
-    // Empty-args repair (issue #140 arc, [llm-raw] evidence): the cloud
-    // backend intermittently emits a formulate_plan tool call with a bare
-    // empty arguments object — the same failure mode seen when required
-    // fields were added to the schema. One bounded repair-retry with an
-    // explicit correction message; a second failure still throws (spec 008:
-    // malformed responses fail rather than repair-loop).
-    if (shapeBad(args)) {
+    // Bounded shape repair (spec 060, R3): reuse the single repair-retry the
+    // client already owns for the empty-args case. Exactly one repair request;
+    // a second failure still throws (spec 008: malformed responses fail rather
+    // than repair-loop).
+    if (reason !== null) {
+      try {
+        logPlanInvalid(payload.agentId, reason, promptSize);
+      } catch {
+        // spec 049
+      }
       console.error(
         `[llm-raw] agent=${payload.agentId ?? '?'} malformed formulate_plan args: ` +
           JSON.stringify(args).slice(0, 400),
@@ -313,23 +404,33 @@ export class OpenAICompatibleLLMClient {
       } catch {
         // diagnostics only
       }
+
+      try {
+        logPlanRepair(payload.agentId, reason);
+      } catch {
+        // spec 049
+      }
+
+      const correction = buildShapeCorrection(reason, decoded);
       // NOTE: append ONLY a user message. An assistant message with
       // content:null and no tool_calls is an invalid sequence — OpenAI-
       // compatible backends reject it with 400 (observed 508× for
       // apprentice-1 in the grand10 run, masking every repair).
-      const retryMessages = [
-        ...messages,
-        {
-          role: 'user' as const,
-          content:
-            'CORRECTION: your previous formulate_plan tool call had empty arguments. ' +
-            'Call formulate_plan again with a non-empty "description" string and a ' +
-            'non-empty "steps" array where every step has a description and a ' +
-            'targetAffordance from the enum values.',
-        },
-      ];
+      const retryMessages = [...messages, { role: 'user' as const, content: correction }];
       args = (await this.requestChat(retryMessages, payload.tools, payload.agentId, 'plan')).args;
-      if (shapeBad(args)) {
+      decoded = decodeFormulatePlanArgs(args);
+      const retryReason = classifyPlanShape(decoded);
+      if (retryReason !== null) {
+        const retrySize = estimatePlanPrompt({
+          systemPrompt: payload.systemPrompt,
+          perceptionContext: `${payload.perceptionContext}\n\n${correction}`,
+          tools: payload.tools,
+        });
+        try {
+          logPlanInvalid(payload.agentId, retryReason, retrySize);
+        } catch {
+          // spec 049
+        }
         throw new LLMResponseError(
           'LLM plan response missing required "description" (non-empty string) or "steps" (non-empty array).',
           JSON.stringify(args),
@@ -337,37 +438,7 @@ export class OpenAICompatibleLLMClient {
       }
     }
 
-    const description = args['description'] as string;
-    const steps = args['steps'] as unknown[];
-    return {
-      description,
-      steps: (steps as unknown[]).map((s) => {
-        // String format (spec 019, Req 13): each string is the targetAffordance.
-        if (typeof s === 'string') {
-          return { description: s, targetAffordance: s };
-        }
-        const obj = s as Record<string, unknown>;
-        // LLMs may use different field names for step items:
-        // - description: the step's human-readable description
-        // - targetAffordance: the affordance ID to execute
-        // Common aliases: reason→description, action→targetAffordance, affordance→targetAffordance, tool→targetAffordance
-        const step: { description: string; targetAffordance?: string } = {
-          description: String(
-            obj['description'] ?? obj['reason'] ?? obj['action'] ?? obj['name'] ?? '',
-          ),
-        };
-        const ta =
-          obj['targetAffordance'] ??
-          obj['action'] ??
-          obj['affordance'] ??
-          obj['target'] ??
-          obj['tool'];
-        if (typeof ta === 'string') {
-          step.targetAffordance = ta;
-        }
-        return step;
-      }),
-    };
+    return decoded;
   }
 
   // ── Batch plan (spec 022, Req 5/6) ────────────────────────────────────────
