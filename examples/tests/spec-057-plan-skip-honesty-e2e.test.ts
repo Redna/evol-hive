@@ -304,8 +304,11 @@ describe('spec 057 AC-8 gap-fill: skipped plan through the real Execute → Refl
 
     const memLines = stderrLines('[plan-memory]');
     expect(memLines).toHaveLength(1);
+    // Spec 057 addendum (commit 1ac8a4c): the diagnostic mirrors the builder's
+    // precedence — a non-empty plan that advanced past failed steps reports
+    // `skipped`, not the unqualified `succeeded` spec 057 R4 repairs.
     expect(memLines[0]).toBe(
-      '[plan-memory] agent=gardener-1 verdict=succeeded steps=- skipped=2 reflected=true',
+      '[plan-memory] agent=gardener-1 verdict=skipped steps=- skipped=2 reflected=true',
     );
   });
 

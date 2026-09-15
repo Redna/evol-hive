@@ -61,8 +61,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      64
 ✅ Done:          36
 🔨 In Development: 0
-🔍 In Review:      22
-📝 Drafted:        4
+🔍 In Review:      23
+📝 Drafted:        3
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -109,4 +109,4 @@ Architecture sections fully implemented: 11/11
 | [055](055-world-saturation-plan-memory-horizon.md) | World Saturation + Plan Memory + Hours-Horizon — Watering Must Deplete, the Agent Sees Its Last Plans, longTermGoals Reach the Plan Prompt | §3, §4, §6, §7, §10 | 🔍 In Review | [#198](https://github.com/Redna/evol-hive/issues/198) | [#200](https://github.com/Redna/evol-hive/pull/200) | shared, engine, cognition, examples |
 | [056](056-plan-supersession-stamping.md) | Plan Supersession Stamping — Abandoned In-Flight Plans Get a `superseded` Outcome So "Your last plan was" Actually Renders (Plan-Ids Move to the Injected Clock) | §3, §6, §11 | 🔍 In Review | [#201](https://github.com/Redna/evol-hive/issues/201) | [#203](https://github.com/Redna/evol-hive/pull/203) | shared, engine, cognition |
 | [057](057-plan-skip-outcome-honesty.md) | Plan Skip Honesty — Completed-By-Skipping Plans Report Their Skipped Steps (`stepsSkipped` on the plan outcome & the plan prompt, honest verdict) | §3, §6, §10 | 🔍 In Review | [#204](https://github.com/Redna/evol-hive/issues/204) | [#207](https://github.com/Redna/evol-hive/pull/207) | shared, cognition |
-| [058](058-eligibility-bound-plan-affordances.md) | Eligibility-Bound Plan Affordances — Constrain the Plan `targetAffordance` Enum to the Agent's Moment-Scoped Eligible Set (conversation `join`/`contribute`/`leave` are no longer valid choices when ineligible) | §4, §6, §7, §10 | 📝 Drafted | [#206](https://github.com/Redna/evol-hive/issues/206) | — | engine, cognition |
+| [058](058-eligibility-bound-plan-affordances.md) | Eligibility-Bound Plan Affordances — Constrain the Plan `targetAffordance` Enum to the Agent's Moment-Scoped Eligible Set (conversation `join`/`contribute`/`leave` are no longer valid choices when ineligible) | §4, §6, §7, §10 | 🔍 In Review | [#206](https://github.com/Redna/evol-hive/issues/206) | — | engine, cognition |
