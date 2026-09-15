@@ -30,11 +30,7 @@ import type {
   MultiAgentPlanEntry,
   PlanShapeReason,
 } from '@evol-hive/shared';
-import {
-  classifyPlanShape,
-  memoryConsolidationTool,
-  multiAgentPlansTool,
-} from '@evol-hive/shared';
+import { classifyPlanShape, memoryConsolidationTool, multiAgentPlansTool } from '@evol-hive/shared';
 import type { LLMContextPayload } from '../index.js';
 import type { EmbeddingProvider } from '../classifier/index.js';
 import {
@@ -231,7 +227,11 @@ export function decodeFormulatePlanArgs(
         ),
       };
       const ta =
-        obj['targetAffordance'] ?? obj['action'] ?? obj['affordance'] ?? obj['target'] ?? obj['tool'];
+        obj['targetAffordance'] ??
+        obj['action'] ??
+        obj['affordance'] ??
+        obj['target'] ??
+        obj['tool'];
       if (typeof ta === 'string') {
         step.targetAffordance = ta;
       }

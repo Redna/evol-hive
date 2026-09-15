@@ -20,11 +20,7 @@ import type {
   FormulatePlanResult,
   PlanShapeReason,
 } from '@evol-hive/shared';
-import {
-  WAIT_AFFORDANCE,
-  classifyPlanShape,
-  defaultPlanMaxSteps,
-} from '@evol-hive/shared';
+import { WAIT_AFFORDANCE, classifyPlanShape, defaultPlanMaxSteps } from '@evol-hive/shared';
 import type { LLMClient, PlanBuilder, GuardrailEngine, LLMContextPayload } from '../index.js';
 import { LLMResponseError } from '../llm/index.js';
 import { checkWaitSuppression, DRIVE_CRITICAL_THRESHOLD } from '../guardrails/wait-guard.js';

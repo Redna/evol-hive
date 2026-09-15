@@ -348,7 +348,12 @@ export type {
   DriveAffordanceRef,
   DriveAffordanceMatch,
 } from './drive-affordance-matcher.js';
-export { PlanServiceImpl, choosePlanFloorTarget, planFloorAfterFailures, DEFAULT_PLAN_FLOOR_AFTER_FAILURES } from './plan-service.js';
+export {
+  PlanServiceImpl,
+  choosePlanFloorTarget,
+  planFloorAfterFailures,
+  DEFAULT_PLAN_FLOOR_AFTER_FAILURES,
+} from './plan-service.js';
 export type { PlanServiceOptions, PlanBindingVerdict } from './plan-service.js';
 export {
   estimatePlanPrompt,

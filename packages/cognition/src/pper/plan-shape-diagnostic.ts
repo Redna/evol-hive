@@ -39,7 +39,9 @@ export interface PlanPromptSize {
 export function estimatePlanPrompt(input: PlanPromptInput): PlanPromptSize {
   const serializedTools = JSON.stringify(input.tools ?? []);
   const chars =
-    (input.systemPrompt?.length ?? 0) + (input.perceptionContext?.length ?? 0) + serializedTools.length;
+    (input.systemPrompt?.length ?? 0) +
+    (input.perceptionContext?.length ?? 0) +
+    serializedTools.length;
   return { chars, estTokens: Math.ceil(chars / 4) };
 }
 
@@ -68,9 +70,7 @@ export function logPlanRepair(
   reason: PlanShapeReason,
   attempt = 1,
 ): void {
-  console.error(
-    `[plan-repair] agent=${agentId ?? '?'} attempt=${attempt} reason=${reason}`,
-  );
+  console.error(`[plan-repair] agent=${agentId ?? '?'} attempt=${attempt} reason=${reason}`);
 }
 
 /** `[plan-floor]` — one line when the fallback floor stores a plan (spec 060, R4). */
