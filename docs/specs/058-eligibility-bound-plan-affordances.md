@@ -90,38 +90,38 @@ untouched (spec 021). No line is a failure: the line states `enum=[]` when the s
 
 ## Acceptance Criteria
 
-- [ ] **AC-1** (R1): Engine unit test — with an open conversation in the agent's room, a participant's
+- [x] **AC-1** (R1): Engine unit test — with an open conversation in the agent's room, a participant's
       `getVisibleAffordancesInRoom` contains the conversation's `contribute`/`leave` and **not**
       `join`; a co-located non-participant contains `join`/`observe` and not `contribute`/`leave`; when
       the conversation is closed, none of the four appear; with the conversation manager unwired, all
       four appear (byte-identical legacy path). Non-conversation affordances are present in every case.
       _(maps to R1)_
-- [ ] **AC-2** (R1): Fog composition test — a `go_to_<unknown-room>` affordance is still removed by the
+- [x] **AC-2** (R1): Fog composition test — a `go_to_<unknown-room>` affordance is still removed by the
       door-sighting gate in the same call that applies eligibility, and a known `go_to_<room>`
       survives; both filters compose without either one short-circuiting the other. _(maps to R1)_
-- [ ] **AC-3** (R2): Collision test — a room containing a non-conversation object that declares
+- [x] **AC-3** (R2): Collision test — a room containing a non-conversation object that declares
       `observe` plus a closed conversation object declaring `observe` keeps the non-conversation
       `observe` in the result; a conversation-only id (`contribute`) is filtered from the conversation
       object and never dropped from an unrelated object. _(maps to R2)_
-- [ ] **AC-4** (R3): Cognition/integration test over the assembled engine + cognition stack — an agent
+- [x] **AC-4** (R3): Cognition/integration test over the assembled engine + cognition stack — an agent
       with no open conversation in its room yields `prunedAffordances`, the `formulate_plan` tool's
       `targetAffordance` enum, and the affordance tool list all free of `join`/`contribute`/`leave`,
       while non-conversation affordances remain; an eligible participant yields `contribute`/`leave`.
       _(maps to R3)_
-- [ ] **AC-5** (R3): Matcher test — `matchDrivesToAffordances` and the rendered drive/chain hints never
+- [x] **AC-5** (R3): Matcher test — `matchDrivesToAffordances` and the rendered drive/chain hints never
       reference an ineligible conversation affordance, because they consume the same filtered set.
       _(maps to R3)_
-- [ ] **AC-6** (R4): Diagnostic test — exactly one `[plan-enum]` line is emitted per formulation,
+- [x] **AC-6** (R4): Diagnostic test — exactly one `[plan-enum]` line is emitted per formulation,
       containing the agent id, room, the enum IDs, and the chosen `targetAffordance` values (or
       `chosen=[none]`/`enum=[]` for the empty cases); a thrown diagnostic never propagates.
       _(maps to R4)_
-- [ ] **AC-7** (R1–R4, live): A **40-minute** live run (`USE_REAL_LLM=true SCENE_DURATION_MS=2400000 npx tsx examples/dynamic-world-sim.ts`, cc=3, 3 agents, the #206 scene) shows skip share
+- [ ] **AC-7** (R1–R4, live — QA/live-env; not run in this PR, see [implementation notes](notes/058-eligibility-bound-plan-affordances-implementation-notes.md)): A **40-minute** live run (`USE_REAL_LLM=true SCENE_DURATION_MS=2400000 npx tsx examples/dynamic-world-sim.ts`, cc=3, 3 agents, the #206 scene) shows skip share
       `skips / (execs + skips) ≤ 25%` (baseline 88–94%) and no single agent accounting for more than
       half of all `[step-skip]` lines; every `[plan-enum]` line for an agent with no eligible
       conversation contains none of `join`/`contribute`/`leave`; `[plan-repeat]` stays bounded; the run
       is executed against a freshly built dist (`pnpm build`). Evidence attached to issue #206.
       _(maps to R1–R4)_
-- [ ] **AC-8** (R1–R3): Regression — `pnpm -r test && pnpm typecheck && pnpm lint` pass; the spec-033
+- [x] **AC-8** (R1–R3): Regression — `pnpm -r test && pnpm typecheck && pnpm lint` pass; the spec-033
       eligibility tests, the spec-037 enum/skip tests, the spec-039 fog tests, and the spec-051
       `[talk-enum]` tests pass unmodified; legacy providers without a conversation manager are
       byte-identical. _(maps to R1, R2, R3)_
