@@ -48,21 +48,21 @@ Living index of all feature specifications. Updated by the Architect when creati
 | [§3](../architecture/03-agent-state-schema.md) | Agent State Schema | 001, 002, 008, 012, 017, 022, 032, 033 | ✅ Implemented |
 | [§4](../architecture/04-smart-objects.md) | Smart Objects & Affordances | 001, 003, 008, 013, 018, 019, 022, 031, 032, 033 | ✅ Implemented |
 | [§5](../architecture/05-fast-path-classifier.md) | Fast-Path Classifier (System 0) + Trainable System 1 Heads | 001, 006, 007, 018, 035 | ✅ Implemented |
-| [§6](../architecture/06-pper-loop.md) | PPER Loop | 001-004, 006, 008, 012, 017, 025, 026, 031, 032, 033 | ✅ Implemented |
+| [§6](../architecture/06-pper-loop.md) | PPER Loop | 001-004, 006, 008, 012, 017, 025, 026, 031, 032, 033, 057 | ✅ Implemented |
 | [§7](../architecture/07-structured-outputs.md) | Structured Outputs | 011 (tool calling), 019 (affordance-as-tools), 025, 026 | ✅ Implemented |
 | [§8](../architecture/08-cognitive-tools.md) | Cognitive Tools | 002, 011, 015, 025, 026, 032, 033 | ✅ Implemented |
 | [§9](../architecture/09-engine-routing.md) | Engine Routing | 002, 003, 004, 006, 008, 009 | ✅ Implemented |
-| [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | 016, 019, 030, 031, 033 | ✅ Implemented |
+| [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails | 016, 019, 030, 031, 033, 057 | ✅ Implemented |
 | [§11](../architecture/11-memory-architecture.md) | Memory Architecture | 004, 007, 014, 017, 025, 026 | ✅ Implemented |
 
 ## Spec Status Summary
 
 ```
-Total specs:      62
+Total specs:      63
 ✅ Done:          36
 🔨 In Development: 0
 🔍 In Review:      22
-📝 Drafted:        2
+📝 Drafted:        3
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -108,3 +108,4 @@ Architecture sections fully implemented: 11/11
 | [054](054-live-tick-provider.md) | Live Tick Provider for CognitiveToolExecutor — Fix Epoch-ms Turn/Relationship Stamps (Freshness Always-True, Negative Pending Ages) | §6, §8 | 🔍 In Review | [#195](https://github.com/Redna/evol-hive/issues/195) | [#197](https://github.com/Redna/evol-hive/pull/197) | cognition, assembly |
 | [055](055-world-saturation-plan-memory-horizon.md) | World Saturation + Plan Memory + Hours-Horizon — Watering Must Deplete, the Agent Sees Its Last Plans, longTermGoals Reach the Plan Prompt | §3, §4, §6, §7, §10 | 🔍 In Review | [#198](https://github.com/Redna/evol-hive/issues/198) | [#200](https://github.com/Redna/evol-hive/pull/200) | shared, engine, cognition, examples |
 | [056](056-plan-supersession-stamping.md) | Plan Supersession Stamping — Abandoned In-Flight Plans Get a `superseded` Outcome So "Your last plan was" Actually Renders (Plan-Ids Move to the Injected Clock) | §3, §6, §11 | 🔍 In Review | [#201](https://github.com/Redna/evol-hive/issues/201) | [#203](https://github.com/Redna/evol-hive/pull/203) | shared, engine, cognition |
+| [057](057-plan-skip-outcome-honesty.md) | Plan Skip Honesty — Completed-By-Skipping Plans Report Their Skipped Steps (`stepsSkipped` on the plan outcome & the plan prompt, honest verdict) | §3, §6, §10 | 📝 Drafted | [#204](https://github.com/Redna/evol-hive/issues/204) | — | shared, cognition |
