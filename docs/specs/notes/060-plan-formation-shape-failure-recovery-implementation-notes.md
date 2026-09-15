@@ -91,6 +91,27 @@
 - `pnpm test` (all packages), `pnpm typecheck`, `pnpm lint`, `pnpm format:check`,
   `pnpm build` — all green.
 
+### AC mapping (resume-session final verification)
+
+Re-run of the full gate on branch head and mapping of the code-testable ACs to
+concrete tests. `pnpm test` exit 0 (all 8 projects; cognition 1186 passing,
+shared/engine/assembly/examples/cli green); `pnpm typecheck`, `pnpm lint`,
+`pnpm format:check`, and `pnpm build` all exit 0.
+
+| AC | Status | Where |
+| --- | --- | --- |
+| AC-1 | ✅ | `spec-060-plan-shape.test.ts` (10) + `checkPlanBinding shapeReason` block in `spec-060-plan-shape-diagnostic.test.ts` |
+| AC-2 | ✅ | `classifier agreement and client decode` block (`isValidFormulatePlanResult` ⇔ `classifyPlanShape`, bare-string step, alias map, defensive decode) |
+| AC-3 | ✅ | `estimatePlanPrompt`, client `[plan-prompt]`/`[plan-invalid]`/`[llm-raw]`, throwing-writer safety, service backstop, single-request no-extra-LLM assertion |
+| AC-4 | ✅ | client-seam repair block (one retry, empty-step naming, two-request throw, bounded across calls) |
+| AC-5 | ✅ | `spec-060-plan-floor.test.ts` (7) + `spec-060-plan-floor-honest-failure.test.ts` (1) |
+| AC-6 | ✅ | listed suites unmodified; the spec-008 suite stubs `PLAN_FLOOR_AFTER_FAILURES=0` (documented deviation above) |
+| AC-7 (R6) | 📋 issue-owned | live mechanism diagnosis/probe numbers on #214 — not run in this PR |
+| AC-8 (R7) | 📋 issue-owned | 40-minute real-LLM run — live env only |
+
+AC-1–AC-6 are checked off in the spec; AC-7/AC-8 carry the live/issue-owned
+annotation and stay unchecked.
+
 ## Not in this PR (issue-owned evidence)
 
 - **R6/AC-7**: the live mechanism diagnosis (prompt growth vs provider load vs client
