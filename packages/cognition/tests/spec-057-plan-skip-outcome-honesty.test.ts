@@ -105,10 +105,7 @@ class SkipScenarioProvider implements ExecuteDataProvider {
   checkPreconditions(): { satisfied: boolean; failed: string[] } {
     return { satisfied: true, failed: [] };
   }
-  async executeAffordance(
-    _objectId: string,
-    affordanceId: string,
-  ): Promise<AffordanceResult> {
+  async executeAffordance(_objectId: string, affordanceId: string): Promise<AffordanceResult> {
     if (this.failingAffordances.has(affordanceId)) {
       return { success: false, failureReason: `'${affordanceId}' failed.` };
     }
@@ -247,7 +244,11 @@ describe('spec 057 Req 1 & Req 6 / AC-3: spec-037 skip semantics unchanged', () 
     const provider = new SkipScenarioProvider(threeStepPlan('plan-shape'));
     const service = new ExecuteServiceImpl({ dataProvider: provider });
     const result = await service.execute(AGENT_ID);
-    expect(result).toEqual({ success: true, result: { success: true, driveChanges: { energy: 5 } }, planComplete: false });
+    expect(result).toEqual({
+      success: true,
+      result: { success: true, driveChanges: { energy: 5 } },
+      planComplete: false,
+    });
     expect('stepsSkipped' in result).toBe(false);
   });
 });
@@ -510,7 +511,13 @@ describe('spec 057 Req 5 / AC-7: [plan-memory] skipped diagnostic', () => {
     expect(
       planMemoryDiagnosticLine(
         'iris-1',
-        outcome({ superseded: true, success: false, stepsCompleted: 1, stepsTotal: 3, stepsSkipped: 1 }),
+        outcome({
+          superseded: true,
+          success: false,
+          stepsCompleted: 1,
+          stepsTotal: 3,
+          stepsSkipped: 1,
+        }),
       ),
     ).toBe('[plan-memory] agent=iris-1 verdict=superseded steps=1/3 skipped=1 reflected=true');
   });

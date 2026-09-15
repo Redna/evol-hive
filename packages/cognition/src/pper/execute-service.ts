@@ -121,7 +121,11 @@ export class ExecuteServiceImpl {
           const feedback = `Navigation is not available — cannot reach '${step.targetArea}'.`;
           dataProvider.setSystemFeedback(agentId, feedback);
           dataProvider.setThinking(agentId, false);
-          return this.withSkipCount(agentId, { success: false, error: feedback, planComplete: false });
+          return this.withSkipCount(agentId, {
+            success: false,
+            error: feedback,
+            planComplete: false,
+          });
         }
         // Call the port ON the provider — extracting the method would lose
         // its `this` (bridge implementations read wired engine state).
@@ -148,7 +152,11 @@ export class ExecuteServiceImpl {
           }
           dataProvider.setSystemFeedback(agentId, feedback);
           dataProvider.setThinking(agentId, false);
-          return this.withSkipCount(agentId, { success: false, error: feedback, planComplete: false });
+          return this.withSkipCount(agentId, {
+            success: false,
+            error: feedback,
+            planComplete: false,
+          });
         }
         // status === 'arrived': the agent stands at the target area. A
         // navigation-only step (no targetAffordance) completes here; a step
