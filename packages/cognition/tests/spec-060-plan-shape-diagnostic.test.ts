@@ -340,7 +340,9 @@ describe('client-seam shape repair + diagnostics (spec 060, R2/R3 / AC-3, AC-4)'
   });
 
   it('throws after exactly two requests when the repair is still shape-invalid', async () => {
-    fetchMock.mockResolvedValue(toolCallResponse('formulate_plan', emptyStepPlan()));
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(toolCallResponse('formulate_plan', emptyStepPlan())),
+    );
     const client = new OpenAICompatibleLLMClient({ baseUrl: BASE_URL, model: MODEL });
     await expect(client.completePlan(makePayload())).rejects.toThrow(LLMResponseError);
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -350,7 +352,9 @@ describe('client-seam shape repair + diagnostics (spec 060, R2/R3 / AC-3, AC-4)'
   });
 
   it('never makes more than two requests per completePlan call', async () => {
-    fetchMock.mockResolvedValue(toolCallResponse('formulate_plan', emptyStepPlan()));
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(toolCallResponse('formulate_plan', emptyStepPlan())),
+    );
     const client = new OpenAICompatibleLLMClient({ baseUrl: BASE_URL, model: MODEL });
     await client.completePlan(makePayload()).catch(() => undefined);
     await client.completePlan(makePayload()).catch(() => undefined);

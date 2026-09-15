@@ -41,6 +41,18 @@ import {
 // Section 1: LLM Client Retry (AC-1, AC-2, AC-3, AC-4)
 // ═════════════════════════════════════════════════════════════════════════════
 
+// Spec 060 (issue #214): once the fallback floor engages, a persistently
+// malformed provider yields a stored floor plan instead of a failed cycle, so
+// the spec-008 cooldown is superseded for floor-able formation failures. These
+// tests exercise the spec-008 recovery path in isolation, so the floor is
+// disabled here; the floor's own behavior lives in the spec-060 suites.
+beforeEach(() => {
+  vi.stubEnv('PLAN_FLOOR_AFTER_FAILURES', '0');
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 const BASE_URL = 'http://localhost:11434/v1';
 const MODEL = 'llama3.1';
 const CHAT_URL = `${BASE_URL}/chat/completions`;

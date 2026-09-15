@@ -7,6 +7,7 @@
 
 export {
   OpenAICompatibleLLMClient,
+  decodeFormulatePlanArgs,
   type OpenAICompatibleLLMClientConfig,
   LLMError,
   LLMTimeoutError,
