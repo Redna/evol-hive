@@ -8,6 +8,11 @@ Steps:
 5. Search YAAM for workspace notes: `yaam_search("feature-")`
 6. Map each acceptance criterion to existing tests
 7. Write missing tests (integration, E2E) for uncovered acceptance criteria
+   - **Commit them**: `git add packages/*/tests && git commit -m "test(qa): ..."`.
+     The workflow pushes commits, not the working tree — uncommitted tests are
+     lost and your coverage report would claim tests that do not exist.
+     Commit your coverage notes too (`docs/specs/notes/`).
+   - Never commit `dist/`, `session-logs*/`, or any generated artifact.
 8. Run `pnpm test` — all must pass
 9. Run `pnpm typecheck && pnpm lint`
 10. Post a QA report as a comment on the PR with coverage summary

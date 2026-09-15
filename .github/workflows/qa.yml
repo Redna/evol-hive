@@ -47,6 +47,19 @@ jobs:
           ref: refs/pull/${{ inputs.pr_number }}/head
           fetch-depth: 0
 
+      # `refs/pull/N/head` is a detached HEAD: `git branch --show-current` is
+      # empty, so the push step below had nothing to push and any QA test work
+      # was lost (PR #213, 2026-09-15). Materialize the PR's real branch so QA
+      # artifacts can land.
+      - name: Check out the PR branch (workflow_dispatch lands detached)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          BRANCH=$(gh pr view "${{ inputs.pr_number }}" --json headRefName -q .headRefName)
+          echo "Checking out branch '$BRANCH'"
+          git checkout -B "$BRANCH"
+
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -116,10 +129,25 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          PR_NUMBER="${{ github.event.pull_request.number || inputs.pr_number }}"
           BRANCH=$(git branch --show-current)
+          if [ -z "$BRANCH" ]; then
+            BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName -q .headRefName)
+            git checkout -B "$BRANCH"
+          fi
+          # This step pushes COMMITS only. QA's artifacts are its test additions
+          # and its coverage notes, so commit them here when the agent left them
+          # in the working tree (that is how PR #213's QA tests were lost).
+          if [ -n "$(git status --porcelain -- packages/*/tests docs/specs/notes)" ]; then
+            git add -A -- packages/*/tests docs/specs/notes 2>/dev/null || true
+            git commit -m "test(qa): verify-coverage additions for PR #${PR_NUMBER}" || true
+          fi
           if git log --branches --not --remotes --oneline | grep -q .; then
             echo "Pushing QA test commits to $BRANCH..."
-            git push origin HEAD:$BRANCH 2>/dev/null || echo "Push failed or nothing to push"
+            git push origin "HEAD:$BRANCH" || echo "::warning::QA push failed — QA artifacts are NOT on the branch"
+            # A GITHUB_TOKEN push does not trigger workflows, so validate the QA
+            # commit explicitly instead of letting it land unverified.
+            gh workflow run ci.yml --ref "$BRANCH" || echo "::warning::could not dispatch CI for the QA commit"
           else
             echo "No unpushed commits."
           fi
