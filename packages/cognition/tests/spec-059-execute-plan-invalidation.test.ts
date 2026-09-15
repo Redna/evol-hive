@@ -150,8 +150,7 @@ class WiredProvider extends BaseProvider {
   }
 }
 
-const staleGuard = (): GuardrailEngineImpl =>
-  new GuardrailEngineImpl(GUARDRAIL_CONFIG);
+const staleGuard = (): GuardrailEngineImpl => new GuardrailEngineImpl(GUARDRAIL_CONFIG);
 
 // ── AC-4/AC-6 — invalidation on a stale-target rejection (R3) ────────────────
 
@@ -215,7 +214,10 @@ describe('spec 059 AC-4: stale-target rejection invalidates the in-flight plan (
     expect(provider.plan).toBeNull();
 
     const completePlan = vi.fn(
-      async (): Promise<{ description: string; steps: { description: string; targetAffordance?: string }[] }> => ({
+      async (): Promise<{
+        description: string;
+        steps: { description: string; targetAffordance?: string }[];
+      }> => ({
         description: 'Fresh plan',
         steps: [{ description: 'Rest', targetAffordance: 'rest' }],
       }),

@@ -55,7 +55,13 @@ function setupScene(core: EngineCore): void {
     roomId: ROOM,
   });
   for (const id of ['agent-a', 'agent-b', 'agent-c']) {
-    core.agentManager.spawn({ id, name: id, description: `agent ${id}`, traits: [], initialDrives: {} });
+    core.agentManager.spawn({
+      id,
+      name: id,
+      description: `agent ${id}`,
+      traits: [],
+      initialDrives: {},
+    });
     core.agentManager.updateState(id, { location: ROOM, lastPerceptionTick: 0 });
   }
 }
