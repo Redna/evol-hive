@@ -61,8 +61,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 Total specs:      66
 ✅ Done:          36
 🔨 In Development: 0
-🔍 In Review:      24
-📝 Drafted:        4
+🔍 In Review:      25
+📝 Drafted:        3
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -112,4 +112,4 @@ Architecture sections fully implemented: 11/11
 | [057](057-plan-skip-outcome-honesty.md) | Plan Skip Honesty — Completed-By-Skipping Plans Report Their Skipped Steps (`stepsSkipped` on the plan outcome & the plan prompt, honest verdict) | §3, §6, §10 | 🔍 In Review | [#204](https://github.com/Redna/evol-hive/issues/204) | [#207](https://github.com/Redna/evol-hive/pull/207) | shared, cognition |
 | [058](058-eligibility-bound-plan-affordances.md) | Eligibility-Bound Plan Affordances — Constrain the Plan `targetAffordance` Enum to the Agent's Moment-Scoped Eligible Set (conversation `join`/`contribute`/`leave` are no longer valid choices when ineligible) | §4, §6, §7, §10 | 🔍 In Review | [#206](https://github.com/Redna/evol-hive/issues/206) | [#209](https://github.com/Redna/evol-hive/pull/209) | engine, cognition |
 | [059](059-plan-retention-revalidation.md) | Plan-Retention Re-Validation — Guardrail-Rejected Stale Steps Invalidate the Plan (plan invalidation + deviation step-skip, agent-scoped eligibility retention; plan-enum executability deferred to [#212](https://github.com/Redna/evol-hive/issues/212)) | §3, §4, §6, §7, §10, §11 | ✅ Done | [#210](https://github.com/Redna/evol-hive/issues/210) | [#213](https://github.com/Redna/evol-hive/pull/213) | shared, engine, cognition, assembly |
-| [060](060-plan-formation-shape-failure-recovery.md) | Plan-Formation Shape-Failure Diagnostics, Bounded Repair & Fallback Floor — Name the shape reason + prompt size, reuse the client's one bounded repair, and floor a persistently failing agent with a valid single-step plan | §5, §6, §7, §10 | 📝 Drafted | [#214](https://github.com/Redna/evol-hive/issues/214) | — | shared, cognition |
+| [060](060-plan-formation-shape-failure-recovery.md) | Plan-Formation Shape-Failure Diagnostics, Bounded Repair & Fallback Floor — Name the shape reason + prompt size, reuse the client's one bounded repair, and floor a persistently failing agent with a valid single-step plan | §5, §6, §7, §10 | 🔍 In Review | [#214](https://github.com/Redna/evol-hive/issues/214) | — | shared, cognition |
