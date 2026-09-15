@@ -7,17 +7,21 @@ on:
   workflow_dispatch:
     inputs:
       issue_number:
-        description: "Issue number to process"
+        description: 'Issue number to process'
         required: true
         type: string
       retry_count:
-        description: "Internal: number of automatic retries used"
+        description: 'Internal: number of automatic retries used'
         required: false
         type: string
-        default: "0"
+        default: '0'
 
 concurrency:
-  group: agent-pipeline
+  # Own group: a spec-draft run must NOT queue behind a long Developer/QA run
+  # for another issue and then be pending-cancelled (issue #206, 2026-09-15).
+  # Phase serialization within one pipeline is already enforced by
+  # scripts/pipeline.sh, which waits for each phase before dispatching the next.
+  group: agent-pipeline-architect
   cancel-in-progress: false
 
 jobs:

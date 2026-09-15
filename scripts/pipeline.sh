@@ -25,6 +25,16 @@ POLL_INTERVAL=30        # seconds between polls for workflow completion
 PR_POLL_INTERVAL=60     # seconds between polls for PR merge
 PR_WAIT_TIMEOUT=3600    # 60 minutes max waiting for human to merge PR
 
+# A run cancelled while QUEUED (GitHub cancels a previously pending run in a
+# concurrency group when a newer one is dispatched) is an infra artifact, not an
+# agent failure — dispatch the phase again WITHOUT consuming its retry budget.
+# Bounded so a persistently-cancelled phase cannot spin forever. Observed on
+# issue #206 (2026-09-15): three Architect dispatches landed while the Developer
+# run for #204 held `agent-pipeline`, each was pending-cancelled by the next,
+# and the aborted pipeline reported "Architect failed 3 times".
+MAX_INFRA_RETRIES=5
+INFRA_RETRIES=0
+
 # --- API helpers ---
 api() {
   # --max-time: an API stall must not wedge the orchestrator (observed:
@@ -271,6 +281,11 @@ while [ $ARCH_RETRIES -lt $MAX_RETRIES_ARCHITECT ]; do
     ARCH_SUCCESS=true
     echo "  ✅ Architect succeeded"
     break
+  elif [ "$RESULT" = "cancelled" ] && [ $INFRA_RETRIES -lt $MAX_INFRA_RETRIES ]; then
+    INFRA_RETRIES=$((INFRA_RETRIES + 1))
+    ARCH_RETRIES=$((ARCH_RETRIES - 1))  # infra cancel does not consume an attempt
+    echo "  ↩️ Architect run cancelled while queued (infra $INFRA_RETRIES/$MAX_INFRA_RETRIES) — re-dispatching"
+    sleep 30
   else
     echo "  ❌ Architect failed ($RESULT), retrying..."
   fi
@@ -358,6 +373,11 @@ while [ $DEV_RETRIES -lt $MAX_RETRIES_DEVELOPER ]; do
     DEV_SUCCESS=true
     echo "  ✅ Developer succeeded"
     break
+  elif [ "$RESULT" = "cancelled" ] && [ $INFRA_RETRIES -lt $MAX_INFRA_RETRIES ]; then
+    INFRA_RETRIES=$((INFRA_RETRIES + 1))
+    DEV_RETRIES=$((DEV_RETRIES - 1))  # infra cancel does not consume an attempt
+    echo "  ↩️ Developer run cancelled while queued (infra $INFRA_RETRIES/$MAX_INFRA_RETRIES) — re-dispatching"
+    sleep 30
   else
     echo "  ❌ Developer failed ($RESULT), retrying..."
   fi
