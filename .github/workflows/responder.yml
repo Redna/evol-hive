@@ -117,7 +117,7 @@ jobs:
 
           pi -p "$TASK" \
             --append-system-prompt "$(cat .pi/agents/responder.md)" \
-            --model ollama/glm-5.3-flash \
+            --model ollama/deepseek-v4.1-flash \
             --thinking medium \
             --tools read,bash \
             --verbose

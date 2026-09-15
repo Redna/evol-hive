@@ -125,13 +125,13 @@ jobs:
 
           # Run the agent with a continuation loop. pi print-mode exits whenever
           # the model emits a text-only response instead of a tool call — common
-          # with glm-5.3-flash mid-implementation (it narrates "Now add X" and
-          # quits). Each pass resumes from the pushed branch + YAAM notes, so
+          # with deepseek-v4.1-flash mid-implementation (it narrates "Now add X"
+          # and quits). Each pass resumes from the pushed branch + YAAM notes, so
           # checkpointed work survives; uncommitted work does not.
           PI_ARGS=(
             -p "$TASK_CONTENT"
             --append-system-prompt "$(cat .pi/agents/developer.md)"
-            --model ollama/glm-5.3-flash
+            --model ollama/deepseek-v4.1-flash
             --thinking medium
             --tools read,write,edit,bash
             --verbose
@@ -162,7 +162,7 @@ jobs:
             PI_ARGS=(
               -p "$TASK_CONTENT"
               --append-system-prompt "$(cat .pi/agents/developer.md)"
-              --model ollama/glm-5.3-flash
+              --model ollama/deepseek-v4.1-flash
               --thinking medium
               --tools read,write,edit,bash
               --verbose

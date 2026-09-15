@@ -59,11 +59,11 @@ All agent actions (PRs, comments, commits) appear as **`evol-hive-agent[bot]** v
 
 | Agent | Role | Trigger | Tools | Model |
 |---|---|---|---|---|
-| **Architect** | Drafts specs from issues, validates against architecture | `workflow_dispatch` (issue #) | read, bash | glm-5.2, high thinking |
-| **Developer** | TDD implementation from specs, opens PRs | `workflow_dispatch` (issue #) | read, write, edit, bash | glm-5.2, medium thinking |
-| **QA** | Verifies test coverage, adds E2E/integration tests | `workflow_dispatch` (PR #) via Controller | read, write, edit, bash | glm-5.2, medium thinking |
-| **Doctor** | Diagnoses CI failures, fixes or escalates | `check_run` failure | read, bash, edit, write | glm-5.2, high thinking |
-| **Overseer** | Interactive brainstorming, roadmap, creates issues | Manual (interactive Pi) | read, bash | glm-5.2, high thinking |
+| **Architect** | Drafts specs from issues, validates against architecture | `workflow_dispatch` (issue #) | read, bash | deepseek-v4.1-flash, high thinking |
+| **Developer** | TDD implementation from specs, opens PRs | `workflow_dispatch` (issue #) | read, write, edit, bash | deepseek-v4.1-flash, medium thinking |
+| **QA** | Verifies test coverage, adds E2E/integration tests | `workflow_dispatch` (PR #) via Controller | read, write, edit, bash | deepseek-v4.1-flash, medium thinking |
+| **Doctor** | Diagnoses CI failures, fixes or escalates | `check_run` failure | read, bash, edit, write | deepseek-v4.1-flash, high thinking |
+| **Overseer** | Interactive brainstorming, roadmap, creates issues | Manual (interactive Pi) | read, bash | deepseek-v4.1-flash, high thinking |
 | **Controller** | Orchestrates pipeline, circuit breaker, escalation | `workflow_run` + `pull_request` closed | none (API only) | — |
 
 ## Pipeline Flow
