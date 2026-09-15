@@ -137,6 +137,44 @@ jobs:
             echo "No unpushed commits."
           fi
 
+      - name: Guard the spec PR against closing keywords
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          set -uo pipefail
+          BRANCH=$(git branch --show-current)
+          if [ "$BRANCH" = "main" ] || [ -z "$BRANCH" ]; then
+            echo "Not on a spec branch — nothing to guard."
+            exit 0
+          fi
+
+          PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -z "$PR" ] || [ "$PR" = "null" ]; then
+            echo "No PR found for $BRANCH — nothing to guard."
+            exit 0
+          fi
+
+          # GitHub matches close/fix/resolve keywords case-insensitively ANYWHERE,
+          # including prose: "close #210; the issue stays open ..." closed #210 when
+          # the spec PR #211 merged (2026-09-15). A spec PR must never close the issue.
+          gh pr view "$PR" --json body --jq '.body // ""' > /tmp/spec-pr-body.md
+          python3 -c "import re,sys; b=open('/tmp/spec-pr-body.md').read(); p=re.compile(r'(?i)\b(closes?|closed|fix(?:es|ed)?|resolve[sd]?)\b\s*:?\s*(?=#[0-9])'); f,n=p.subn('Refs ',b); sys.stderr.write('sanitized %d closing keyword(s)\n' % n); open('/tmp/spec-pr-body-fixed.md','w').write(f)"
+          if ! cmp -s /tmp/spec-pr-body.md /tmp/spec-pr-body-fixed.md; then
+            gh pr edit "$PR" --body-file /tmp/spec-pr-body-fixed.md
+            echo "::warning::Spec PR #$PR body contained a closing keyword before an issue reference — rewritten to 'Refs' so the issue stays open until the implementation PR lands."
+          else
+            echo "Spec PR #$PR body is clean."
+          fi
+
+          # Commit messages on the spec branch are parsed the same way on merge.
+          BAD=$(git log "origin/main..HEAD" --format=%B | grep -nEi '\b(closes?|closed|fix(es|ed)?|resolve[sd]?)\b[[:space:]]*:?[[:space:]]*#[0-9]+' || true)
+          if [ -n "$BAD" ]; then
+            echo "::error::Spec branch commit messages contain a closing keyword before an issue reference — rewrite them before merging (the spec PR must not close the issue):"
+            echo "$BAD"
+            exit 1
+          fi
+
       - name: Save YAAM memory
         if: always()
         run: bash scripts/save-memory.sh

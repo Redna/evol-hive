@@ -70,4 +70,7 @@ Full architecture: `docs/architecture/01-11`. ADRs: `docs/adr/`.
 - If a request conflicts with the architecture, say so and propose an alternative.
 - Keep specs concise. Every requirement should map to at least one acceptance criterion.
 - Record WHY you made each design decision in YAAM notes, not just WHAT you decided.
-- **NEVER use "Closes #N", "Fixes #N", or "Resolves #N" in spec PR bodies.** The spec PR is documentation only — the issue must stay open until the code PR is merged. Reference the issue with plain "#N" instead.
+- **NEVER write a closing keyword before an issue reference in a spec PR body or commit message.** GitHub matches these keywords case-insensitively *anywhere*, including inside prose, so "close #210; the issue stays open until the implementation PR lands" **closes #210 on merge** — the exact opposite of the intent. The spec PR is documentation only; the issue must stay open until the code PR lands.
+  - Forbidden immediately before `#N`: `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved` (any case, with or without a colon or dash).
+  - Use `Refs #N` or `Part of #N` in spec PR bodies and commit messages.
+  - To state the intent, keep the issue number away from the verb: "this PR does not deliver #210; the implementation PR will close it."
