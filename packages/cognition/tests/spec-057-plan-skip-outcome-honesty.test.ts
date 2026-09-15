@@ -38,7 +38,7 @@ import { ExecuteServiceImpl } from '../src/pper/execute-service.js';
 import { ReflectServiceImpl } from '../src/pper/reflect-service.js';
 import { ReflectBuilderImpl } from '../src/pper/reflect-builder.js';
 import { PlanBuilderImpl } from '../src/pper/plan-builder.js';
-import { planMemoryDiagnosticLine } from '../src/pper/plan-memory-diagnostic.js';
+import { planMemoryDiagnosticLine, planMemoryVerdict } from '../src/pper/plan-memory-diagnostic.js';
 import type { LLMClient } from '../src/index.js';
 
 const AGENT_ID = 'a1';
@@ -495,9 +495,23 @@ function outcome(overrides: Partial<LastPlanOutcome> = {}): LastPlanOutcome {
 }
 
 describe('spec 057 Req 5 / AC-7: [plan-memory] skipped diagnostic', () => {
-  it('appends skipped=<N> when stepsSkipped is defined', () => {
+  it("appends skipped=<N> and reports the builder's skipped verdict", () => {
+    // Spec 057 addendum: the verdict word mirrors the PROMPT, which drops
+    // "it succeeded" for a plan that completed by skipping.
     expect(planMemoryDiagnosticLine('iris-1', outcome({ stepsSkipped: 2 }))).toBe(
-      '[plan-memory] agent=iris-1 verdict=succeeded steps=- skipped=2 reflected=true',
+      '[plan-memory] agent=iris-1 verdict=skipped steps=- skipped=2 reflected=true',
+    );
+  });
+
+  it('keeps the succeeded verdict when the skip count is absent or zero', () => {
+    expect(planMemoryVerdict(outcome())).toBe('succeeded');
+    expect(planMemoryVerdict(outcome({ stepsSkipped: 0 }))).toBe('succeeded');
+  });
+
+  it('never fabricates a skip verdict for an empty step list (builder fallback)', () => {
+    expect(planMemoryVerdict(outcome({ stepsSkipped: 3, steps: [] }))).toBe('succeeded');
+    expect(planMemoryDiagnosticLine('iris-1', outcome({ stepsSkipped: 3, steps: [] }))).toBe(
+      '[plan-memory] agent=iris-1 verdict=succeeded steps=- skipped=3 reflected=true',
     );
   });
 
@@ -505,6 +519,12 @@ describe('spec 057 Req 5 / AC-7: [plan-memory] skipped diagnostic', () => {
     const line = planMemoryDiagnosticLine('iris-1', outcome());
     expect(line).toBe('[plan-memory] agent=iris-1 verdict=succeeded steps=- reflected=true');
     expect(line).not.toContain('skipped=');
+  });
+
+  it('keeps supersession precedence over the skipped verdict', () => {
+    expect(planMemoryVerdict(outcome({ superseded: true, success: false, stepsSkipped: 2 }))).toBe(
+      'superseded',
+    );
   });
 
   it('reports a skipped superseded line with both step counts and the skip count', () => {

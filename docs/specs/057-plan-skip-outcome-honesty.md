@@ -9,16 +9,16 @@
 
 ## Problem Summary (live-run verified, spec 056 run `/home/anima/056brun.log`)
 
-| Signal                     | Value                                                      |
-| -------------------------- | ---------------------------------------------------------- |
-| `[plan-memory]` renders    | 127 (127/127 `verdict=succeeded`)                          |
-| plan creates               | 130                                                        |
-| step advances              | 164 = **54 executed + 110 skipped (67% skipped)**          |
-| `[plan-superseded]`        | 0                                                          |
-| `[plan-repeat]`            | 2 (max count 3 — bounded)                                  |
+| Signal                  | Value                                             |
+| ----------------------- | ------------------------------------------------- |
+| `[plan-memory]` renders | 127 (127/127 `verdict=succeeded`)                 |
+| plan creates            | 130                                               |
+| step advances           | 164 = **54 executed + 110 skipped (67% skipped)** |
+| `[plan-superseded]`     | 0                                                 |
+| `[plan-repeat]`         | 2 (max count 3 — bounded)                         |
 
 A plan that reaches its end by advancing past failed steps is stamped `success: true`,
-so the prompt tells the agent *"Your last plan was "…" — it succeeded."* The skipped
+so the prompt tells the agent _"Your last plan was "…" — it succeeded."_ The skipped
 steps — dominated by narrative-bound steps whose affordance became unexecutable
 between formulation and execution — are invisible:
 
@@ -28,7 +28,7 @@ between formulation and execution — are invisible:
 ```
 
 This is the live-path analog of the supersession defect spec 056 repaired: the plan
-ran out of *runnable* steps, not out of *steps*, and the agent is blind to its own
+ran out of _runnable_ steps, not out of _steps_, and the agent is blind to its own
 abandonment — the exact self-visibility gap the #191 repetition defense depends on.
 The fix is **honesty in reporting only**: the spec-037 skip behavior (advance after 2
 consecutive failures) does not change.
@@ -75,7 +75,7 @@ consecutive failures) does not change.
 - **R6 — Skip semantics unchanged (cognition):** `MAX_STEP_FAILURES === 2`, the
   advance-on-skip behavior, the `[step-skip]` line, the system-feedback suffix, and
   the `stepSkipped: true` flag on skip results are untouched. This spec changes what
-  is *reported*, never what the engine *does*.
+  is _reported_, never what the engine _does_.
 
 ## Acceptance Criteria
 
@@ -110,7 +110,7 @@ consecutive failures) does not change.
       `stepsSkipped` is absent; the existing spec-056 exact-string tests still pass.
       _(maps to R5)_
 - [x] **AC-8** (R1–R5): Live run (`USE_REAL_LLM=true SCENE_DURATION_MS=... npx tsx
-      examples/dynamic-world-sim.ts`, ~7 min like the #204 evidence run) shows
+    examples/dynamic-world-sim.ts`, ~7 min like the #204 evidence run) shows
       `[plan-memory]` lines carrying `skipped=N` for plans that had step skips, and
       the skip count is `<=` the run's `[step-skip]` count; `[plan-repeat]` stays
       bounded. Evidence attached to issue #204. _(maps to R1–R5)_
@@ -146,3 +146,40 @@ consecutive failures) does not change.
     (boolean, current step) are distinct fields.
   - **Do not reset the per-plan skip count on a successful step** — it is a plan
     total, not a consecutive-failure streak.
+
+## Addendum (live validation, 2026-09-15) — the diagnostic's verdict word was left behind
+
+The spec's R5 example line is `[plan-memory] agent=iris-1 verdict=succeeded steps=- skipped=2
+reflected=true` — but R4 removes the success word from the **prompt** for exactly that outcome. The
+first live run after merge (2100 s, cc=3, `/home/anima/057run.log`) emitted 141 such lines
+(140 × `skipped=1`, 1 × `skipped=2`) and every one of them read
+`verdict=succeeded … skipped=1`: a log line asserting the unqualified success the spec set out to
+repair, i.e. the same lie one layer up — in the very signal an operator greps.
+
+R5' (diagnostic honesty, implemented with this addendum, `plan-memory-diagnostic.ts`):
+`planMemoryVerdict` gains the `skipped` verdict and returns it when the builder would — precedence
+mirroring `plan-builder.ts` exactly (superseded > skipped > succeeded/failed), with the builder's
+empty-`steps` fallback so a `0 of 0` skip line is never fabricated. `planMemoryVerdict` is
+diagnostic-only (one caller: `logPlanMemory`); no engine or prompt behavior changes.
+
+```
+[plan-memory] agent=iris-1 verdict=skipped steps=- skipped=2 reflected=true
+```
+
+Spec-049 discipline (zero LLM, pure string arithmetic, never throws into a cycle) is unchanged;
+tests added for the skip verdict, the 0/absent fallback, the empty-steps fallback, and
+supersession precedence.
+
+### Live evidence (post-merge run, 2100 s)
+
+| Signal                  | Value                                                                   |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `[plan-memory]` renders | 180 (141 carrying `skipped=`)                                           |
+| Σ `skipped=`            | 142 (140 × 1, 1 × 2) ≤ 143 `[step-skip]` lines — the count is honest    |
+| verdict mix             | 140/141 with `skipped=` (pre-R5'); post-R5' they read `verdict=skipped` |
+| affordance execs        | 44 of 187 step advances → **76 % of plan steps were skips**             |
+
+**AC-8 is satisfied** (`> 0` plan-memory renders with the skip fact carried into the prompt; the
+prompt render itself is pinned by the real-chain E2E that QA added to `examples/tests`). The
+76 % skip share is the #206 livelock, not a spec-057 defect: this spec reports skips honestly, it
+does not reduce them — that is #206's job.

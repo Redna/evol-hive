@@ -16,14 +16,27 @@
  * the call so a logging failure can never break a cycle.
  *
  * The verdict vocabulary mirrors the builder's rendering exactly:
- * `superseded` (spec 056) / `succeeded` / `failed` (spec 055).
+ * `superseded` (spec 056) / `skipped` (spec 057) / `succeeded` / `failed`
+ * (spec 055) — including the empty-`steps` fallback the builder applies, so a
+ * `0 of 0` skip line is never fabricated.
  */
 
 import type { LastPlanOutcome } from '@evol-hive/shared';
 
-/** The rendered verdict of a last-plan outcome — the builder's own trichotomy. */
-export function planMemoryVerdict(outcome: LastPlanOutcome): 'superseded' | 'succeeded' | 'failed' {
+/**
+ * The rendered verdict of a last-plan outcome — the builder's own vocabulary.
+ *
+ * `skipped` (spec 057 addendum): a plan that reached its end by advancing past
+ * failed steps drops the success/failure word in the prompt, so the diagnostic
+ * must too — `verdict=succeeded skipped=2` reads as exactly the unqualified
+ * success the spec repaired. Precedence mirrors `plan-builder.ts` exactly:
+ * supersession (spec 056) > skipped (spec 057) > succeeded / failed (spec 055).
+ */
+export function planMemoryVerdict(
+  outcome: LastPlanOutcome,
+): 'superseded' | 'skipped' | 'succeeded' | 'failed' {
   if (outcome.superseded === true) return 'superseded';
+  if ((outcome.stepsSkipped ?? 0) > 0 && outcome.steps.length > 0) return 'skipped';
   return outcome.success ? 'succeeded' : 'failed';
 }
 
