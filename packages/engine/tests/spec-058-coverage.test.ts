@@ -77,7 +77,9 @@ describe('Spec 058 — Document structure', () => {
 
   it('spec file contains exactly 8 acceptance criteria', () => {
     const content = readFile(SPEC_PATH);
-    const acMatches = content.match(/^- \[ \] \*\*AC-\d+\*\*/gm);
+    // Count AC definitions regardless of checkbox state — the boxes are ticked
+    // as criteria are verified, but the spec must always define exactly eight.
+    const acMatches = content.match(/^- \[[ x]\] \*\*AC-\d+\*\*/gm);
     expect(acMatches).not.toBeNull();
     expect(acMatches!.length).toBe(8);
   });
