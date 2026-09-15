@@ -717,6 +717,14 @@ export interface ExecuteResult {
   error?: string;
   planComplete: boolean;
   stepSkipped?: boolean;
+  /**
+   * The cumulative number of steps skipped by the spec-037 livelock guard for
+   * the in-flight plan (spec 057, Req 1 — issue #204). Omitted on skip-free
+   * results so their shape is byte-identical; present (and cumulative, never
+   * reset by an intervening success) on every result once the plan has skipped
+   * a step, so the final cycle carries the total Reflect stamps.
+   */
+  stepsSkipped?: number;
   /** `true` when the action was rejected by plan validation (spec 016, Req 13). */
   deviationRejected?: boolean;
   /**

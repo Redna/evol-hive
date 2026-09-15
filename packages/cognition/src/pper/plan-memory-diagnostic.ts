@@ -38,9 +38,13 @@ export function planMemoryDiagnosticLine(agentId: string, outcome: LastPlanOutco
   const verdict = planMemoryVerdict(outcome);
   const steps =
     outcome.superseded === true ? `${outcome.stepsCompleted ?? 0}/${outcome.stepsTotal ?? 0}` : '-';
+  // Spec 057 (R5 — issue #204): the per-plan skip total is exposed only when
+  // stamped, so pre-spec-056 lines stay byte-identical and `grep 'skipped='`
+  // is a direct live signal for skip frequency.
+  const skipped = outcome.stepsSkipped !== undefined ? ` skipped=${outcome.stepsSkipped}` : '';
   return (
     `[plan-memory] agent=${agentId} verdict=${verdict} ` +
-    `steps=${steps} reflected=${outcome.reflected === true}`
+    `steps=${steps}${skipped} reflected=${outcome.reflected === true}`
   );
 }
 

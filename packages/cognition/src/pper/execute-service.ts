@@ -55,6 +55,16 @@ export class ExecuteServiceImpl {
    */
   private readonly stepFailures = new Map<string, { stepKey: string; count: number }>();
 
+  /**
+   * Cumulative per-plan skip total (spec 057, R1 — issue #204): the number of
+   * steps the step-skip livelock guard has advanced past for the agent's
+   * in-flight plan. Keyed by the plan's id so a new plan resets the count;
+   * unlike `stepFailures` it is NOT reset by an intervening successful step —
+   * it is a per-plan total that rides every later `ExecuteResult` so Reflect
+   * can stamp the plan's final cycle.
+   */
+  private readonly planSkips = new Map<string, { planId: string; count: number }>();
+
   /** After this many consecutive failures the step is skipped (advances). */
   private static readonly MAX_STEP_FAILURES = 2;
 
@@ -75,15 +85,24 @@ export class ExecuteServiceImpl {
         return { success: false, error: 'No active plan', planComplete: true };
       }
 
+      // Per-plan skip accumulator (spec 057, R1): a new plan id resets the
+      // count. Every result below rides `withSkipCount` so the cumulative total
+      // is visible once the plan has skipped a step.
+      this.syncPlanSkipCount(agentId, agentState.currentPlan.id);
+
       // If the plan is already complete, return success without executing.
       if (dataProvider.isPlanComplete(agentId)) {
-        return { success: true, planComplete: true };
+        return this.withSkipCount(agentId, { success: true, planComplete: true });
       }
 
       // Get the current step.
       const step = dataProvider.getCurrentStep(agentId);
       if (!step) {
-        return { success: false, error: 'No current step in plan', planComplete: true };
+        return this.withSkipCount(agentId, {
+          success: false,
+          error: 'No current step in plan',
+          planComplete: true,
+        });
       }
 
       // Navigation-then-execution (spec 039, R2): a step carrying targetArea
@@ -102,7 +121,7 @@ export class ExecuteServiceImpl {
           const feedback = `Navigation is not available — cannot reach '${step.targetArea}'.`;
           dataProvider.setSystemFeedback(agentId, feedback);
           dataProvider.setThinking(agentId, false);
-          return { success: false, error: feedback, planComplete: false };
+          return this.withSkipCount(agentId, { success: false, error: feedback, planComplete: false });
         }
         // Call the port ON the provider — extracting the method would lose
         // its `this` (bridge implementations read wired engine state).
@@ -110,7 +129,11 @@ export class ExecuteServiceImpl {
         if (status === 'walking') {
           // Multi-tick movement in progress: the step stays current; the
           // affordance executes on arrival (a later cycle observes it).
-          return { success: true, planComplete: false, navigating: true };
+          return this.withSkipCount(agentId, {
+            success: true,
+            planComplete: false,
+            navigating: true,
+          });
         }
         if (status === 'no-route' || status === 'unknown-area') {
           const feedback =
@@ -121,11 +144,11 @@ export class ExecuteServiceImpl {
           // past the step (same guard as affordance execution failures).
           const skipped = this.registerStepFailure(agentId, step, feedback, dataProvider);
           if (skipped !== undefined) {
-            return skipped;
+            return this.withSkipCount(agentId, skipped);
           }
           dataProvider.setSystemFeedback(agentId, feedback);
           dataProvider.setThinking(agentId, false);
-          return { success: false, error: feedback, planComplete: false };
+          return this.withSkipCount(agentId, { success: false, error: feedback, planComplete: false });
         }
         // status === 'arrived': the agent stands at the target area. A
         // navigation-only step (no targetAffordance) completes here; a step
@@ -134,7 +157,7 @@ export class ExecuteServiceImpl {
         if (step.targetAffordance === undefined) {
           dataProvider.advanceStep(agentId);
           const planComplete = dataProvider.isPlanComplete(agentId);
-          return { success: true, planComplete };
+          return this.withSkipCount(agentId, { success: true, planComplete });
         }
       }
 
@@ -149,7 +172,7 @@ export class ExecuteServiceImpl {
         );
         dataProvider.advanceStep(agentId);
         const planComplete = dataProvider.isPlanComplete(agentId);
-        return { success: true, planComplete, stepSkipped: true };
+        return this.withSkipCount(agentId, { success: true, planComplete, stepSkipped: true });
       }
 
       // Escape hatch (spec 037, Req 1): a 'wait' step is an intentional no-op.
@@ -165,7 +188,7 @@ export class ExecuteServiceImpl {
       if (step.targetAffordance === WAIT_AFFORDANCE) {
         dataProvider.advanceStep(agentId);
         const planComplete = dataProvider.isPlanComplete(agentId);
-        return { success: true, planComplete, stepSkipped: true };
+        return this.withSkipCount(agentId, { success: true, planComplete, stepSkipped: true });
       }
 
       // Plan validation (spec 016, Req 11): before executing, validate that the
@@ -186,12 +209,12 @@ export class ExecuteServiceImpl {
           const reason = validation.reason ?? 'Action deviates from plan';
           dataProvider.setSystemFeedback(agentId, reason);
           dataProvider.setThinking(agentId, false);
-          return {
+          return this.withSkipCount(agentId, {
             success: false,
             error: reason,
             planComplete: false,
             deviationRejected: true,
-          };
+          });
         }
       }
 
@@ -206,7 +229,10 @@ export class ExecuteServiceImpl {
         const compound =
           dataProvider.resolveCompoundAction?.(agentState.location, step.targetAffordance) ?? null;
         if (compound) {
-          return await this.executeCompoundAction(agentId, agentState.location, compound);
+          return this.withSkipCount(
+            agentId,
+            await this.executeCompoundAction(agentId, agentState.location, compound),
+          );
         }
 
         // Co-location failure (spec 031, Req 4): the affordance exists on an
@@ -220,7 +246,11 @@ export class ExecuteServiceImpl {
           const failureReason = `The ${relocated.objectName} (${relocated.objectId}) is no longer here — it moved to the ${relocated.roomId}.`;
           dataProvider.setSystemFeedback(agentId, failureReason);
           dataProvider.setThinking(agentId, false);
-          return { success: false, error: failureReason, planComplete: false };
+          return this.withSkipCount(agentId, {
+            success: false,
+            error: failureReason,
+            planComplete: false,
+          });
         }
 
         // Skip steps with unresolvable affordances (LLM may plan actions that
@@ -234,7 +264,7 @@ export class ExecuteServiceImpl {
         const planComplete = dataProvider.isPlanComplete(agentId);
         const feedback = `Skipped step: affordance '${step.targetAffordance}' not found in room '${agentState.location}'.`;
         dataProvider.setSystemFeedback(agentId, feedback);
-        return { success: true, planComplete, stepSkipped: true };
+        return this.withSkipCount(agentId, { success: true, planComplete, stepSkipped: true });
       }
 
       // Check preconditions.
@@ -250,15 +280,15 @@ export class ExecuteServiceImpl {
         // world changes) remain reachable.
         const skipped = this.registerStepFailure(agentId, step, feedback, dataProvider);
         if (skipped !== undefined) {
-          return skipped;
+          return this.withSkipCount(agentId, skipped);
         }
         dataProvider.setSystemFeedback(agentId, feedback);
         dataProvider.setThinking(agentId, false);
-        return {
+        return this.withSkipCount(agentId, {
           success: false,
           error: `Preconditions not met: ${failedList}`,
           planComplete: false,
-        };
+        });
       }
 
       // Execute the affordance.
@@ -275,15 +305,15 @@ export class ExecuteServiceImpl {
         // later steps. Feedback names the failure either way.
         const skipped = this.registerStepFailure(agentId, step, feedback, dataProvider);
         if (skipped !== undefined) {
-          return skipped;
+          return this.withSkipCount(agentId, skipped);
         }
         dataProvider.setSystemFeedback(agentId, feedback);
         dataProvider.setThinking(agentId, false);
-        return {
+        return this.withSkipCount(agentId, {
           success: false,
           error: result.failureReason ?? 'Affordance execution failed',
           planComplete: false,
-        };
+        });
       }
 
       // Success resets the failure counter.
@@ -299,12 +329,12 @@ export class ExecuteServiceImpl {
 
       // Report plan completion.
       const planComplete = dataProvider.isPlanComplete(agentId);
-      return { success: true, result, planComplete };
+      return this.withSkipCount(agentId, { success: true, result, planComplete });
     } catch (err) {
       // Guarantee isThinking is set to false on any exception (§9.1).
       dataProvider.setThinking(agentId, false);
       const message = err instanceof Error ? err.message : String(err);
-      return { success: false, error: message, planComplete: false };
+      return this.withSkipCount(agentId, { success: false, error: message, planComplete: false });
     }
   }
 
@@ -434,6 +464,10 @@ export class ExecuteServiceImpl {
       return undefined;
     }
     this.stepFailures.delete(agentId);
+    // Per-plan skip total (spec 057, R1): increment exactly once per skip; it
+    // is deliberately NOT reset here on a successful step between skips.
+    const skips = this.planSkips.get(agentId);
+    if (skips !== undefined) skips.count += 1;
     console.error(
       `[step-skip] agent=${agentId} step='${current.slice(0, 60)}' failed ${count}x consecutively — advancing past it`,
     );
@@ -443,6 +477,29 @@ export class ExecuteServiceImpl {
     dataProvider.setSystemFeedback(agentId, skipFeedback);
     dataProvider.setThinking(agentId, false);
     return { success: true, planComplete, stepSkipped: true };
+  }
+
+  /**
+   * Reset the per-plan skip accumulator when the agent starts a new plan
+   * (spec 057, R1). A new plan id zeroes the count so earlier skips never leak
+   * into the next plan's outcome.
+   */
+  private syncPlanSkipCount(agentId: string, planId: string): void {
+    const current = this.planSkips.get(agentId);
+    if (current === undefined || current.planId !== planId) {
+      this.planSkips.set(agentId, { planId, count: 0 });
+    }
+  }
+
+  /**
+   * Attach the accumulated per-plan skip count to a result (spec 057, R1).
+   * Skip-free results pass through untouched so their shape stays
+   * byte-identical; once non-zero the count rides every later result.
+   */
+  private withSkipCount(agentId: string, result: ExecuteResult): ExecuteResult {
+    const skips = this.planSkips.get(agentId);
+    if (skips === undefined || skips.count === 0) return result;
+    return { ...result, stepsSkipped: skips.count };
   }
 }
 

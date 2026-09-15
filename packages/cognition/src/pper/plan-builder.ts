@@ -132,11 +132,20 @@ export class PlanBuilderImpl implements PlanBuilder {
       // mid-flight. stepsCompleted/stepsTotal are only read when superseded
       // (they are always stamped together, Req 1); outcomes without
       // `superseded` render exactly as before (spec 055).
+      // Spec 057 (R4 — issue #204): a plan that reached its end by advancing
+      // past failed steps (the spec-037 guard) drops the success/failure word —
+      // an unqualified "it succeeded" is the lie being repaired — and reports
+      // the skip count. An empty step list falls back to the spec-055 verdict
+      // so a `0 of 0` line is never fabricated.
+      const skipCount = outcome.stepsSkipped ?? 0;
+      const skipped = skipCount > 0 && outcome.steps.length > 0;
       const verdict = outcome.superseded
         ? `superseded after ${outcome.stepsCompleted ?? 0} of ${outcome.stepsTotal ?? 0} steps${deltas}`
-        : outcome.success
-          ? `it succeeded${deltas}`
-          : `it failed${deltas}`;
+        : skipped
+          ? `${skipCount} of ${outcome.steps.length} steps were skipped${deltas}`
+          : outcome.success
+            ? `it succeeded${deltas}`
+            : `it failed${deltas}`;
       dynamicLines.push(`Your last plan was "${stepList}" — ${verdict}.`);
       if (outcome.reflected) {
         dynamicLines.push(
