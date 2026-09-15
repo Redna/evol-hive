@@ -210,3 +210,14 @@ enum changes as targets leave the room or hit the talk cap; `Plant seeds…` —
 | `[plan-repeat]`                      | 2 (max count 3; bounded, far below the #191 356×) |
 | world saturation                     | `planter is full` × 6                             |
 | conversations / social               | 9 / 17                                            |
+
+### 5. Correction — the "healthy end state" readings were short-run artifacts
+
+The runs backing the spec-055/056 validation reports were stopped at 137 state
+samples (~15–20 min), which is _before_ the population's collapse phase. A 40-min
+run of the same built code reproduces the 053/054/055 signature instead: 68
+affordance executions against **503 step skips (88 %)**, `[step-skip]` split 500
+(iris-1) / 3 (gardener-1), and every drive decaying monotonically to zero
+(`gardener-1` ends `e=0 h=0 s=0`; two of three agents at zero after 40 minutes).
+Conversations stop at ~10 min, after which every proposed social step is
+guaranteed to fail-and-skip. Filed with the cross-run table as **#206**.
