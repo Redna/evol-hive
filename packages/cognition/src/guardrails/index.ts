@@ -123,6 +123,7 @@ export class GuardrailEngineImpl implements GuardrailEngine {
         return {
           valid: false,
           reason: `Movement '${action}' from room '${context.fromRoom}' is blocked: the connection is closed. Reflect and choose a different action.`,
+          reasonCode: 'movement-blocked',
         };
       }
     }
@@ -143,10 +144,25 @@ export class GuardrailEngineImpl implements GuardrailEngine {
       context.fromRoom !== undefined &&
       !action.startsWith('go_to_')
     ) {
-      if (!context.affordanceGuard.isAffordanceAvailableInRoom(action, context.fromRoom)) {
+      // Spec 059, R1 (issue #210): prefer the agent-scoped, moment-scoped
+      // eligibility projection when the wired guard provides it — the same
+      // live set the plan enum consumes (spec 058 R1). Legacy guards without
+      // the method keep the room-scoped registry check byte-identically.
+      const eligibleForAgent = context.affordanceGuard.isAffordanceEligibleForAgent;
+      const eligible =
+        eligibleForAgent !== undefined
+          ? eligibleForAgent.call(
+              context.affordanceGuard,
+              action,
+              context.fromRoom,
+              context.agentId,
+            )
+          : context.affordanceGuard.isAffordanceAvailableInRoom(action, context.fromRoom);
+      if (!eligible) {
         return {
           valid: false,
           reason: `The '${action}' target is no longer in '${context.fromRoom}'. The plan is stale — reflect and choose a different action.`,
+          reasonCode: 'stale-target',
         };
       }
     }
@@ -164,6 +180,7 @@ export class GuardrailEngineImpl implements GuardrailEngine {
     return {
       valid: false,
       reason: GUARDRAIL_DEVIATION_FEEDBACK_TEMPLATE.replace('{action}', action),
+      reasonCode: 'deviation',
     };
   }
 }

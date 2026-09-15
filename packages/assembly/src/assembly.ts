@@ -260,6 +260,11 @@ export interface CognitionStack {
   /** Token usage aggregation (spec 022, Req 10) — populated for real LLM runs. */
   readonly tokenUsageReporter: TokenUsageReporter;
   readonly guardrail: GuardrailEngineImpl;
+  /**
+   * The affordance co-location / eligibility guard (spec 031 Req 5; spec 059
+   * R1). Exposed for introspection and the plan-retention adapter tests.
+   */
+  readonly affordanceGuard: AffordanceGuard;
   readonly embeddingProvider: MemEmbeddingProvider;
   readonly classifier: AffordanceClassifier;
   readonly vectorStore: InMemoryVectorStore;
@@ -356,9 +361,27 @@ export function assembleCognitionStack(
   // Affordance co-location plan validation (spec 031, Req 5): the adapter
   // reads the core's live smart-object registry — objects move at runtime
   // (spec 030 move_object), so the guard must never trust a cached view.
+  // Spec 059, R1 (issue #210): the agent-scoped, moment-scoped eligibility
+  // method prefers the core's live `getVisibleAffordancesInRoom` projection
+  // (spec 058 R1 — conversation eligibility + fog), falling back to the
+  // room-scoped registry check only when the projection is unavailable.
+  // Both reads are live (no caching across ticks).
   const affordanceGuard: AffordanceGuard = {
     isAffordanceAvailableInRoom: (affordanceId: string, roomId: string): boolean =>
       core.smartObjectRegistry.isAffordanceAvailableInRoom(affordanceId, roomId),
+    isAffordanceEligibleForAgent: (
+      affordanceId: string,
+      roomId: string,
+      agentId: string,
+    ): boolean => {
+      const perception = core.bridges.perception;
+      if (typeof perception.getVisibleAffordancesInRoom !== 'function') {
+        return core.smartObjectRegistry.isAffordanceAvailableInRoom(affordanceId, roomId);
+      }
+      return perception
+        .getVisibleAffordancesInRoom(agentId, roomId)
+        .some((affordance) => affordance.id === affordanceId);
+    },
   };
   const guardrail = new GuardrailEngineImpl({ config: guardrailConfig, topologyGuard });
 
@@ -453,6 +476,7 @@ export function assembleCognitionStack(
     llmClient,
     tokenUsageReporter,
     guardrail,
+    affordanceGuard,
     embeddingProvider: memory.embeddingProvider,
     classifier,
     vectorStore: memory.vectorStore,

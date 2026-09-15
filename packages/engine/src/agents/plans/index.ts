@@ -169,6 +169,20 @@ export class PlanManagerImpl implements PlanManager {
   clearPlan(agentId: string): void {
     this.agentManager.updateState(agentId, { currentPlan: null });
   }
+
+  /**
+   * Invalidate the in-flight plan (spec 059, R3 — issue #210): stamp the
+   * spec-056 `superseded` outcome for the plan being abandoned, then clear
+   * `currentPlan` so the sticky Plan phase (spec 002) re-formulates from
+   * fresh eligibility. The `superseded` stamp is the honest self-visibility
+   * record (spec 057 vocabulary) because Reflect's `planAtEntry` is null
+   * after the clear and can no longer stamp. A subsequent `createPlan` sees
+   * no in-flight plan and therefore does not stamp a second outcome.
+   */
+  invalidatePlan(agentId: string): void {
+    this.stampSupersededOutcome(agentId);
+    this.clearPlan(agentId);
+  }
 }
 
 /**

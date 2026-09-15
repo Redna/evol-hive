@@ -68,6 +68,13 @@ export interface PlanManager {
   isComplete(agentId: string): boolean;
   /** Clear the current plan (e.g., after reflection forces replanning). */
   clearPlan(agentId: string): void;
+  /**
+   * Invalidate the agent's in-flight plan (spec 059, R3 — issue #210): stamp
+   * the honest `superseded` outcome for the abandoned plan, then clear
+   * `currentPlan` so the sticky Plan phase re-formulates from fresh
+   * eligibility.
+   */
+  invalidatePlan(agentId: string): void;
 }
 
 // ── Re-exports ────────────────────────────────────────────────────────────────

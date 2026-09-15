@@ -217,6 +217,18 @@ export interface AffordanceGuard {
    * `affordanceId` (live registry read — no caching across ticks).
    */
   isAffordanceAvailableInRoom(affordanceId: string, roomId: string): boolean;
+  /**
+   * Agent-scoped, moment-scoped eligibility (spec 059, R1 — issue #210):
+   * `true` when `affordanceId` is in the agent's live eligible set for
+   * `roomId` — the same projection spec 058 R1 feeds the plan enum. The
+   * engine's assembly adapter implements this against
+   * `PerceptionProvider.getVisibleAffordancesInRoom(agentId, roomId)` (which
+   * composes conversation eligibility and fog), falling back to
+   * {@link isAffordanceAvailableInRoom} only when the visibility projection
+   * is unavailable. Optional so existing guard implementations compile and
+   * behave byte-identically.
+   */
+  isAffordanceEligibleForAgent?(affordanceId: string, roomId: string, agentId: string): boolean;
 }
 
 // ── modify_scene cognitive tool (Req 13) ─────────────────────────────────────
