@@ -157,6 +157,15 @@ export class ExecuteDataProviderImpl implements ExecuteDataProvider {
     this.planManager.advanceStep(agentId);
   }
 
+  /**
+   * Invalidate the agent's in-flight plan (spec 059, R3 — issue #210):
+   * delegates to the engine's `PlanManager`, which stamps the honest
+   * `superseded` outcome and clears `currentPlan`.
+   */
+  invalidatePlan(agentId: string): void {
+    this.planManager.invalidatePlan(agentId);
+  }
+
   applyDriveChanges(agentId: string, changes: Partial<Record<string, number>>): void {
     this.driveSystem.applyChanges(agentId, changes);
   }

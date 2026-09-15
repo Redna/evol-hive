@@ -86,6 +86,43 @@ function oneLine(text: string, max: number): string {
   return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;
 }
 
+/** The invalidation context the `[plan-stale]` line reads (spec 059, R5). */
+export interface PlanStaleContext {
+  agentId: string;
+  planId: string;
+  /** The plan's zero-based current step index. */
+  currentStepIndex: number;
+  /** The plan's total step count. */
+  stepTotal: number;
+  /** The offending target affordance (absent from the live eligible set). */
+  targetAffordance: string;
+}
+
+/**
+ * The one-line stale-plan diagnostic (spec 059, R5 — pure, tests assert the
+ * exact string):
+ * `[plan-stale] agent=<id> plan=<id> step=<i>/<N> target='<affordance>' not in eligible set — plan invalidated`
+ */
+export function planStaleLine(context: PlanStaleContext): string {
+  return (
+    `[plan-stale] agent=${context.agentId} plan=${context.planId} ` +
+    `step=${context.currentStepIndex + 1}/${context.stepTotal} ` +
+    `target='${context.targetAffordance}' not in eligible set — plan invalidated`
+  );
+}
+
+/**
+ * Emit the stale-plan diagnostic. Never throws (spec 049 discipline): a
+ * logging failure must not cost the cycle that just invalidated a plan.
+ */
+export function logPlanStale(context: PlanStaleContext): void {
+  try {
+    console.error(planStaleLine(context));
+  } catch {
+    // Diagnostics must never break a cycle.
+  }
+}
+
 /**
  * pper/reflect-diagnostic — the per-cycle `[reflect]` log line.
  *

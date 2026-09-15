@@ -528,10 +528,23 @@ export interface GuardrailConfig {
   waitSuppression?: boolean;
 }
 
+/**
+ * Machine-readable plan-rejection reason (spec 059, R2 — issue #210). The
+ * human-readable `reason` strings are unchanged; this code lets Execute act
+ * differently on an irreversibly stale target (invalidate the whole plan)
+ * versus a blocked movement (skip after two).
+ */
+export type PlanValidationReasonCode = 'stale-target' | 'movement-blocked' | 'deviation';
+
 /** The result of plan validation (spec 016, Req 3). */
 export interface PlanValidationResult {
   valid: boolean;
   reason?: string;
+  /**
+   * The rejection kind (spec 059, R2) — additive-optional; absent on valid
+   * results and on results produced by implementations that predate spec 059.
+   */
+  reasonCode?: PlanValidationReasonCode;
 }
 
 /**
@@ -728,6 +741,13 @@ export interface ExecuteResult {
   /** `true` when the action was rejected by plan validation (spec 016, Req 13). */
   deviationRejected?: boolean;
   /**
+   * `true` when a stale-target rejection invalidated the agent's in-flight
+   * plan (spec 059, R3 — issue #210). Additive-optional: omitted on every
+   * non-invalidation result so skip-free/legacy executions keep their exact
+   * `ExecuteResult` shape.
+   */
+  planInvalidated?: boolean;
+  /**
    * `true` when the step is waiting on multi-tick navigation (spec 039, R2):
    * the affordance executes on arrival; the step stays current meanwhile.
    */
@@ -831,6 +851,15 @@ export interface ExecuteDataProvider {
    * consult it).
    */
   navigateToArea?(agentId: string, targetArea: string): NavigationStepStatus;
+  /**
+   * Invalidate the agent's in-flight plan after a stale-target guardrail
+   * rejection (spec 059, R3 — issue #210): stamp the honest `superseded`
+   * outcome, then clear `currentPlan` so the sticky Plan phase re-formulates
+   * from fresh eligibility. Optional so existing custom `ExecuteDataProvider`
+   * implementations compile and behave byte-identically — when absent,
+   * Execute falls through to the spec-037 step-skip safety net (R4).
+   */
+  invalidatePlan?(agentId: string): void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

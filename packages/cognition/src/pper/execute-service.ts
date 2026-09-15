@@ -26,7 +26,7 @@ import type {
   AffordanceGuard,
 } from '@evol-hive/shared';
 import { WAIT_AFFORDANCE } from '@evol-hive/shared';
-import { logExecuteOutcome } from './execute-diagnostic.js';
+import { logExecuteOutcome, logPlanStale } from './execute-diagnostic.js';
 import type { GuardrailEngine } from '../index.js';
 
 /** Constructor options for {@link ExecuteServiceImpl}. */
@@ -79,12 +79,17 @@ export class ExecuteServiceImpl {
    * untouched.
    */
   async execute(agentId: string): Promise<ExecuteResult> {
+    // Spec 059, R5: capture the plan BEFORE the phase runs so an invalidating
+    // result's `[execute]` line still names the plan that was invalidated
+    // (non-invalidation paths keep reading the post-phase plan below, so the
+    // step advance stays visible in the line).
+    const planBefore = this.options.dataProvider.getAgentState(agentId)?.currentPlan ?? null;
     const result = await this.executeImpl(agentId);
-    logExecuteOutcome(
-      agentId,
-      this.options.dataProvider.getAgentState(agentId)?.currentPlan ?? null,
-      result,
-    );
+    const planForLine =
+      result.planInvalidated === true
+        ? planBefore
+        : (this.options.dataProvider.getAgentState(agentId)?.currentPlan ?? null);
+    logExecuteOutcome(agentId, planForLine, result);
     return result;
   }
 
@@ -233,6 +238,46 @@ export class ExecuteServiceImpl {
         });
         if (!validation.valid) {
           const reason = validation.reason ?? 'Action deviates from plan';
+
+          // Spec 059, R3 (issue #210): an irreversibly stale target invalidates
+          // the WHOLE plan instead of re-queuing the same stale step forever.
+          // The guard stays advisory (spec 031 Req 7) — Execute owns the
+          // provider, so it performs the invalidation. `invalidatePlan` is
+          // optional; when unwired we fall through to the R4 step-skip net.
+          const invalidate = dataProvider.invalidatePlan?.bind(dataProvider);
+          if (validation.reasonCode === 'stale-target' && invalidate !== undefined) {
+            const stalePlan = agentState.currentPlan;
+            // Spec 059, R5: one zero-LLM line per invalidation at this seam.
+            // A logging failure must never cost a cycle — `logPlanStale`
+            // swallows its own errors (spec 049 discipline).
+            logPlanStale({
+              agentId,
+              planId: stalePlan.id,
+              currentStepIndex: stalePlan.currentStepIndex,
+              stepTotal: stalePlan.steps.length,
+              targetAffordance: step.targetAffordance,
+            });
+            invalidate(agentId);
+            dataProvider.setSystemFeedback(agentId, reason);
+            dataProvider.setThinking(agentId, false);
+            return this.withSkipCount(agentId, {
+              success: false,
+              error: reason,
+              planComplete: false,
+              deviationRejected: true,
+              planInvalidated: true,
+            });
+          }
+
+          // Spec 059, R4: a deviation that does not invalidate the plan
+          // (movement blocked, legacy provider without `invalidatePlan`, or a
+          // generic deviation) is fed through the existing spec-037 step-skip
+          // guard exactly like an execution failure — no plan+step can be
+          // handed to Execute more than the bounded number of times.
+          const skipped = this.registerStepFailure(agentId, step, reason, dataProvider);
+          if (skipped !== undefined) {
+            return this.withSkipCount(agentId, skipped);
+          }
           dataProvider.setSystemFeedback(agentId, reason);
           dataProvider.setThinking(agentId, false);
           return this.withSkipCount(agentId, {
