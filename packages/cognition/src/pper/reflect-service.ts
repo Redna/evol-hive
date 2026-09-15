@@ -249,6 +249,12 @@ function stampPlanOutcome(
       steps: plan.steps.map((step) => step.targetAffordance ?? step.description),
       success: executeResult.success === true,
       ...(cleanDriveChanges !== undefined ? { driveChanges: cleanDriveChanges } : {}),
+      // Spec 057 (R3 — issue #204): a completed-by-skipping plan carries its
+      // skip total so the next plan prompt can report it honestly. Zero/absent
+      // renders byte-identically to a spec-055 stamp (additive-optional).
+      ...(executeResult.stepsSkipped !== undefined && executeResult.stepsSkipped > 0
+        ? { stepsSkipped: executeResult.stepsSkipped }
+        : {}),
       reflected: memoryStored,
     };
     dataProvider.stampLastPlanOutcome(agentId, outcome);

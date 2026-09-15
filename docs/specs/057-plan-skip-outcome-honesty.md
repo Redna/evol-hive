@@ -79,37 +79,37 @@ consecutive failures) does not change.
 
 ## Acceptance Criteria
 
-- [ ] **AC-1** (R1): Unit test — an agent on a 3-step plan where step 0 is skipped,
+- [x] **AC-1** (R1): Unit test — an agent on a 3-step plan where step 0 is skipped,
       step 1 executes, and step 2 is skipped yields a final `ExecuteResult` with
       `planComplete === true` and `stepsSkipped === 2`; the intermediate result after
       the first skip carries `stepsSkipped === 1`. _(maps to R1)_
-- [ ] **AC-2** (R1): Unit test — a skip-free plan never carries `stepsSkipped`
+- [x] **AC-2** (R1): Unit test — a skip-free plan never carries `stepsSkipped`
       (`toBeUndefined()`), and switching to a new plan id resets a previously
       accumulated count to 0. _(maps to R1)_
-- [ ] **AC-3** (R1, R6): Regression test — the spec-037 skip suite passes unchanged:
+- [x] **AC-3** (R1, R6): Regression test — the spec-037 skip suite passes unchanged:
       a step still advances only after 2 consecutive failures of the same step,
       `stepSkipped === true` is still returned, `[step-skip]`'s format is unchanged,
       and skip-free execution results keep their existing shape. _(maps to R1, R6)_
-- [ ] **AC-4** (R2): Type-level / additive test — `LastPlanOutcome` literals without
+- [x] **AC-4** (R2): Type-level / additive test — `LastPlanOutcome` literals without
       `stepsSkipped` typecheck and behave as before; one with `stepsSkipped: 2`
       typechecks; `pnpm typecheck` passes under `exactOptionalPropertyTypes`.
       _(maps to R2)_
-- [ ] **AC-5** (R3): Reflect test — a completed plan whose `ExecuteResult` carries
+- [x] **AC-5** (R3): Reflect test — a completed plan whose `ExecuteResult` carries
       `stepsSkipped: 2` stamps `lastPlanOutcome.stepsSkipped === 2`; a completed plan
       with no `stepsSkipped` stamps an outcome with the field absent
       (`toBeUndefined()`). _(maps to R3)_
-- [ ] **AC-6** (R4): Builder test — an outcome with `steps: ['a','b','c']`,
+- [x] **AC-6** (R4): Builder test — an outcome with `steps: ['a','b','c']`,
       `success: true`, `stepsSkipped: 2` renders exactly
       `Your last plan was "a, b, c" — 2 of 3 steps were skipped.` in the dynamic
       section; with `driveChanges` the deltas render before the period; with
       `reflected: true` the reflection line follows; a superseded outcome still wins;
       an outcome without `stepsSkipped` renders byte-identically to spec 055.
       _(maps to R4)_
-- [ ] **AC-7** (R5): Diagnostic test — `planMemoryDiagnosticLine` contains
+- [x] **AC-7** (R5): Diagnostic test — `planMemoryDiagnosticLine` contains
       `skipped=2` for a skipped outcome and contains no `skipped=` substring when
       `stepsSkipped` is absent; the existing spec-056 exact-string tests still pass.
       _(maps to R5)_
-- [ ] **AC-8** (R1–R5): Live run (`USE_REAL_LLM=true SCENE_DURATION_MS=... npx tsx
+- [x] **AC-8** (R1–R5): Live run (`USE_REAL_LLM=true SCENE_DURATION_MS=... npx tsx
       examples/dynamic-world-sim.ts`, ~7 min like the #204 evidence run) shows
       `[plan-memory]` lines carrying `skipped=N` for plans that had step skips, and
       the skip count is `<=` the run's `[step-skip]` count; `[plan-repeat]` stays

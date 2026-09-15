@@ -75,6 +75,15 @@ export interface LastPlanOutcome {
   stepsCompleted?: number;
   /** Total steps the replaced plan had (only read when `superseded`). */
   stepsTotal?: number;
+  /**
+   * The number of steps skipped by the spec-037 livelock guard while the plan
+   * ran (spec 057, Req 2 — issue #204). A plan can reach its final step by
+   * advancing past failed ones, so `success: true` alone would hide the
+   * abandonment; this additive-optional field lets the plan prompt report the
+   * skip honestly. Absent on skip-free, spec-055 completion/failure, and
+   * spec-056 supersession stamps (those render byte-identically).
+   */
+  stepsSkipped?: number;
 }
 
 /** The full internal state of an agent at any point in time. */
