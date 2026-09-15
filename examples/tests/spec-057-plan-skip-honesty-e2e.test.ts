@@ -305,7 +305,7 @@ describe('spec 057 AC-8 gap-fill: skipped plan through the real Execute → Refl
     const memLines = stderrLines('[plan-memory]');
     expect(memLines).toHaveLength(1);
     expect(memLines[0]).toBe(
-      '[plan-memory] agent=gardener-1 verdict=succeeded steps=- skipped=2 reflected=true',
+      '[plan-memory] agent=gardener-1 verdict=skipped steps=- skipped=2 reflected=true',
     );
   });
 
