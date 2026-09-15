@@ -47,6 +47,7 @@ import { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
 import { logOverheardDiagnostic } from './overheard-diagnostic.js';
 import { logTalkEnumDiagnostic } from './talk-enum.js';
 import { logDriveHintDiagnostic } from './drive-hint-diagnostic.js';
+import { logPlanEnumDiagnostic } from './plan-enum-diagnostic.js';
 import { PlanRepeatTracker } from './plan-repeat-diagnostic.js';
 import type { BatchPlanService } from './batch-plan-service.js';
 
@@ -229,6 +230,12 @@ export class PPEROrchestratorImpl {
         this.perceptionProvider,
         plan.success ? plan.plan : undefined,
       );
+      // Spec 058 (R4 — issue #206): one `[plan-enum]` line per plan
+      // formulation at the same seam — the offered value space
+      // (`prunedAffordances`, already eligibility-filtered engine-side) and
+      // the chosen step targets. A plan failure renders `chosen=[none]`; an
+      // empty eligible set renders `enum=[]`.
+      logPlanEnumDiagnostic(agentId, perception, plan.success ? plan.plan : undefined);
     } catch {
       // Diagnostics must never break a cycle (spec 049 Constraints).
     }

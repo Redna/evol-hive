@@ -365,6 +365,7 @@ export type { PPEROrchestratorOptions } from './orchestrator.js';
 export { logSocialUrgeDiagnostic } from './social-urge-diagnostic.js';
 export { logOverheardDiagnostic } from './overheard-diagnostic.js';
 export { logDriveHintDiagnostic } from './drive-hint-diagnostic.js';
+export { logPlanEnumDiagnostic } from './plan-enum-diagnostic.js';
 export {
   PlanRepeatTracker,
   planFingerprint,
