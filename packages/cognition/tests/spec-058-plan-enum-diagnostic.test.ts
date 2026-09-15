@@ -56,7 +56,10 @@ function makePerception(overrides: Partial<PerceptionResult> = {}): PerceptionRe
 
 describe('spec 058 AC-5 — drive/chain hints never reference ineligible conversation affordances', () => {
   it('matchDrivesToAffordances over the filtered set returns no join/contribute/leave', () => {
-    const filtered = [makeAffordance('rest_among_seedlings', { energy: 12 }), makeAffordance('sit')];
+    const filtered = [
+      makeAffordance('rest_among_seedlings', { energy: 12 }),
+      makeAffordance('sit'),
+    ];
     const matches = matchDrivesToAffordances({ energy: 20, social: 5 }, filtered);
     const referenced = matches.flatMap((m) => [
       ...m.affordances.map((a) => a.affordanceId),
@@ -137,17 +140,13 @@ describe('spec 058 AC-6 — [plan-enum] formulation diagnostic', () => {
   it('renders enum=[] when the eligible set is empty', () => {
     const { logs, spy } = captureLogs();
     try {
-      logPlanEnumDiagnostic(
-        AGENT_ID,
-        makePerception({ prunedAffordances: [] }),
-        {
-          id: 'plan-1',
-          description: 'wait',
-          steps: [{ description: 'wait', targetAffordance: 'wait', completed: false }],
-          currentStepIndex: 0,
-          createdAt: 0,
-        },
-      );
+      logPlanEnumDiagnostic(AGENT_ID, makePerception({ prunedAffordances: [] }), {
+        id: 'plan-1',
+        description: 'wait',
+        steps: [{ description: 'wait', targetAffordance: 'wait', completed: false }],
+        currentStepIndex: 0,
+        createdAt: 0,
+      });
       expect(logs[0]).toContain('enum=[]');
     } finally {
       spy.mockRestore();

@@ -72,10 +72,7 @@ function buildWorld(): World {
   const agentManager = new AgentManagerImpl();
   const registry = new SmartObjectRegistryImpl();
   registry.register(TROWEL);
-  const sceneManager = new SceneManagerImpl(
-    agentManager,
-    new Map(ROOMS.map((r) => [r.id, r])),
-  );
+  const sceneManager = new SceneManagerImpl(agentManager, new Map(ROOMS.map((r) => [r.id, r])));
   const conversations = new ConversationManagerImpl({
     agentManager,
     registry,
@@ -137,9 +134,7 @@ describe('spec 058 AC-1 — conversation eligibility composes into visible affor
   it('a closed conversation contributes none of the four affordances', () => {
     const conversationId = openConversation(world);
     world.conversations.close(conversationId, 'test');
-    const visibleParticipant = ids(
-      world.perception.getVisibleAffordancesInRoom('agent-a', GARDEN),
-    );
+    const visibleParticipant = ids(world.perception.getVisibleAffordancesInRoom('agent-a', GARDEN));
     const visibleBystander = ids(world.perception.getVisibleAffordancesInRoom('agent-c', GARDEN));
     for (const id of CONVERSATION_IDS) {
       expect(visibleParticipant).not.toContain(id);
