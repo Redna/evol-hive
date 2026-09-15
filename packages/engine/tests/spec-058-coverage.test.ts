@@ -21,18 +21,17 @@
  *    This validates the spec's claim that the fix is *wiring an existing
  *    projection*, not building a new one.
  *
- * 3. **AC test scaffolds** — `it.todo()` stubs for each of the 8 acceptance
- *    criteria. These are pending tests that will be activated (converted to
- *    real `it()` tests) when the implementation PR lands. They are a
- *    verifiable checklist ensuring no AC is forgotten.
+ * 3. **AC test coverage pins** — a routing map from each acceptance
+ *    criterion to the per-layer suite that now asserts it (the implementation
+ *    PR landed). AC-7 (live run) is evidence on issue #206, not a CI test.
  *
- * Layer routing when activated: AC-1/AC-2/AC-3/AC-5 are engine unit tests
- * here; AC-4 (assembled engine + cognition stack) belongs in
- * `packages/assembly/tests/`; AC-6 is a cognition diagnostic test; AC-7 is
- * live-run evidence (documented, not CI); AC-8 is the regression gate.
+ * Layer routing: AC-1/AC-2/AC-3 are engine unit tests here; AC-4 (assembled
+ * engine + cognition stack) lives in `packages/assembly/tests/`; AC-5/AC-6 are
+ * cognition tests; AC-7 is live-run evidence (documented, not CI); AC-8 is the
+ * regression gate.
  *
  * Coverage summary:
- *   - AC-1 through AC-8: all scaffolded as `it.todo` (implementation pending)
+ *   - AC-1 through AC-8: implemented in the per-layer suites (pinned below)
  *   - Spec document structure: 8 active tests
  *   - INDEX.md update: 3 active tests
  *   - Existing-scaffolding verification: 6 active tests
@@ -78,7 +77,9 @@ describe('Spec 058 — Document structure', () => {
 
   it('spec file contains exactly 8 acceptance criteria', () => {
     const content = readFile(SPEC_PATH);
-    const acMatches = content.match(/^- \[ \] \*\*AC-\d+\*\*/gm);
+    // Count AC definitions regardless of checkbox state — the boxes are ticked
+    // as criteria are verified, but the spec must always define exactly eight.
+    const acMatches = content.match(/^- \[[ x]\] \*\*AC-\d+\*\*/gm);
     expect(acMatches).not.toBeNull();
     expect(acMatches!.length).toBe(8);
   });
@@ -116,11 +117,14 @@ describe('Spec 058 — Document structure', () => {
 // ─── INDEX.md Validation ────────────────────────────────────────────────────
 
 describe('Spec 058 — INDEX.md update', () => {
-  it('INDEX.md contains the spec 058 row with the correct title and Drafted status', () => {
+  it('INDEX.md contains the spec 058 row with the correct title and In Review status', () => {
     const content = readFile(INDEX_PATH);
-    expect(content).toContain('058');
-    expect(content).toContain('Eligibility-Bound Plan Affordances');
-    expect(content).toContain('📝 Drafted');
+    const row = content
+      .split('\n')
+      .find((line) => line.includes('[058](058-eligibility-bound-plan-affordances.md)'));
+    expect(row).toBeDefined();
+    expect(row).toContain('Eligibility-Bound Plan Affordances');
+    expect(row).toContain('🔍 In Review');
   });
 
   it('INDEX.md references issue #206 for spec 058', () => {
@@ -205,42 +209,45 @@ describe('Spec 058 — Existing scaffolding: cognition plan enum + diagnostic ho
   });
 });
 
-// ─── AC Scaffolds (pending until implementation) ────────────────────────────
+// ─── AC Coverage Pins (implementation landed) ───────────────────────────────
 //
-// Each `it.todo` below corresponds to one acceptance criterion from the spec.
-// When the implementation PR lands, convert these to real `it()` tests with
-// assertions. This ensures every AC is tracked and none are forgotten.
+// The AC scaffolds were activated when the implementation PR landed: the real
+// assertions live in the per-layer suites below. These pins keep the routing
+// auditable from the spec-coverage suite itself (AC-7 is live-run evidence,
+// documented on issue #206 — not a CI test).
 
-describe('Spec 058 — Acceptance Criteria scaffolds (pending implementation)', () => {
-  it.todo(
-    'AC-1 (R1): Engine unit test — with an open conversation in the agent’s room, a participant’s getVisibleAffordancesInRoom contains contribute/leave and not join; a co-located non-participant contains join/observe and not contribute/leave; when the conversation is closed, none of the four appear; with the conversation manager unwired, all four appear (byte-identical legacy path). Non-conversation affordances are present in every case.',
+describe('Spec 058 — Acceptance Criteria coverage (implementation landed)', () => {
+  const engineSuite = join(
+    REPO_ROOT,
+    'packages/engine/tests/spec-058-eligibility-bound-plan-affordances.test.ts',
   );
+  const cognitionSuite = join(
+    REPO_ROOT,
+    'packages/cognition/tests/spec-058-plan-enum-diagnostic.test.ts',
+  );
+  const assemblySuite = join(REPO_ROOT, 'packages/assembly/tests/spec-058-plan-enum-e2e.test.ts');
 
-  it.todo(
-    'AC-2 (R1): Fog composition test — a go_to_<unknown-room> affordance is still removed by the door-sighting gate in the same call that applies eligibility, and a known go_to_<room> survives; both filters compose without either one short-circuiting the other.',
-  );
+  it('AC-1 / AC-2 / AC-3 are covered by the engine eligibility suite', () => {
+    expect(fileExists(engineSuite)).toBe(true);
+    const content = readFile(engineSuite);
+    expect(content).toContain('AC-1');
+    expect(content).toContain('AC-2');
+    expect(content).toContain('AC-3');
+  });
 
-  it.todo(
-    'AC-3 (R2): Collision test — a room containing a non-conversation object that declares observe plus a closed conversation object declaring observe keeps the non-conversation observe in the result; a conversation-only id (contribute) is filtered from the conversation object and never dropped from an unrelated object.',
-  );
+  it('AC-4 is covered by the assembled engine + cognition E2E suite', () => {
+    expect(fileExists(assemblySuite)).toBe(true);
+    expect(readFile(assemblySuite)).toContain('AC-4');
+  });
 
-  it.todo(
-    'AC-4 (R3): Cognition/integration test over the assembled engine + cognition stack (packages/assembly/tests) — an agent with no open conversation in its room yields prunedAffordances, the formulate_plan tool targetAffordance enum, and the affordance tool list all free of join/contribute/leave, while non-conversation affordances remain; an eligible participant yields contribute/leave.',
-  );
+  it('AC-5 / AC-6 are covered by the cognition diagnostic suite', () => {
+    expect(fileExists(cognitionSuite)).toBe(true);
+    const content = readFile(cognitionSuite);
+    expect(content).toContain('AC-5');
+    expect(content).toContain('AC-6');
+  });
 
-  it.todo(
-    'AC-5 (R3): Matcher test — matchDrivesToAffordances and the rendered drive/chain hints never reference an ineligible conversation affordance, because they consume the same filtered set.',
-  );
-
-  it.todo(
-    'AC-6 (R4): Diagnostic test — exactly one [plan-enum] line is emitted per formulation, containing the agent id, room, the enum IDs, and the chosen targetAffordance values (or chosen=[none]/enum=[] for the empty cases); a thrown diagnostic never propagates.',
-  );
-
-  it.todo(
-    'AC-7 (R1–R4, live): A 40-minute live run (USE_REAL_LLM=true SCENE_DURATION_MS=2400000 npx tsx examples/dynamic-world-sim.ts, cc=3, 3 agents, the #206 scene) shows skip share skips / (execs + skips) ≤ 25% (baseline 88–94%) and no single agent accounting for more than half of all [step-skip] lines; every [plan-enum] line for an agent with no eligible conversation contains none of join/contribute/leave; [plan-repeat] stays bounded; the run is executed against a freshly built dist (pnpm build). Evidence attached to issue #206.',
-  );
-
-  it.todo(
-    'AC-8 (R1–R3): Regression — pnpm -r test && pnpm typecheck && pnpm lint pass; the spec-033 eligibility tests, the spec-037 enum/skip tests, the spec-039 fog tests, and the spec-051 [talk-enum] tests pass unmodified; legacy providers without a conversation manager are byte-identical.',
-  );
+  it('AC-8 is the regression gate (pnpm -r test / typecheck / lint)', () => {
+    expect(readFile(SPEC_PATH)).toContain('AC-8');
+  });
 });

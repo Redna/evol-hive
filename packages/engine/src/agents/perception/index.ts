@@ -15,6 +15,7 @@ import type {
   CompoundAction,
   ObjectDependency,
   Relationship,
+  SmartObject,
   SmartObjectSummary,
   SelfModel,
   SocialMessage,
@@ -141,14 +142,17 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
   }
 
   /**
-   * Fog-filtered available affordances in the agent's CURRENT room (R3):
-   * the explored-area gate plus the door-sighting gate — `go_to_<room>`
-   * movement affordances surface only when the destination is known (door
-   * seen or room visited). Unknown doors do not leak into prunedAffordances.
+   * Fog-filtered eligible affordances in the agent's CURRENT room (R3, spec
+   * 058 R1): composes the conversation-eligibility projection with the
+   * explored-area gate and the door-sighting gate — `go_to_<room>` movement
+   * affordances surface only when the destination is known (door seen or room
+   * visited). Unknown doors do not leak into prunedAffordances, and an
+   * affordance ineligible for this agent at this moment is not a valid plan
+   * value either. The two filters are orthogonal and both applied.
    */
   getVisibleAffordancesInRoom(agentId: string, roomId: string): Affordance[] {
     const mem = this.fog(agentId);
-    const base = this.getAvailableAffordancesInRoom(roomId);
+    const base = this.eligibleAffordances(roomId, agentId);
     if (mem === null) return base; // legacy: no fog
     // Occupancy overrides the unexplored-room gate (spec 052 finding, #183 —
     // same rationale as getVisibleObjectsInRoom above).
@@ -284,20 +288,44 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
 
   /**
    * Available affordances in a room with conversation-eligibility applied
-   * (AC-2): conversation objects expose join/observe to co-located
-   * non-participants and contribute/leave to participants. Non-conversation
-   * objects pass through unchanged.
+   * (spec 033 AC-2, spec 058 R1/R2): conversation objects expose join/observe
+   * to co-located non-participants and contribute/leave to participants;
+   * non-conversation objects pass through unchanged.
+   *
+   * Spec 058 R2: ownership is resolved per OBJECT — each available affordance
+   * is paired with the object that DECLARES it (reference identity), never by
+   * scanning the room's flat list for a matching id. `observe` is declared on
+   * nearly every smart object, so a flat-id lookup would misattribute a
+   * conversation's affordance to a non-conversation owner (and vice versa).
    */
   getEligibleAffordancesInRoom(roomId: string, agentId: string): Affordance[] {
+    return this.eligibleAffordances(roomId, agentId);
+  }
+
+  /**
+   * The shared eligibility predicate (spec 058 R1/R2): the room's available
+   * affordances (conditions + movement filter already applied) filtered by
+   * the owning conversation's per-agent role projection. Non-conversation
+   * affordances — including a duplicate id on an unrelated object — pass
+   * through unchanged. Legacy unwired managers return the available set
+   * byte-identically.
+   */
+  private eligibleAffordances(roomId: string, agentId: string): Affordance[] {
     const base = this.smartObjectRegistry.getAvailableAffordancesInRoom(roomId);
-    if (this.conversationManager === undefined) return base;
+    const manager = this.conversationManager;
+    if (manager === undefined) return base;
+    // Pair each available affordance with its declaring object. Reference
+    // identity is unambiguous even when ids collide across objects.
+    const owners = new Map<Affordance, SmartObject>();
+    for (const object of this.smartObjectRegistry.getByRoom(roomId)) {
+      for (const affordance of object.affordances) {
+        owners.set(affordance, object);
+      }
+    }
     return base.filter((affordance) => {
-      const objects = this.smartObjectRegistry.getByRoom(roomId);
-      const owner = objects.find((o) => o.affordances.some((a) => a.id === affordance.id));
+      const owner = owners.get(affordance);
       if (owner === undefined || owner.type !== 'conversation') return true;
-      return this.conversationManager!.getEligibleAffordances(owner.id, agentId).includes(
-        affordance.id,
-      );
+      return manager.getEligibleAffordances(owner.id, agentId).includes(affordance.id);
     });
   }
 
