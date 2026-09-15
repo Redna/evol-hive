@@ -41,28 +41,28 @@ Living index of all feature specifications. Updated by the Architect when creati
 
 ## Architecture Coverage
 
-| Section                                           | Topic                                                      | Spec(s)                                                             | Status         |
-| ------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
-| [§1](../architecture/01-vision.md)                | Vision & Philosophy                                        | —                                                                   | ✅ Documented  |
-| [§2](../architecture/02-system-overview.md)       | System Overview                                            | 008, 013, 017, 022                                                  | ✅ Documented  |
-| [§3](../architecture/03-agent-state-schema.md)    | Agent State Schema                                         | 001, 002, 008, 012, 017, 022, 032, 033                              | ✅ Implemented |
-| [§4](../architecture/04-smart-objects.md)         | Smart Objects & Affordances                                | 001, 003, 008, 013, 018, 019, 022, 031, 032, 033, 058, 059          | ✅ Implemented |
-| [§5](../architecture/05-fast-path-classifier.md)  | Fast-Path Classifier (System 0) + Trainable System 1 Heads | 001, 006, 007, 018, 035                                             | ✅ Implemented |
-| [§6](../architecture/06-pper-loop.md)             | PPER Loop                                                  | 001-004, 006, 008, 012, 017, 025, 026, 031, 032, 033, 057, 058, 059 | ✅ Implemented |
-| [§7](../architecture/07-structured-outputs.md)    | Structured Outputs                                         | 011 (tool calling), 019 (affordance-as-tools), 025, 026, 058, 059   | ✅ Implemented |
-| [§8](../architecture/08-cognitive-tools.md)       | Cognitive Tools                                            | 002, 011, 015, 025, 026, 032, 033                                   | ✅ Implemented |
-| [§9](../architecture/09-engine-routing.md)        | Engine Routing                                             | 002, 003, 004, 006, 008, 009                                        | ✅ Implemented |
-| [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails                                       | 016, 019, 030, 031, 033, 057, 058, 059                              | ✅ Implemented |
-| [§11](../architecture/11-memory-architecture.md)  | Memory Architecture                                        | 004, 007, 014, 017, 025, 026                                        | ✅ Implemented |
+| Section                                           | Topic                                                      | Spec(s)                                                                  | Status         |
+| ------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------ | -------------- |
+| [§1](../architecture/01-vision.md)                | Vision & Philosophy                                        | —                                                                        | ✅ Documented  |
+| [§2](../architecture/02-system-overview.md)       | System Overview                                            | 008, 013, 017, 022                                                       | ✅ Documented  |
+| [§3](../architecture/03-agent-state-schema.md)    | Agent State Schema                                         | 001, 002, 008, 012, 017, 022, 032, 033                                   | ✅ Implemented |
+| [§4](../architecture/04-smart-objects.md)         | Smart Objects & Affordances                                | 001, 003, 008, 013, 018, 019, 022, 031, 032, 033, 058, 059               | ✅ Implemented |
+| [§5](../architecture/05-fast-path-classifier.md)  | Fast-Path Classifier (System 0) + Trainable System 1 Heads | 001, 006, 007, 018, 035, 060                                             | ✅ Implemented |
+| [§6](../architecture/06-pper-loop.md)             | PPER Loop                                                  | 001-004, 006, 008, 012, 017, 025, 026, 031, 032, 033, 057, 058, 059, 060 | ✅ Implemented |
+| [§7](../architecture/07-structured-outputs.md)    | Structured Outputs                                         | 011 (tool calling), 019 (affordance-as-tools), 025, 026, 058, 059, 060   | ✅ Implemented |
+| [§8](../architecture/08-cognitive-tools.md)       | Cognitive Tools                                            | 002, 011, 015, 025, 026, 032, 033                                        | ✅ Implemented |
+| [§9](../architecture/09-engine-routing.md)        | Engine Routing                                             | 002, 003, 004, 006, 008, 009                                             | ✅ Implemented |
+| [§10](../architecture/10-cognitive-guardrails.md) | Cognitive Guardrails                                       | 016, 019, 030, 031, 033, 057, 058, 059, 060                              | ✅ Implemented |
+| [§11](../architecture/11-memory-architecture.md)  | Memory Architecture                                        | 004, 007, 014, 017, 025, 026                                             | ✅ Implemented |
 
 ## Spec Status Summary
 
 ```
-Total specs:      65
+Total specs:      66
 ✅ Done:          36
 🔨 In Development: 0
 🔍 In Review:      24
-📝 Drafted:        3
+📝 Drafted:        4
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -112,3 +112,4 @@ Architecture sections fully implemented: 11/11
 | [057](057-plan-skip-outcome-honesty.md) | Plan Skip Honesty — Completed-By-Skipping Plans Report Their Skipped Steps (`stepsSkipped` on the plan outcome & the plan prompt, honest verdict) | §3, §6, §10 | 🔍 In Review | [#204](https://github.com/Redna/evol-hive/issues/204) | [#207](https://github.com/Redna/evol-hive/pull/207) | shared, cognition |
 | [058](058-eligibility-bound-plan-affordances.md) | Eligibility-Bound Plan Affordances — Constrain the Plan `targetAffordance` Enum to the Agent's Moment-Scoped Eligible Set (conversation `join`/`contribute`/`leave` are no longer valid choices when ineligible) | §4, §6, §7, §10 | 🔍 In Review | [#206](https://github.com/Redna/evol-hive/issues/206) | [#209](https://github.com/Redna/evol-hive/pull/209) | engine, cognition |
 | [059](059-plan-retention-revalidation.md) | Plan-Retention Re-Validation — Guardrail-Rejected Stale Steps Invalidate the Plan (plan invalidation + deviation step-skip, agent-scoped eligibility retention; plan-enum executability deferred to [#212](https://github.com/Redna/evol-hive/issues/212)) | §3, §4, §6, §7, §10, §11 | ✅ Done | [#210](https://github.com/Redna/evol-hive/issues/210) | [#213](https://github.com/Redna/evol-hive/pull/213) | shared, engine, cognition, assembly |
+| [060](060-plan-formation-shape-failure-recovery.md) | Plan-Formation Shape-Failure Diagnostics, Bounded Repair & Fallback Floor — Name the shape reason + prompt size, reuse the client's one bounded repair, and floor a persistently failing agent with a valid single-step plan | §5, §6, §7, §10 | 📝 Drafted | [#214](https://github.com/Redna/evol-hive/issues/214) | — | shared, cognition |
