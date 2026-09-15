@@ -1,0 +1,55 @@
+/**
+ * pper/plan-memory-diagnostic — the per-formulation `[plan-memory]` log line
+ * (spec 056 follow-up — issue #201)
+ * ────────────────────────────────────────────────────────────────────────────
+ * The spec-055 plan-memory line (`Your last plan was "…" — …`) lives in the
+ * PLAN PROMPT, and the prompt is never logged — so "did plan memory render?"
+ * was unanswerable from run logs (the #201 "0 renders" reading was a
+ * measurement artifact, not a signal). This diagnostic makes the render
+ * observable: ONE `console.error` (stderr) line whenever the plan service
+ * builds a payload that carries a `lastPlanOutcome` — i.e. exactly when the
+ * builder will push the last-plan line.
+ *
+ * Spec-049 discipline: zero LLM calls, pure string arithmetic, one line per
+ * formulation (never per cycle — the stickiness short-circuit returns before
+ * the payload is built, so continuations emit nothing), and the caller wraps
+ * the call so a logging failure can never break a cycle.
+ *
+ * The verdict vocabulary mirrors the builder's rendering exactly:
+ * `superseded` (spec 056) / `succeeded` / `failed` (spec 055).
+ */
+
+import type { LastPlanOutcome } from '@evol-hive/shared';
+
+/** The rendered verdict of a last-plan outcome — the builder's own trichotomy. */
+export function planMemoryVerdict(outcome: LastPlanOutcome): 'superseded' | 'succeeded' | 'failed' {
+  if (outcome.superseded === true) return 'superseded';
+  return outcome.success ? 'succeeded' : 'failed';
+}
+
+/**
+ * The one-line diagnostic (pure — tests assert on the exact string):
+ * `[plan-memory] agent=<id> verdict=<v> steps=<N>/<M> reflected=<bool>`
+ *
+ * `steps` carries `N/M` only for superseded outcomes (the only verdict with a
+ * step count, spec 056 Req 1); completion/failure stamps render `steps=-`.
+ */
+export function planMemoryDiagnosticLine(agentId: string, outcome: LastPlanOutcome): string {
+  const verdict = planMemoryVerdict(outcome);
+  const steps =
+    outcome.superseded === true ? `${outcome.stepsCompleted ?? 0}/${outcome.stepsTotal ?? 0}` : '-';
+  return (
+    `[plan-memory] agent=${agentId} verdict=${verdict} ` +
+    `steps=${steps} reflected=${outcome.reflected === true}`
+  );
+}
+
+/**
+ * Emit the diagnostic when — and only when — a last-plan line will be
+ * rendered. `undefined` (cycle 1, legacy saves) emits nothing: the builder
+ * pushes no line, so there is nothing to report.
+ */
+export function logPlanMemory(agentId: string, outcome: LastPlanOutcome | undefined): void {
+  if (outcome === undefined) return;
+  console.error(planMemoryDiagnosticLine(agentId, outcome));
+}

@@ -22,6 +22,7 @@ import { WAIT_AFFORDANCE, defaultPlanMaxSteps } from '@evol-hive/shared';
 import type { LLMClient, PlanBuilder, GuardrailEngine, LLMContextPayload } from '../index.js';
 import { LLMResponseError } from '../llm/index.js';
 import { checkWaitSuppression } from '../guardrails/wait-guard.js';
+import { logPlanMemory } from './plan-memory-diagnostic.js';
 
 /** Constructor options for {@link PlanServiceImpl}. */
 export interface PlanServiceOptions {
@@ -63,6 +64,18 @@ export class PlanServiceImpl {
 
       const payload = planBuilder.build(perceptionResult, builderOptions);
       payload.agentId = agentId;
+
+      // Spec 056 follow-up (issue #201): make the plan-memory line observable.
+      // The rendered `Your last plan was "…"` line lives in the prompt (never
+      // logged), so this stderr line is the only live signal that plan memory
+      // fired — and its verdict (superseded / succeeded / failed). One line per
+      // formulation; the stickiness short-circuit above returns before the
+      // payload is built, so continuations are silent. Never breaks a cycle.
+      try {
+        logPlanMemory(agentId, perceptionResult.lastPlanOutcome);
+      } catch {
+        // Diagnostic-grade data: never break the plan phase over a log line.
+      }
 
       // Spec 037, Req 1+4: the plan tool schema enum-binds targetAffordance to
       // the affordances available in the agent's current room. The validator
