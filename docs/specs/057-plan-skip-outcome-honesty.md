@@ -110,7 +110,7 @@ consecutive failures) does not change.
       `stepsSkipped` is absent; the existing spec-056 exact-string tests still pass.
       _(maps to R5)_
 - [x] **AC-8** (R1–R5): Live run (`USE_REAL_LLM=true SCENE_DURATION_MS=... npx tsx
-    examples/dynamic-world-sim.ts`, ~7 min like the #204 evidence run) shows
+  examples/dynamic-world-sim.ts`, ~7 min like the #204 evidence run) shows
       `[plan-memory]` lines carrying `skipped=N` for plans that had step skips, and
       the skip count is `<=` the run's `[step-skip]` count; `[plan-repeat]` stays
       bounded. Evidence attached to issue #204. _(maps to R1–R5)_
@@ -168,7 +168,10 @@ diagnostic-only (one caller: `logPlanMemory`); no engine or prompt behavior chan
 
 Spec-049 discipline (zero LLM, pure string arithmetic, never throws into a cycle) is unchanged;
 tests added for the skip verdict, the 0/absent fallback, the empty-steps fallback, and
-supersession precedence.
+supersession precedence. The R5' change also required updating the byte-exact assertion in QA's
+AC-8 gap-fill E2E (`examples/tests/spec-057-plan-skip-honesty-e2e.test.ts`) — the first push to main
+went red on exactly that one assertion (`a331075`), a reminder that the spec-057 lines are pinned in
+two packages (cognition unit + examples E2E).
 
 ### Live evidence (post-merge run, 2100 s)
 
