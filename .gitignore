@@ -46,4 +46,7 @@ models/
 .yaam_start_lines
 events.jsonl.bak
 session-logs/
-gate-artifact.json
+# Tagged live-run session dirs (`/tmp/ac7-run.sh <tag>` writes session-logs-<tag>/) and trained
+# gate artifacts — evidence, not source (spec 035 / spec 056 addendum §5).
+session-logs-*/
+gate-artifact*.json
