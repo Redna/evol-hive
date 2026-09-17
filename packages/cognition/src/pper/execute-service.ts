@@ -258,6 +258,14 @@ export class ExecuteServiceImpl {
               targetAffordance: step.targetAffordance,
             });
             invalidate(agentId);
+            // Issue #215: the invalidation path must NOT *register* a step
+            // failure (a stale target is not the agent's fault), but it must
+            // clear any entry left by an earlier deviation. The counter is
+            // keyed on the step *description*, so a surviving entry would make
+            // the next plan whose current step reuses that description skip
+            // one attempt early (its first offence counted as the second).
+            // Mirror the step-change / success reset above.
+            this.stepFailures.delete(agentId);
             dataProvider.setSystemFeedback(agentId, reason);
             dataProvider.setThinking(agentId, false);
             return this.withSkipCount(agentId, {
