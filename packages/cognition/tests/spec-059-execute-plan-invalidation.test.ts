@@ -288,6 +288,51 @@ describe('spec 059 AC-6: unwired invalidatePlan falls through to R4 (R3)', () =>
     expect(result.planInvalidated).toBeUndefined();
     expect(provider.plan).not.toBeNull();
   });
+
+  // Item 2 of issue #215: AC-6 pins the legacy *rejection* and the absence of
+  // `planInvalidated`, but not that the legacy path actually joins the R4
+  // step-failure counter. Without this, a regression that returned before
+  // `registerStepFailure` (e.g. silently dropping the deviation) would still
+  // satisfy the two existing assertions — the plan would be retained, no
+  // `planInvalidated` — while the plan+step livelocked forever.
+  it('legacy guard: first rejection counts, second skips with [step-skip], plan survives (no invalidatePlan call)', async () => {
+    const errors: string[] = [];
+    vi.spyOn(console, 'error').mockImplementation((...args) => {
+      errors.push(args.map(String).join(' '));
+    });
+    const provider = new BaseProvider(); // no invalidatePlan — legacy provider
+    // Explicit: the fall-through must be exercised, not an absent-but-called path.
+    expect('invalidatePlan' in provider).toBe(false);
+    const service = new ExecuteServiceImpl({
+      dataProvider: provider,
+      guardrail: staleGuard(),
+      // Legacy guard: omits `isAffordanceEligibleForAgent`, so the room-registry
+      // check (`isAffordanceAvailableInRoom`) rejects with `stale-target`.
+      affordanceGuard: { isAffordanceAvailableInRoom: () => false },
+    });
+
+    // First identical rejection: R4 registers failure #1 — no advance, no skip.
+    const first = await service.execute(AGENT_ID);
+    expect(first.success).toBe(false);
+    expect(first.deviationRejected).toBe(true);
+    expect(first.planInvalidated).toBeUndefined();
+    expect(first.stepSkipped).toBeUndefined();
+    expect(provider.advanceStepCalls).toEqual([]);
+    expect(provider.plan).not.toBeNull();
+
+    // Second identical rejection: the counter reaches MAX_STEP_FAILURES → skip.
+    const second = await service.execute(AGENT_ID);
+    expect(second.success).toBe(true);
+    expect(second.stepSkipped).toBe(true);
+    expect(second.planInvalidated).toBeUndefined();
+    expect(provider.advanceStepCalls).toEqual([AGENT_ID]);
+    expect(errors.some((l) => l.includes('[step-skip]'))).toBe(true);
+
+    // R4 advances the STEP, never clears the plan; the legacy path emits no
+    // `[plan-stale]` invalidation line (nothing was invalidated).
+    expect(provider.plan).not.toBeNull();
+    expect(errors.some((l) => l.includes('[plan-stale]'))).toBe(false);
+  });
 });
 
 // ── AC-7 — guardrail deviations join the step-skip guard (R4) ────────────────
