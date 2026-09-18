@@ -363,6 +363,22 @@ export {
   logPlanFloor,
 } from './plan-shape-diagnostic.js';
 export type { PlanPromptInput, PlanPromptSize } from './plan-shape-diagnostic.js';
+export {
+  budgetPlanContext,
+  planPromptMaxChars,
+  capRecallText,
+  capRecallBlocks,
+  planRecallMaxLines,
+  planRecallMaxChars,
+  DEFAULT_PLAN_PROMPT_MAX_CHARS,
+  DEFAULT_PLAN_RECALL_MAX_LINES,
+  DEFAULT_PLAN_RECALL_MAX_CHARS,
+} from './plan-context-budget.js';
+export type {
+  PlanContextBlockId,
+  PlanContextBlock,
+  BudgetedPlanContext,
+} from './plan-context-budget.js';
 export { ExecuteServiceImpl } from './execute-service.js';
 export type { ExecuteServiceOptions } from './execute-service.js';
 export { ReflectBuilderImpl } from './reflect-builder.js';
