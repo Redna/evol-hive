@@ -60,3 +60,40 @@ pretest build hook or a `pnpm verify` convenience script.
   feature PRs.
 - One actionable gap in the PR itself: **AC-10** (ADR flip + §5 amendment)
   is not included in the diff.
+---
+
+# QA Notes — PR #137 coverage verification (docs-only final-state audit, 2026-09-06)
+
+> `yaam` CLI/daemon again unavailable in this environment; recording here per
+> the notes-directory convention.
+
+## Scope
+
+Coverage verification for PR #137 ("docs: spec-035 final-state audit") — an
+append-only note in `035-...-implementation-notes.md`; no code. The audit
+below re-verified spec 035's ACs against the merged implementation (PR #136)
+on PR #137's tree.
+
+## Result: PASS
+
+| AC | Status | Evidence |
+|----|--------|----------|
+| AC-1 | ✅ | `cognition/spec-035-feature-extractor.test.ts` (23), `shared/spec-035-system1-types.test.ts` (6), `engine/spec-035-system1-engine-state.test.ts` (9) |
+| AC-2 | ✅ | `cognition/spec-035-react-gate.test.ts` (19) — fail-open + warn-exactly-once + hard triggers at p=0 |
+| AC-3 | ✅ | `engine/spec-035-system1-gating.test.ts` (16) — threshold gating, hard triggers, no idle injection, zero-LLM gating |
+| AC-4 | ✅ | `engine/spec-035-system1-gating.test.ts` (labeling) + `cognition/spec-035-session-log.test.ts` (8, JSONL format) |
+| AC-5 | ✅ | `cognition/spec-035-training-artifact.test.ts` (5) vs committed `training/{fixtures,artifacts}`; cadence in `training/README.md`; training/ never invoked by tests |
+| AC-6 | ✅ | `cognition/spec-035-dream-update.test.ts` (10) — bounded updates, audit event, holdout-degrade revert |
+| AC-7 | ✅ | `cognition/spec-035-importance-head.test.ts` (12) + `memory/spec-035-importance-write.test.ts` (5) + `memory/spec-035-retrieval-frozen-regression.test.ts` (5) |
+| AC-8 | ✅ | `cognition/spec-035-identity-salience.test.ts` (11) |
+| AC-9 | ⏸ | Manual real-LLM A/B by design; evidence → issue #132 (closed) |
+| AC-10 | ✅ | ADR-0002 = Accepted; §5 has "Trainable System 1 Heads" + "Amended Golden Rule" |
+| AC-11 | ✅ | 2,054 passed / 0 failed; typecheck + lint clean (re-run on PR #137 tree) |
+
+## Observations
+
+- Spec-035 suites re-run in isolation: cognition 7 files / 83 tests, engine
+  2 files / 25 tests — matches the PR note's figures exactly.
+- No missing tests found; PR #137 adds no code, so no new tests were written.
+- Full QA report posted as a comment on PR #137
+  (issuecomment-5555642035); label "Status: In Review/QA" applied.

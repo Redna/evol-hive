@@ -63,3 +63,36 @@ the old commits remain recoverable via SHA `a83f268`.
 - `update_self_model`-style LLM plumbing for the mid-session identity pass
   (the deterministic salience machinery is wired; examples default to a
   zero-proposal provider).
+
+## Final state — resume-session audit (2026-09-06)
+
+A later session resumed after an interruption and re-verified everything;
+no code changes were needed. Evidence:
+
+- Branch `feature/035-system1-trainable-heads`: **PR #136 was merged while this
+  session was running** (merge commit `7c751f8` on main, "feat: System 1 — …
+  (#136)"); issue [#132](https://github.com/Redna/evol-hive/issues/132) is now
+  **CLOSED (COMPLETED)**. At session start the PR was still OPEN with all CI
+  checks SUCCESS, so this session's verification ran against the exact
+  reviewed tree.
+- PR [#136](https://github.com/Redna/evol-hive/pull/136) CI rollup was all
+  SUCCESS at review time (Type Check & Lint / Build / Test / GitGuardian).
+- Local re-verification (AC-11): `pnpm build`, `pnpm typecheck`, `pnpm lint`,
+  `pnpm format:check` all clean; `pnpm -r test` = **2,054 passed / 0 failed**
+  (shared 306, visualizer 23, memory 101, cognition 768, engine 717,
+  examples 135, cli 4; todos/skips as reported by vitest).
+- Spec-035 suites spot-checked: cognition 7 files / 83 tests, engine
+  2 files / 25 tests — all green.
+- `docs/specs/INDEX.md` row 035: 🔍 In Review → PR #136 (unchanged, correct).
+- AC checkboxes in the spec intentionally stay unchecked (repo convention —
+  see specs 031/033/034).
+- `docs/specs/INDEX.md` row 035 still reads 🔍 In Review — this matches the
+  repo convention (merged specs 030–032 also remain "In Review" until a
+  separate sign-off flips them); left unchanged intentionally.
+- Housekeeping: GitHub deleted the feature branch on merge; a late push from
+  this session briefly recreated it and it was cleaned up again after the
+  note was re-homed to this docs PR.
+- Remaining for full done: AC-9 manual real-LLM A/B (evidence → issue #132,
+  now closed — file as follow-up issue if pursued).
+- `yaam` CLI/daemon again unavailable in this environment; this section is
+  the breadcrumb per the notes-directory convention.
