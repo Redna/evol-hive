@@ -112,6 +112,12 @@ export interface LLMContextPayload {
    * loop. When absent, the tool call loop is not activated.
    */
   agentId?: string;
+  /**
+   * Plan-context budget breakdown (spec 061, R4), attached by the plan builder
+   * and consumed by the LLM client to emit the `[plan-context]` grower line.
+   * Absent for non-plan payloads.
+   */
+  planContextDiagnostic?: import('./pper/plan-shape-diagnostic.js').PlanContextDiagnostic;
 }
 
 // ── LLM Client ───────────────────────────────────────────────────────────────

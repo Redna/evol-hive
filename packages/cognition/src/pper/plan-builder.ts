@@ -7,6 +7,13 @@
  *
  * Persona injection (spec 012, Req 8): When `perceptionResult.persona` is
  * present and non-null, the system prompt starts with the persona text.
+ *
+ * Spec 061 (R2, issue #219): the perception context is assembled as an ordered
+ * `PlanContextBlock[]` and bounded by `budgetPlanContext` to the headroom left
+ * by the constant prefix. `systemPrompt` and `tools` are computed first and are
+ * never budgeted, reordered, truncated or regenerated — the `formulate_plan`
+ * enum is plan legality (spec 037/058) and the stable prefix is spec 021. Under
+ * budget the assembled context is byte-identical to the pre-change builder.
  */
 
 import type { AgentProfile, PerceptionResult, Relationship } from '@evol-hive/shared';
@@ -30,6 +37,15 @@ import {
   formatPlanDriveHint,
   formatPlanChainHint,
 } from './drive-affordance-matcher.js';
+import type { PlanContextBlock } from './plan-context-budget.js';
+import {
+  budgetPlanContext,
+  capRecallBlocks,
+  planPromptMaxChars,
+  planRecallMaxChars,
+  planRecallMaxLines,
+} from './plan-context-budget.js';
+import type { PlanContextDiagnostic } from './plan-shape-diagnostic.js';
 
 /** Options for contextual forcing in the Plan builder (spec 016, Req 9). */
 export interface PlanBuilderGuardrailOptions {
@@ -70,11 +86,44 @@ export class PlanBuilderImpl implements PlanBuilder {
       systemPrompt = `${systemPrompt} ${GUARDRAIL_FORCING_DIRECTIVE}`;
     }
 
+    // Social drive prompt hint (spec 018, Req 39; spec 024, Req 4).
+    // When agents are present AND social is the primary drive, a stronger
+    // imperative hint replaces the original hedging hint (spec 024, Req 4).
+    const isSocialPrimary = hasAgentsPresent && primaryDriveLabel.toLowerCase().includes('social');
+
+    // Spec 039, R1: known areas feed both the `targetArea` enum and the
+    // `Known areas` context line; they are read once so both agree.
+    const { knownAreas, unexploredAreas } = perceptionResult;
+
+    // ── Constant prefix: never budgeted, reordered, truncated or regenerated ─
+    // (spec 061, R2; the tool enum is plan legality — spec 037/058).
+    const affordanceTools = affordancesToToolDefinitions(prunedAffordances);
+    const planTool = formulatePlanToolFor(
+      prunedAffordances.map((a) => a.id),
+      knownAreas,
+    );
+    const tools = buildPlanTools(
+      hasAgentsPresent,
+      affordanceTools,
+      isSocialPrimary,
+      planTool,
+      // Spec 051 (R1/R2): the plan-phase talk_to is enum-bound per cycle to
+      // the present, uncapped agent IDs — same construction as the
+      // perception builder; omitted entirely when nothing is valid.
+      computeTalkEnum(passive.agentsPresent, perceptionResult.socialUrges).valid,
+    );
+
+    // ── Ordered context blocks (spec 061, R2) ─────────────────────────────────
     // Spec 021, Req 2: Stable content first (deterministic for a given room +
-    // object set), dynamic content last (separated by `---`).
-    const stableLines: string[] = [
-      `Room: ${passive.roomId}`,
-      `Objects: ${objectNames.length > 0 ? objectNames.join(', ') : 'none'}`,
+    // object set), dynamic content last (separated by `---`). The `---`
+    // separator is a required block in the stream (spec 061, R2).
+    const blocks: PlanContextBlock[] = [
+      { id: 'room', text: `Room: ${passive.roomId}`, required: true },
+      {
+        id: 'objects',
+        text: `Objects: ${objectNames.length > 0 ? objectNames.join(', ') : 'none'}`,
+        required: true,
+      },
     ];
 
     if (hasAgentsPresent) {
@@ -83,19 +132,26 @@ export class PlanBuilderImpl implements PlanBuilder {
       const agentsStr = passive
         .agentsPresent!.map((a) => `${a.name} (${a.agentId}) (${a.currentActivity})`)
         .join(', ');
-      stableLines.push(`Agents present: ${agentsStr}`);
-      stableLines.push(
-        'You can call talk_to, observe_agent, help, or ignore directly to interact with other agents.',
-      );
+      blocks.push({
+        id: 'agents-present',
+        text: [
+          `Agents present: ${agentsStr}`,
+          'You can call talk_to, observe_agent, help, or ignore directly to interact with other agents.',
+        ].join('\n'),
+      });
     }
 
     // Relationship context (spec 018, Req 35) — stable for a given room state.
     if (hasAgentsPresent && perceptionResult.relationships !== undefined) {
+      const relationshipLines: string[] = [];
       for (const agent of passive.agentsPresent!) {
         const rel = perceptionResult.relationships[agent.agentId];
         if (rel !== undefined) {
-          stableLines.push(...buildRelationshipContextLines(agent.name, rel));
+          relationshipLines.push(...buildRelationshipContextLines(agent.name, rel));
         }
+      }
+      if (relationshipLines.length > 0) {
+        blocks.push({ id: 'relationships', text: relationshipLines.join('\n') });
       }
     }
 
@@ -104,20 +160,23 @@ export class PlanBuilderImpl implements PlanBuilder {
       const summary = perceptionResult.compoundActions
         .map((ca) => `${ca.label} (${ca.steps.length} steps)`)
         .join(', ');
-      stableLines.push(`Multi-step actions available: ${summary}`);
+      blocks.push({ id: 'compound-actions', text: `Multi-step actions available: ${summary}` });
     }
 
     // Object dependencies in LLM context (spec 018, Req 26) — stable for a given room state.
     if (perceptionResult.objectDependencies && perceptionResult.objectDependencies.length > 0) {
       const summary = perceptionResult.objectDependencies.map((dep) => dep.description).join(', ');
-      stableLines.push(`Object dependencies: ${summary}`);
+      blocks.push({ id: 'object-dependencies', text: `Object dependencies: ${summary}` });
     }
 
     // ── Dynamic content (changes per tick) ──────────────────────────────────
-    const dynamicLines: string[] = [
-      `Primary drive: ${primaryDriveLabel}`,
-      `Drives: ${driveSummary}`,
-    ];
+    blocks.push({ id: 'separator', text: '---', required: true });
+    blocks.push({
+      id: 'primary-drive',
+      text: `Primary drive: ${primaryDriveLabel}`,
+      required: true,
+    });
+    blocks.push({ id: 'drives', text: `Drives: ${driveSummary}`, required: true });
 
     // Plan memory (spec 055, Req 4 — issue #198): the agent's last plan + its
     // outcome — the self-visibility defense against the #191 356× identical
@@ -146,38 +205,42 @@ export class PlanBuilderImpl implements PlanBuilder {
           : outcome.success
             ? `it succeeded${deltas}`
             : `it failed${deltas}`;
-      dynamicLines.push(`Your last plan was "${stepList}" — ${verdict}.`);
+      blocks.push({ id: 'last-plan', text: `Your last plan was "${stepList}" — ${verdict}.` });
       if (outcome.reflected) {
-        dynamicLines.push(
-          'You already reflected on that plan — what you learned is in your memory.',
-        );
+        blocks.push({
+          id: 'last-plan-reflection',
+          text: 'You already reflected on that plan — what you learned is in your memory.',
+        });
       }
     }
 
     // Social context messages are dynamic (incoming messages change per tick).
     if (passive.socialContext !== undefined && passive.socialContext.length > 0) {
-      for (const msg of passive.socialContext) {
-        dynamicLines.push(`Message from ${msg.fromName}: "${msg.content}"`);
-      }
+      blocks.push({
+        id: 'social-messages',
+        text: passive.socialContext
+          .map((msg) => `Message from ${msg.fromName}: "${msg.content}"`)
+          .join('\n'),
+      });
     }
 
-    // Social drive prompt hint (spec 018, Req 39; spec 024, Req 4).
-    // When agents are present AND social is the primary drive, a stronger
-    // imperative hint replaces the original hedging hint (spec 024, Req 4).
-    const isSocialPrimary = hasAgentsPresent && primaryDriveLabel.toLowerCase().includes('social');
     if (isSocialPrimary) {
-      dynamicLines.push(
-        'Your social drive is your most urgent need. Call talk_to or help NOW to interact with another agent in this room. Do not formulate a plan first.',
-      );
+      blocks.push({
+        id: 'social-primary-hint',
+        text: 'Your social drive is your most urgent need. Call talk_to or help NOW to interact with another agent in this room. Do not formulate a plan first.',
+        required: true,
+      });
     }
 
     // Stronger social directive (spec 024, Req 3): added to the dynamic section
     // whenever agents are present (regardless of primary drive). This is an
     // imperative that counters the system prompt's "You must formulate a plan".
     if (hasAgentsPresent) {
-      dynamicLines.push(
-        'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them. Do not use formulate_plan for social actions.',
-      );
+      blocks.push({
+        id: 'social-directive',
+        text: 'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them. Do not use formulate_plan for social actions.',
+        required: true,
+      });
     }
 
     // Drive→affordance matching hints, imperative form (spec 034, Req 2): the
@@ -186,16 +249,20 @@ export class PlanBuilderImpl implements PlanBuilder {
     // Supplements (never replaces) the social directive logic above; social is
     // excluded from matching (spec 018/024 own it). Dynamic section only
     // (KV-cache safety, spec 021); no matching affordance → no hint (Req 4).
+    const driveHintLines: string[] = [];
     for (const match of matchDrivesToAffordances(passive.drives, prunedAffordances)) {
       if (match.affordances.length > 0) {
-        dynamicLines.push(formatPlanDriveHint(match));
+        driveHintLines.push(formatPlanDriveHint(match));
       }
       // Chain-progress hints (spec 048, Req 3): imperative secondary line
       // AFTER the direct-restoration imperative for the same drive; emitted
       // for chain-only matches too (the gated-restorer case).
       if ((match.chainProgress ?? []).length > 0) {
-        dynamicLines.push(formatPlanChainHint(match));
+        driveHintLines.push(formatPlanChainHint(match));
       }
+    }
+    if (driveHintLines.length > 0) {
+      blocks.push({ id: 'drive-hints', text: driveHintLines.join('\n'), required: true });
     }
 
     // Known-map summary + unknown markers (spec 039, R1/R4). DYNAMIC section
@@ -203,16 +270,17 @@ export class PlanBuilderImpl implements PlanBuilder {
     // the exact targetArea enum values; unexplored-but-known doors/areas are
     // rendered as explicit markers ("a door to 'workshop' — unexplored") so
     // the LLM can plan exploration without perceiving the unknown side.
-    const { knownAreas, unexploredAreas } = perceptionResult;
     if (knownAreas !== undefined && knownAreas.length > 0) {
-      dynamicLines.push(`Known areas: ${knownAreas.join(', ')}`);
-      dynamicLines.push(
-        'Set targetArea on a step to navigate to a known area first — the engine walks you there and the affordance executes on arrival.',
-      );
+      blocks.push({ id: 'known-areas', text: `Known areas: ${knownAreas.join(', ')}` });
+      blocks.push({
+        id: 'known-areas-directive',
+        text: 'Set targetArea on a step to navigate to a known area first — the engine walks you there and the affordance executes on arrival.',
+      });
     }
     if (unexploredAreas !== undefined) {
-      for (const area of unexploredAreas) {
-        dynamicLines.push(`a door to '${area}' — unexplored`);
+      const unexploredLines = unexploredAreas.map((area) => `a door to '${area}' — unexplored`);
+      if (unexploredLines.length > 0) {
+        blocks.push({ id: 'unexplored-areas', text: unexploredLines.join('\n') });
       }
     }
 
@@ -220,64 +288,84 @@ export class PlanBuilderImpl implements PlanBuilder {
     // several steps and connect to what the agent intends over the coming
     // hours. Horizon FRAMING, not a forced schedule — the LLM keeps the
     // decision. Dynamic section only (spec 021).
-    dynamicLines.push(
-      'Horizon: your plan may chain several steps toward what you intend over the coming hours — e.g. a morning of watering, harvesting and trading, an afternoon of rest and talk. This is framing, not a schedule: the choice stays yours.',
-    );
+    blocks.push({
+      id: 'horizon',
+      text: 'Horizon: your plan may chain several steps toward what you intend over the coming hours — e.g. a morning of watering, harvesting and trading, an afternoon of rest and talk. This is framing, not a schedule: the choice stays yours.',
+    });
 
     // Append system feedback (prior action failures) per §9.2.
     if (passive.systemFeedback !== undefined) {
-      dynamicLines.push(`System feedback: ${passive.systemFeedback}`);
-      // Spec 038 (replan quality): a bare failure report does not stop the
-      // model from planning the identical action again (observed live:
-      // 108 failed plant_seeds re-plannings against a full planter). Make the
-      // anti-repeat instruction explicit, referencing the failure text.
-      dynamicLines.push(
-        'IMPORTANT: Do NOT plan an action that just failed. Choose a DIFFERENT affordance — ' +
-          'for example, if the planter is full, plan harvest or eat instead of planting more seeds; ' +
-          'if a resource is exhausted, look for another object or move to another room.',
-      );
+      blocks.push({
+        id: 'system-feedback',
+        text: [
+          `System feedback: ${passive.systemFeedback}`,
+          // Spec 038 (replan quality): a bare failure report does not stop the
+          // model from planning the identical action again (observed live:
+          // 108 failed plant_seeds re-plannings against a full planter). Make
+          // the anti-repeat instruction explicit, referencing the failure text.
+          'IMPORTANT: Do NOT plan an action that just failed. Choose a DIFFERENT affordance — ' +
+            'for example, if the planter is full, plan harvest or eat instead of planting more seeds; ' +
+            'if a resource is exhausted, look for another object or move to another room.',
+        ].join('\n'),
+        required: true,
+      });
     }
 
     // Append stuck directive when no physical actions are available (spec 008, Req 5.3, AC-16).
     if (perceptionResult.stuck === true) {
-      dynamicLines.push(
-        '\n\nWARNING: No physical actions are available in this room. You may need to move or use a cognitive tool.',
-      );
+      blocks.push({
+        id: 'stuck-warning',
+        text: '\n\nWARNING: No physical actions are available in this room. You may need to move or use a cognitive tool.',
+        required: true,
+      });
     }
 
-    const contextLines = [...stableLines, '---', ...dynamicLines];
+    // Spec 061 (R3, defensive): cap any reserved recall block with the
+    // env-derived caps, preserving the provider's ranked order. No recall
+    // block is rendered today (`associativeMemories` wiring is Deferred), so
+    // this is inert until a future wiring adds one.
+    const cappedBlocks = capRecallBlocks(blocks, planRecallMaxLines(), planRecallMaxChars());
 
-    // Affordance tools are included so the LLM sees exact affordance IDs as tool
-    // names when formulating a plan (spec 019, Req 8).
-    const affordanceTools = affordancesToToolDefinitions(prunedAffordances);
+    // Spec 061 (R2): `headroom` is what remains of the ceiling after the
+    // constant prefix. `budgetPlanContext` bounds only the perception context.
+    const headroom = planPromptMaxChars() - systemPrompt.length - JSON.stringify(tools).length;
+    const budgetedContext = budgetPlanContext(cappedBlocks, Math.max(0, headroom));
 
-    // Spec 037, Req 1: the formulate_plan schema enum-binds targetAffordance to
-    // the pruned affordance IDs (+ 'wait') — the pruner's output becomes a
-    // value-space constraint, not just prompt context. Spec 039, R1: when the
-    // agent knows areas, steps additionally gain the enum-bound targetArea.
-    const planTool = formulatePlanToolFor(
-      prunedAffordances.map((a) => a.id),
-      knownAreas,
-    );
+    // Spec 061 (R4): attach the budget breakdown so the client can emit
+    // `[plan-context]` alongside `[plan-prompt]`. `top` names the largest
+    // surviving block (the grower) from logs alone; `budget` is the ceiling
+    // applied, `orig`/`kept` are the pre-/post-budget context chars.
+    const droppedSet = new Set(budgetedContext.droppedBlockIds);
+    let topBlockId = 'none';
+    let topBlockChars = 0;
+    for (const block of cappedBlocks) {
+      if (!droppedSet.has(block.id) && block.text.length > topBlockChars) {
+        topBlockId = block.id;
+        topBlockChars = block.text.length;
+      }
+    }
+    const planContextDiagnostic: PlanContextDiagnostic = {
+      originalChars: budgetedContext.originalChars,
+      budgetChars: Math.max(0, headroom),
+      keptChars: budgetedContext.chars,
+      droppedBlockIds: budgetedContext.droppedBlockIds,
+      ...(budgetedContext.truncatedBlockId !== undefined
+        ? { truncatedBlockId: budgetedContext.truncatedBlockId }
+        : {}),
+      topBlockId,
+      topBlockChars,
+    };
 
     return {
       systemPrompt,
-      perceptionContext: contextLines.join('\n'),
+      perceptionContext: budgetedContext.perceptionContext,
       availableAffordances: prunedAffordances,
       cognitiveTools: defaultCognitiveTools,
       // Spec 039, R1: the known-area value space rides with the payload so
       // the plan validator can enforce area-bound steps.
       ...(knownAreas !== undefined ? { knownAreas } : {}),
-      tools: buildPlanTools(
-        hasAgentsPresent,
-        affordanceTools,
-        isSocialPrimary,
-        planTool,
-        // Spec 051 (R1/R2): the plan-phase talk_to is enum-bound per cycle to
-        // the present, uncapped agent IDs — same construction as the
-        // perception builder; omitted entirely when nothing is valid.
-        computeTalkEnum(passive.agentsPresent, perceptionResult.socialUrges).valid,
-      ),
+      tools,
+      planContextDiagnostic,
     };
   }
 }

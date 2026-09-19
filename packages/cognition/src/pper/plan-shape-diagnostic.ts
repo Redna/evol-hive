@@ -77,3 +77,38 @@ export function logPlanRepair(
 export function logPlanFloor(agentId: string, failures: number, target: string): void {
   console.error(`[plan-floor] agent=${agentId} failures=${failures} target=${target}`);
 }
+
+/**
+ * The plan-context budget breakdown attached to a payload by the builder and
+ * emitted by the client as `[plan-context]` (spec 061, R4).
+ */
+export interface PlanContextDiagnostic {
+  /** Pre-budget `perceptionContext` chars (what the context grew to). */
+  originalChars: number;
+  /** The ceiling applied to the perception context (headroom after the prefix). */
+  budgetChars: number;
+  /** Post-budget `perceptionContext` chars (what was actually sent). */
+  keptChars: number;
+  /** Optional block ids dropped, in drop order (empty = none dropped). */
+  droppedBlockIds: string[];
+  /** Set when the last required block had to be truncated. */
+  truncatedBlockId?: string;
+  /** Id of the largest surviving block — the live instrument that names the grower. */
+  topBlockId: string;
+  /** Char count of the largest surviving block (capped, pre-truncation). */
+  topBlockChars: number;
+}
+
+/**
+ * `[plan-context]` — one line per plan formulation naming the growing block
+ * (spec 061, R4). Zero-LLM, pure string arithmetic; the call site wraps it so
+ * a throwing writer never breaks a cycle (spec 049).
+ */
+export function logPlanContext(agentId: string | undefined, d: PlanContextDiagnostic): void {
+  const dropped = d.droppedBlockIds.length > 0 ? d.droppedBlockIds.join(',') : 'none';
+  const trunc = d.truncatedBlockId !== undefined ? ` trunc=${d.truncatedBlockId}` : '';
+  console.error(
+    `[plan-context] agent=${agentId ?? '?'} orig=${d.originalChars} budget=${d.budgetChars} ` +
+      `kept=${d.keptChars} dropped=${dropped} top=${d.topBlockId}:${d.topBlockChars}${trunc}`,
+  );
+}
