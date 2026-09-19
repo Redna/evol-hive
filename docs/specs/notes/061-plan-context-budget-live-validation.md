@@ -45,18 +45,29 @@ conversation objects from **#224** (62 dead `Conversation: …` mirrors in a sin
 26-minute window). The second grower, `known-areas`, feeds the `targetArea` enum
 (the spec's named contingency).
 
-## Why the cap did not help: the enum is never budgeted
+## Why the cap did not help: the prefix is ~88% of the ceiling, and the leak lands in `targetArea`
 
-`systemPrompt` and `tools` are deliberately **not** budgeted (enum = plan
-legality, spec 037/058). The affordance/tool enum grows with the leaked
-conversation mirrors (#224, each carrying `contribute/join/leave`) and with
-`known-areas`. So the *constant prefix* grew while the *budgeted context* shrank:
-the `[plan-context] budget=` headroom fell from ~3,347 to ~1,000 chars, and the
-budgeter then **starved** the context — dropping `known-areas`, `last-plan`,
-`social`, `relationships` and truncating `system-feedback`.
+Measured from the run's own payload dump (`PLAN_PAYLOAD_DUMP_DIR`, largest payload per agent):
 
-So the ceiling treated a symptom (context size) that was not the driver, while
-the real growth (the un-budgeted enum) continued unchecked.
+| part | chars | ~tokens |
+| --- | --- | --- |
+| `systemPrompt` | 1,256–1,310 | ~320 |
+| `tools` (whole array, 14–15 defs) | 5,514–6,080 | ~1.4–1.5k |
+| — of which `formulate_plan` | 1,905–2,305 | ~480–580 |
+| — of which `talk_to` | 869 | ~220 |
+| `perceptionContext` | 2,639–3,171 | ~660–790 |
+| **total** | **~9.9–10.0k** | **~2.5k** |
+
+Units matter: the enum is **~6k characters (~1.5k tokens)**, not "9k tokens". The `10000 − budget` figure is the constant-prefix **chars**; across the run that prefix has **median ≈ 8,758 chars** (min 4,373, max 10,000), i.e. ~88% of the ceiling is consumed before any context, leaving ~1.2k chars of headroom at the median.
+
+**The leak's vector is `targetArea`, not `targetAffordance`:**
+
+- `targetAffordance`: 9 values, 117 chars, **0** conversation values (the earlier "each mirror adds contribute/join/leave" claim was **wrong**).
+- `targetArea` (built from `knownAreas`): 44 / 50 / 69 values for the three agents, of which **27 / 33 / 52 are leaked conversation ids** (`conv-…`). Most of that enum is the #224 leak.
+
+So the mechanism is: leak → conversation mirrors in `room.objectIds` → `knownAreas` → the **`targetArea` enum** and the `known-areas` context block grow → the un-budgeted prefix consumes the ceiling → the budgeter starves the context. (`systemPrompt` and `tools` are deliberately never budgeted: enum = plan legality, spec 037/058.)
+
+Separately observed: `observe` is emitted **three times** as an affordance tool def (~165 chars each) — a small independent duplication waste.
 
 ## Secondary signals (plan quality degraded)
 
@@ -70,11 +81,12 @@ the real growth (the un-budgeted enum) continued unchecked.
 ## Conclusion and next action
 
 1. **#224 (conversation-object leak) is the prime suspect** and the next work
-   item: it inflates the un-budgeted tool enum and the `objects` context block
-   without bound.
+   item: it injects 27–52 dead conversation ids into the `targetArea` enum (via
+   `knownAreas`) and into the `known-areas` context block, unbounded.
 2. **#212** (non-executable conversation affordances in the plan enum) is
-   entangled — the leaked mirrors are exactly what puts `contribute/join/leave`
-   in the enum.
+   adjacent but **not** what this run shows: `targetAffordance` carried no
+   conversation values. #212's path was not observed here and should be
+   re-checked against its own reproduction.
 3. **Re-run this ceiling validation after #224** to separate the leak's effect
    from the ramp; and re-evaluate whether `PLAN_PROMPT_MAX_CHARS=10_000` is right
    once the enum stops leaking (it may currently be too tight, given the enum
