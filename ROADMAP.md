@@ -149,21 +149,22 @@
 
 ## Decision Log
 
-| Date       | Decision                                        | Rationale                                                                                    |
-| ---------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| 2026-08-04 | 4-package monorepo structure                    | [ADR-0001](docs/adr/0001-lean-monorepo-structure.md)                                         |
-| 2026-08-04 | GitHub-hosted runners for agent CI              | Free for public repos, no security risk                                                      |
-| 2026-08-04 | Ollama Cloud direct API for LLM                 | No local daemon needed in CI                                                                 |
-| 2026-08-04 | YAAM memory via git memory branch               | Durable, versioned, no cache eviction                                                        |
-| 2026-08-04 | pi -p (print mode) for agents                   | Multi-turn tool use without interactive mode                                                 |
-| 2026-08-06 | GitHub App for bot identity                     | `evol-hive-agent[bot]` distinct from human                                                   |
-| 2026-08-06 | PAT for PR creation, App for everything else    | Triggers pull_request events automatically                                                   |
-| 2026-08-07 | Controller → Pipeline Orchestrator              | Single workflow, no event storms                                                             |
-| 2026-08-17 | Tool calling replaces structured output         | 3x faster, reliable field names, simpler code                                                |
-| 2026-08-17 | Configurable decay rate (0.1/sec)               | Real LLM too slow for 1.0/sec decay                                                          |
-| 2026-08-17 | Core cognition before visuals                   | Emergent behavior is the priority, not presentation                                          |
-| 2026-08-24 | Compaction lock for distributed agents          | `yaam-compaction.lock` prevents race between agents and compaction                           |
-| 2026-08-24 | JS compactor for CI, daemon compactor for local | Daemon compact breaks delta math; JS compactor runs without daemon                           |
-| 2026-09-04 | Streaming compactor for scheduled compaction    | In-memory compactor OOM'd at 3.7M events; streaming (readline + Maps) handles multi-GB files |
-| 2026-09-04 | 4GB swap + heartbeat on hosted runners          | Agent stack sits at 93-95% of 16GB runner RAM; spikes OOM-killed ~50% of agent jobs          |
-| 2026-09-04 | Strict spec lookup in Developer workflow        | "Latest spec" fallback made the agent implement the wrong issue (PR #116)                    |
+| Date       | Decision                                        | Rationale                                                                                                                                                                                                       |
+| ---------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-04 | 4-package monorepo structure                    | [ADR-0001](docs/adr/0001-lean-monorepo-structure.md)                                                                                                                                                            |
+| 2026-08-04 | GitHub-hosted runners for agent CI              | Free for public repos, no security risk                                                                                                                                                                         |
+| 2026-08-04 | Ollama Cloud direct API for LLM                 | No local daemon needed in CI                                                                                                                                                                                    |
+| 2026-08-04 | YAAM memory via git memory branch               | Durable, versioned, no cache eviction                                                                                                                                                                           |
+| 2026-08-04 | pi -p (print mode) for agents                   | Multi-turn tool use without interactive mode                                                                                                                                                                    |
+| 2026-08-06 | GitHub App for bot identity                     | `evol-hive-agent[bot]` distinct from human                                                                                                                                                                      |
+| 2026-08-06 | PAT for PR creation, App for everything else    | Triggers pull_request events automatically                                                                                                                                                                      |
+| 2026-08-07 | Controller → Pipeline Orchestrator              | Single workflow, no event storms                                                                                                                                                                                |
+| 2026-08-17 | Tool calling replaces structured output         | 3x faster, reliable field names, simpler code                                                                                                                                                                   |
+| 2026-08-17 | Configurable decay rate (0.1/sec)               | Real LLM too slow for 1.0/sec decay                                                                                                                                                                             |
+| 2026-08-17 | Core cognition before visuals                   | Emergent behavior is the priority, not presentation                                                                                                                                                             |
+| 2026-08-24 | Compaction lock for distributed agents          | `yaam-compaction.lock` prevents race between agents and compaction                                                                                                                                              |
+| 2026-08-24 | JS compactor for CI, daemon compactor for local | Daemon compact breaks delta math; JS compactor runs without daemon                                                                                                                                              |
+| 2026-09-04 | Streaming compactor for scheduled compaction    | In-memory compactor OOM'd at 3.7M events; streaming (readline + Maps) handles multi-GB files                                                                                                                    |
+| 2026-09-04 | 4GB swap + heartbeat on hosted runners          | Agent stack sits at 93-95% of 16GB runner RAM; spikes OOM-killed ~50% of agent jobs                                                                                                                             |
+| 2026-09-04 | Strict spec lookup in Developer workflow        | "Latest spec" fallback made the agent implement the wrong issue (PR #116)                                                                                                                                       |
+| 2026-09-18 | Local relay legs + GitHub ledger (hybrid)       | Actions ~40% no-op runs and spec drift (every agent-authored spec needed correction); local legs do the intellectual work, GitHub keeps CI/QA/identity. See [DELIVERY_PROCEDURE.md](docs/DELIVERY_PROCEDURE.md) |

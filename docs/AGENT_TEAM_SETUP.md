@@ -2,6 +2,15 @@
 
 > How we bootstrapped an autonomous AI agent team for evol-hive using GitHub Actions, Ollama Cloud, Pi, pi-goal, YAAM, and a GitHub App for bot identity.
 
+> **Current working model (2026-09-18):** see [`DELIVERY_PROCEDURE.md`](DELIVERY_PROCEDURE.md).
+> The intellectual work (spec drafting + code-grounded review, implementation, live
+> validation, root-cause) is done in **local relay legs** on the always-on box; GitHub
+> Actions is retained as the **ledger + verification layer** (CI, QA coverage runs, bot
+> identity, GitGuardian, branch protection). The fully-autonomous
+> Architect→Developer→QA pipeline below still runs and remains the fallback for
+> mechanical/triage work, but its spec/implementation output is now authored and
+> reviewed locally.
+
 ## Architecture Overview
 
 ```
