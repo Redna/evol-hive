@@ -73,9 +73,30 @@ export interface PlanManager {
    * the honest `superseded` outcome for the abandoned plan, then clear
    * `currentPlan` so the sticky Plan phase re-formulates from fresh
    * eligibility.
+   *
+   * Optional (issue #215, item 4 — measured tests-inclusive typecheck backlog
+   * too large to route (a)): the spec-059 capability is additive, so legacy and
+   * lightweight doubles need not provide it. The engine's production
+   * implementation is still compile-checked to provide it via
+   * {@link PlanManagerInvalidating}.
    */
-  invalidatePlan(agentId: string): void;
+  invalidatePlan?(agentId: string): void;
 }
+
+/**
+ * Compile-checked guard (issue #215, item 4). `invalidatePlan` is optional on
+ * {@link PlanManager} so legacy/lightweight implementations stay assignable,
+ * but the engine's production implementation must still provide it:
+ * `PlanManagerImpl implements PlanManagerInvalidating`, so dropping the method
+ * in `packages/engine/src/agents/plans/index.ts` fails `pnpm typecheck`.
+ *
+ * This is deliberately the strongest gate available for route (b): plain
+ * `pnpm typecheck` excludes `tests/**`, so it cannot see a broken *test* double
+ * (the `RecordingPlanManager` latent TS2420 that motivated issue #215 item 4).
+ */
+export type PlanManagerInvalidating = PlanManager & {
+  invalidatePlan(agentId: string): void;
+};
 
 // ── Re-exports ────────────────────────────────────────────────────────────────
 

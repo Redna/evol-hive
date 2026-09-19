@@ -15,7 +15,7 @@ import type {
   PlanStep,
   PlanDataProvider,
 } from '@evol-hive/shared';
-import type { AgentManager, PlanManager } from '../index.js';
+import type { AgentManager, PlanManager, PlanManagerInvalidating } from '../index.js';
 
 /** A clock function that returns the current simulation time. */
 export type SimulationClock = () => number;
@@ -27,7 +27,7 @@ export type SimulationClock = () => number;
  * time source (spec 056, Req 4: deterministic under fixed-clock tests,
  * consistent with sim time — the spec-054 epoch-stamp family).
  */
-export class PlanManagerImpl implements PlanManager {
+export class PlanManagerImpl implements PlanManagerInvalidating {
   /** Monotonic counter to guarantee unique plan ids within the same millisecond. */
   private static planCounter = 0;
 

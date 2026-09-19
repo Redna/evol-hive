@@ -160,10 +160,12 @@ export class ExecuteDataProviderImpl implements ExecuteDataProvider {
   /**
    * Invalidate the agent's in-flight plan (spec 059, R3 — issue #210):
    * delegates to the engine's `PlanManager`, which stamps the honest
-   * `superseded` outcome and clears `currentPlan`.
+   * `superseded` outcome and clears `currentPlan`. `PlanManager.invalidatePlan`
+   * is optional (issue #215, item 4), so a legacy/lightweight manager wired
+   * here is a no-op — the same fall-through semantics as an unwired provider.
    */
   invalidatePlan(agentId: string): void {
-    this.planManager.invalidatePlan(agentId);
+    this.planManager.invalidatePlan?.(agentId);
   }
 
   applyDriveChanges(agentId: string, changes: Partial<Record<string, number>>): void {
