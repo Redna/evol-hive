@@ -1,6 +1,6 @@
 ---
 name: evol-hive-triage
-description: Triage evol-hive issues and PRs into a small state machine before any leg picks them up. Use when a new issue or PR needs evaluation, when asked "what needs attention", or when deciding what an agent should work on next. Verifies the claim against the code before grilling, checks whether the requested behaviour already exists, and writes agent-ready briefs. Fits the GitHub-ledger + human-gates workflow in docs/DELIVERY_PROCEDURE.md.
+description: 'Triage evol-hive issues and PRs into a small state machine before any leg picks them up. Use when a new issue or PR needs evaluation, when asked "what needs attention", or when deciding what an agent should work on next. Verifies the claim against the code before grilling, checks whether the requested behaviour already exists, and writes agent-ready briefs. Fits the GitHub-ledger + human-gates workflow in docs/DELIVERY_PROCEDURE.md.'
 ---
 
 # Triage (evol-hive)

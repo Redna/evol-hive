@@ -1,6 +1,6 @@
 ---
 name: evol-hive-spec
-description: Draft an evol-hive spec from a foggy issue or conversation, written against the code so it does not drift. Use when an issue needs a spec before implementation, when a design is too big for one session, or when asked to "spec this". Produces docs/specs/NNN-*.md in the Requirements/ACs/Constraints skeleton and agrees the test seams with the user first. Fits the spec-driven workflow and the three human gates in docs/DELIVERY_PROCEDURE.md.
+description: 'Draft an evol-hive spec from a foggy issue or conversation, written against the code so it does not drift. Use when an issue needs a spec before implementation, when a design is too big for one session, or when asked to "spec this". Produces docs/specs/NNN-*.md in the Requirements/ACs/Constraints skeleton and agrees the test seams with the user first. Fits the spec-driven workflow and the three human gates in docs/DELIVERY_PROCEDURE.md.'
 ---
 
 # Spec (evol-hive)

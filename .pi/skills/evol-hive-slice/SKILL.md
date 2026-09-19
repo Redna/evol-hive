@@ -1,6 +1,6 @@
 ---
 name: evol-hive-slice
-description: Break a spec or issue into tracer-bullet legs (vertical slices) with blocking edges, and use expand-contract for wide refactors. Use when a spec is ready to implement and needs decomposition, when planning a multi-leg chain, or when asked "how do we build this in legs". Quiz the user on granularity and dependencies before publishing; produces leg packets.
+description: 'Break a spec or issue into tracer-bullet legs (vertical slices) with blocking edges, and use expand-contract for wide refactors. Use when a spec is ready to implement and needs decomposition, when planning a multi-leg chain, or when asked "how do we build this in legs". Quiz the user on granularity and dependencies before publishing; produces leg packets.'
 ---
 
 # Slice (evol-hive)

@@ -1,6 +1,6 @@
 ---
 name: evol-hive-review
-description: Review a diff since a fixed point along two independent axes — Standards (repo conventions + a smell baseline) and Spec (does it do what the originating issue/spec asked) — and never rerank across them. Use when reviewing a PR, a leg's branch, work-in-progress changes, or a spec against the code. Fits the PR merge gate and the spec gate in docs/DELIVERY_PROCEDURE.md.
+description: 'Review a diff since a fixed point along two independent axes — Standards (repo conventions + a smell baseline) and Spec (does it do what the originating issue/spec asked) — and never rerank across them. Use when reviewing a PR, a leg branch, work-in-progress changes, or a spec against the code. Fits the PR merge gate and the spec gate in docs/DELIVERY_PROCEDURE.md.'
 ---
 
 # Review (evol-hive)

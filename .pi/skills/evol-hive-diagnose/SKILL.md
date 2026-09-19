@@ -1,6 +1,6 @@
 ---
 name: evol-hive-diagnose
-description: Discipline for hard bugs and performance regressions in evol-hive: build a tight red-capable feedback loop before theorizing, then reproduce, minimise, hypothesise, and instrument one variable at a time. Use when the user says "diagnose"/"debug this", or reports something broken, throwing, failing, or slow — especially live-sim anomalies and memory spikes.
+description: 'Discipline for hard bugs and performance regressions in evol-hive: build a tight red-capable feedback loop before theorizing, then reproduce, minimise, hypothesise, and instrument one variable at a time. Use when the user says "diagnose"/"debug this", or reports something broken, throwing, failing, or slow — especially live-sim anomalies and memory spikes.'
 ---
 
 # Diagnose (evol-hive)

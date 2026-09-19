@@ -1,6 +1,6 @@
 ---
 name: evol-hive-build
-description: Execute one evol-hive leg test-first (red-green-refactor) at pre-agreed seams, then run the verification matrix before committing. Use when implementing a ticket or leg, building a feature, fixing a bug, or making any code change in the monorepo. Fits the local-legs workflow in docs/DELIVERY_PROCEDURE.md.
+description: 'Execute one evol-hive leg test-first (red-green-refactor) at pre-agreed seams, then run the verification matrix before committing. Use when implementing a ticket or leg, building a feature, fixing a bug, or making any code change in the monorepo. Fits the local-legs workflow in docs/DELIVERY_PROCEDURE.md.'
 ---
 
 # Build a leg (evol-hive)

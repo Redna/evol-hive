@@ -40,9 +40,10 @@ So: **local legs do the thinking; GitHub does the checking.**
 
 ## Skills (pipeline stage → skill)
 
-Each pipeline stage has a matching skill under `.pi/skills/` (symlinked into
-`~/.pi/agent/skills/` for pi discovery). Consult the relevant one when doing that
-stage's work.
+Each pipeline stage has a matching skill under `.pi/skills/` — the **versioned
+source of truth**. The agent reads them from `~/.pi/agent/skills/evol-hive-*/`,
+installed as **copies** (not symlinks) so a branch switch never leaves them
+dangling; after editing a skill in the repo, re-copy it into the agent dir.
 
 | Stage | Skill | Borrows from |
 | --- | --- | --- |
