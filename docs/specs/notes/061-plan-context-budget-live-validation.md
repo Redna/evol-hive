@@ -94,3 +94,57 @@ Separately observed: `observe` is emitted **three times** as an affordance tool 
 4. Do **not** treat spec 060's AC-7 "mechanism = prompt growth" as established;
    the next spec on this ramp must start from the enum (legality-bearing, never
    budgeted), not the context.
+
+---
+
+## R5 probe (H1/H2 discriminator) — the ramp's mechanism identified
+
+**Method.** Replay the run's own late-run payloads (`PLAN_PAYLOAD_DUMP_DIR`,
+largest per agent) against `gemma4:31b-cloud`, faithful to
+`OpenAICompatibleLLMClient.sendRequest` (`{model, messages, tools, stream:false,
+tool_choice:'auto'}`), classified with the shared `classifyPlanShape` + the
+client's `decodeFormulatePlanArgs` (`/tmp/r5-probe.mjs`).
+
+| experiment (late payload, cc=1, n=20) | tool chosen | reason |
+| --- | --- | --- |
+| unmodified, cc=1 | `talk_to` 20/20 | `missing-description` |
+| unmodified, **cc=3** | `talk_to` 20/20 | `missing-description` |
+| social-imperative lines removed | `observe_agent` 20/20 | `missing-description` |
+| social tools removed from `tools` | `talk_to` 19/20 | `missing-description` |
+| social framing + social tools removed | **`formulate_plan` 20/20** | `empty-step-description` |
+
+- **H2 (provider load) falsified:** cc=1 and cc=3 are identical (0/20 each).
+- **H1 (prompt size) already falsified** by the run (size flat, rate ramped).
+- The model is **not producing malformed plans** — it is calling `talk_to`, which
+  `completePlan` classifies as a shape failure (`missing-description`).
+
+**Why: the plan phase's own context instructs it.** The system message ends
+`… do not use formulate_plan for social actions.` immediately followed by
+`You must use formulate_plan to create a plan before taking any physical
+action.` The user message adds `Agents present: …`,
+`Primary drive: low social, need to restore social`,
+`Your social drive is your most urgent need. Call talk_to or help NOW … Do not
+formulate a plan first.` and
+`IMPORTANT: Other agents are present. Call talk_to, … Do not use formulate_plan
+for social actions.` The model obeys the plan phase's own instruction, and the
+plan phase rejects the obedient answer.
+
+**The "invalid rate" therefore conflates two modes** (061 run: 1,446 invalids):
+
+1. **Social-routing contradiction** — `missing-description`, **1,002 (69%)**: the
+   model calls a social tool. Rises as agents co-locate and social urgency
+   grows — **this is the ramp**.
+2. **Genuine shape failure** — `empty-step-description`, **444 (31%)**: the mode
+   spec 060 targeted. Still real, but not the ramp's driver.
+
+**Implications.**
+
+- Spec 060's client repair and spec 061's context ceiling both address mode 2 /
+  prompt size; neither can fix mode 1, because the model is doing what the prompt
+  says.
+- The fix is **routing**, not repair or compression: the plan phase must either
+  stop rendering social imperatives / stop offering social tools, or accept a
+  legitimate social tool call as an action rather than a plan failure — exactly
+  **#212**'s "route them or narrow the value space".
+- **#224** (dead conversation mirrors) remains a separate *correctness* bug
+  (pollutes `objects`/`knownAreas`/`targetArea`); fix it, but it is not the ramp.
