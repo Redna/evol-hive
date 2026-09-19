@@ -210,7 +210,12 @@ describe('Spec 018 — Existing scaffolding verification', () => {
     expect(fileExists(planBuilderPath)).toBe(true);
     const planContent = readFile(planBuilderPath);
     expect(planContent).toContain('export class PlanBuilderImpl');
-    expect(planContent).toContain('contextLines');
+    // Spec 061 (R2, #219) replaced the `contextLines` local with the ordered
+    // `PlanContextBlock[]` stream budgeted by `budgetPlanContext`. The intent
+    // of this scaffolding check — the builder assembles plan context — is
+    // unchanged; the structural marker tracks the refactor.
+    expect(planContent).toContain('budgetPlanContext');
+    expect(planContent).toContain('PlanContextBlock');
   });
 });
 
