@@ -38,6 +38,27 @@ So: **local legs do the thinking; GitHub does the checking.**
 | Intellectual work | **Local legs** | spec drafting + code-grounded review, implementation, unit tests, live validation, root-cause |
 | Memory            | Local YAAM     | durable notes/workspaces (the handoff channel); regenerable code topology                     |
 
+## Skills (pipeline stage → skill)
+
+Each pipeline stage has a matching skill under `.pi/skills/` (symlinked into
+`~/.pi/agent/skills/` for pi discovery). Consult the relevant one when doing that
+stage's work.
+
+| Stage | Skill | Borrows from |
+| --- | --- | --- |
+| Feed the ledger | `evol-hive-triage` | mattpocock `triage` |
+| Chart a foggy issue | `evol-hive-spec` | `wayfinder` + `to-spec` + `domain-modeling` |
+| Decompose into legs | `evol-hive-slice` | `to-tickets` (tracer bullets, expand–contract) |
+| Execute a leg | `evol-hive-build` | `tdd` + `implement` |
+| Review a PR / spec | `evol-hive-review` | `code-review` |
+| Fix a bug / regression | `evol-hive-diagnose` | `diagnosing-bugs` |
+
+The skills carry the *disciplines* only; the tracker/scaffold assumptions of the
+upstream suite (their label vocabulary, `.scratch/`, `.out-of-scope/`) are **not**
+adopted — the GitHub ledger, the spec/AC skeleton, and YAAM memory remain the
+infrastructure. Skills load at session start; a new skill needs a `/reload` to
+appear in a running session.
+
 ## The three human gates
 
 The human sits at exactly three gates. Everything else is a leg or an automated check.
