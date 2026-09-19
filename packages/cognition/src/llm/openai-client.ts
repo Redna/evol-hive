@@ -35,10 +35,12 @@ import type { LLMContextPayload } from '../index.js';
 import type { EmbeddingProvider } from '../classifier/index.js';
 import {
   estimatePlanPrompt,
+  logPlanContext,
   logPlanInvalid,
   logPlanPrompt,
   logPlanRepair,
 } from '../pper/plan-shape-diagnostic.js';
+import { writeLargestPlanPayload } from './plan-payload-dump.js';
 
 // ─── Error Hierarchy (Req 15) ────────────────────────────────────────────────
 
@@ -367,6 +369,31 @@ export class OpenAICompatibleLLMClient {
       logPlanPrompt(payload.agentId, promptSize);
     } catch {
       // Diagnostic-grade data: never break a plan request over a log line.
+    }
+
+    // Spec 061, R4: `[plan-context]` names the growing block (one line per
+    // formulation, zero-LLM) and the env-gated largest-payload dump enables
+    // offline H1/H2 replay. Both wrapped — never break a plan request.
+    try {
+      if (payload.planContextDiagnostic !== undefined) {
+        logPlanContext(payload.agentId, payload.planContextDiagnostic);
+      }
+    } catch {
+      // spec 049
+    }
+    try {
+      const dumpDir = process.env['PLAN_PAYLOAD_DUMP_DIR'];
+      if (dumpDir !== undefined && dumpDir.length > 0) {
+        writeLargestPlanPayload(dumpDir, {
+          messages,
+          tools: payload.tools,
+          systemPrompt: payload.systemPrompt,
+          perceptionContext: payload.perceptionContext,
+          agentId: payload.agentId,
+        });
+      }
+    } catch {
+      // diagnostics only
     }
 
     let { args } = await this.requestChat(messages, payload.tools, payload.agentId, 'plan');

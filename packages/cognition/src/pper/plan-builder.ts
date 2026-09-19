@@ -45,6 +45,7 @@ import {
   planRecallMaxChars,
   planRecallMaxLines,
 } from './plan-context-budget.js';
+import type { PlanContextDiagnostic } from './plan-shape-diagnostic.js';
 
 /** Options for contextual forcing in the Plan builder (spec 016, Req 9). */
 export interface PlanBuilderGuardrailOptions {
@@ -330,6 +331,31 @@ export class PlanBuilderImpl implements PlanBuilder {
     const headroom = planPromptMaxChars() - systemPrompt.length - JSON.stringify(tools).length;
     const budgetedContext = budgetPlanContext(cappedBlocks, Math.max(0, headroom));
 
+    // Spec 061 (R4): attach the budget breakdown so the client can emit
+    // `[plan-context]` alongside `[plan-prompt]`. `top` names the largest
+    // surviving block (the grower) from logs alone; `budget` is the ceiling
+    // applied, `orig`/`kept` are the pre-/post-budget context chars.
+    const droppedSet = new Set(budgetedContext.droppedBlockIds);
+    let topBlockId = 'none';
+    let topBlockChars = 0;
+    for (const block of cappedBlocks) {
+      if (!droppedSet.has(block.id) && block.text.length > topBlockChars) {
+        topBlockId = block.id;
+        topBlockChars = block.text.length;
+      }
+    }
+    const planContextDiagnostic: PlanContextDiagnostic = {
+      originalChars: budgetedContext.originalChars,
+      budgetChars: Math.max(0, headroom),
+      keptChars: budgetedContext.chars,
+      droppedBlockIds: budgetedContext.droppedBlockIds,
+      ...(budgetedContext.truncatedBlockId !== undefined
+        ? { truncatedBlockId: budgetedContext.truncatedBlockId }
+        : {}),
+      topBlockId,
+      topBlockChars,
+    };
+
     return {
       systemPrompt,
       perceptionContext: budgetedContext.perceptionContext,
@@ -339,6 +365,7 @@ export class PlanBuilderImpl implements PlanBuilder {
       // the plan validator can enforce area-bound steps.
       ...(knownAreas !== undefined ? { knownAreas } : {}),
       tools,
+      planContextDiagnostic,
     };
   }
 }

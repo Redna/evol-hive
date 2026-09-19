@@ -12,7 +12,7 @@
  * ceiling headroom while `systemPrompt` and `tools` stay byte-identical (the
  * enum is plan legality — spec 037/058).
  */
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import type { Affordance, PerceptionResult } from '@evol-hive/shared';
 import {
   budgetPlanContext,
@@ -26,8 +26,13 @@ import {
   DEFAULT_PLAN_RECALL_MAX_LINES,
 } from '../src/pper/plan-context-budget.js';
 import type { PlanContextBlock } from '../src/pper/plan-context-budget.js';
-import { estimatePlanPrompt } from '../src/pper/plan-shape-diagnostic.js';
+import { estimatePlanPrompt, logPlanContext } from '../src/pper/plan-shape-diagnostic.js';
 import { PlanBuilderImpl } from '../src/pper/plan-builder.js';
+import { writeLargestPlanPayload } from '../src/llm/plan-payload-dump.js';
+import { OpenAICompatibleLLMClient } from '../src/llm/openai-client.js';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as pathJoin } from 'node:path';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -290,5 +295,163 @@ describe('spec 061 R2 — builder bounds the context without touching legality',
       roomy.tools.find((t) => t.name === 'formulate_plan'),
     );
     expect(tight.perceptionContext.length).toBeLessThan(roomy.perceptionContext.length);
+  });
+});
+
+// ── R4 / AC-1: [plan-context] grower diagnostic + largest-payload dump ──────
+
+function toolCallResponse(args: unknown): Response {
+  return new Response(
+    JSON.stringify({
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'formulate_plan', arguments: JSON.stringify(args) },
+              },
+            ],
+          },
+        },
+      ],
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  );
+}
+
+describe('spec 061 R4 — [plan-context] grower diagnostic + largest-payload dump', () => {
+  const builder = new PlanBuilderImpl();
+
+  it('attaches planContextDiagnostic with orig/budget/kept and top on every build', () => {
+    vi.stubEnv('PLAN_PROMPT_MAX_CHARS', '100000');
+    const roomy = builder.build(makeOversizedPerception());
+    const d = roomy.planContextDiagnostic;
+    expect(d).toBeDefined();
+    expect(d!.originalChars).toBe(roomy.perceptionContext.length);
+    expect(d!.keptChars).toBe(roomy.perceptionContext.length);
+    expect(d!.droppedBlockIds).toEqual([]);
+    expect(d!.truncatedBlockId).toBeUndefined();
+    expect(d!.budgetChars).toBeGreaterThan(0);
+    expect(d!.topBlockId).toMatch(/^[a-z-]+$/);
+    expect(d!.topBlockChars).toBeGreaterThan(0);
+  });
+
+  it('reports dropped blocks (lowest tier first) and top names the surviving grower', () => {
+    vi.stubEnv('PLAN_PROMPT_MAX_CHARS', '100000');
+    const roomy = builder.build(makeOversizedPerception());
+    const prefixChars = roomy.systemPrompt.length + JSON.stringify(roomy.tools).length;
+    vi.stubEnv('PLAN_PROMPT_MAX_CHARS', String(prefixChars + 200));
+    const tight = builder.build(makeOversizedPerception());
+    const d = tight.planContextDiagnostic!;
+    expect(d.keptChars).toBe(tight.perceptionContext.length);
+    expect(d.keptChars).toBeLessThan(d.originalChars);
+    expect(d.droppedBlockIds.length).toBeGreaterThan(0);
+    // required Tier 0 blocks survive and can never be in the drop set
+    expect(d.droppedBlockIds).not.toContain('room');
+    expect(d.droppedBlockIds).not.toContain('objects');
+    // the named top block survived
+    expect(d.droppedBlockIds).not.toContain(d.topBlockId);
+  });
+
+  it('renders the [plan-context] line exactly (dropped=none and trunc suffix)', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    logPlanContext('a1', {
+      originalChars: 10,
+      budgetChars: 5,
+      keptChars: 5,
+      droppedBlockIds: [],
+      topBlockId: 'room',
+      topBlockChars: 4,
+    });
+    logPlanContext(undefined, {
+      originalChars: 10,
+      budgetChars: 5,
+      keptChars: 3,
+      droppedBlockIds: ['x'],
+      truncatedBlockId: 'drives',
+      topBlockId: 'room',
+      topBlockChars: 4,
+    });
+    const calls = err.mock.calls.map((c) => String(c[0]));
+    expect(calls[0]).toBe(
+      '[plan-context] agent=a1 orig=10 budget=5 kept=5 dropped=none top=room:4',
+    );
+    expect(calls[1]).toBe(
+      '[plan-context] agent=? orig=10 budget=5 kept=3 dropped=x top=room:4 trunc=drives',
+    );
+    err.mockRestore();
+  });
+
+  it('writeLargestPlanPayload writes only the largest payload per agent', () => {
+    const dir = mkdtempSync(pathJoin(tmpdir(), 'spec-061-dump-'));
+    try {
+      const small = {
+        messages: [],
+        tools: [],
+        systemPrompt: 's',
+        perceptionContext: 'a',
+        agentId: 'a1',
+      };
+      const big = {
+        messages: [],
+        tools: [],
+        systemPrompt: 's',
+        perceptionContext: 'a'.repeat(500),
+        agentId: 'a1',
+      };
+      writeLargestPlanPayload(dir, small);
+      const first = readFileSync(pathJoin(dir, 'plan-payload-a1.json'), 'utf8');
+      writeLargestPlanPayload(dir, big);
+      const second = readFileSync(pathJoin(dir, 'plan-payload-a1.json'), 'utf8');
+      expect(second.length).toBeGreaterThan(first.length);
+      expect(JSON.parse(second).perceptionContext.length).toBe(500);
+      // a smaller payload must not shrink it back
+      writeLargestPlanPayload(dir, small);
+      expect(readFileSync(pathJoin(dir, 'plan-payload-a1.json'), 'utf8')).toBe(second);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('emits [plan-context] once per completePlan call (client seam)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        toolCallResponse({
+          description: 'Restore energy',
+          steps: [{ description: 'Brew coffee', targetAffordance: 'brew_coffee' }],
+        }),
+      ),
+    );
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const client = new OpenAICompatibleLLMClient({ baseUrl: 'http://localhost:1', model: 'test' });
+    await client.completePlan({
+      systemPrompt: 'You are an agent.',
+      perceptionContext: 'Room: garden',
+      availableAffordances: [],
+      cognitiveTools: [],
+      tools: [],
+      agentId: 'a1',
+      planContextDiagnostic: {
+        originalChars: 100,
+        budgetChars: 50,
+        keptChars: 40,
+        droppedBlockIds: ['social-messages'],
+        topBlockId: 'drives',
+        topBlockChars: 22,
+      },
+    });
+    const calls = err.mock.calls.map((c) => String(c[0]));
+    const ctx = calls.filter((l) => l.includes('[plan-context]'));
+    expect(ctx).toHaveLength(1);
+    expect(ctx[0]).toBe(
+      '[plan-context] agent=a1 orig=100 budget=50 kept=40 dropped=social-messages top=drives:22',
+    );
+    err.mockRestore();
+    vi.unstubAllGlobals();
   });
 });
