@@ -148,3 +148,47 @@ plan phase rejects the obedient answer.
   **#212**'s "route them or narrow the value space".
 - **#224** (dead conversation mirrors) remains a separate *correctness* bug
   (pollutes `objects`/`knownAreas`/`targetArea`); fix it, but it is not the ramp.
+
+---
+
+## AC-8 re-run after #212 + #224 (2026-09-20) — **AC-8 MET**
+
+Log `/home/anima/224run.log`: full 40 minutes, 143,989 ticks, **5,467 plan prompts** (a larger
+sample than the 061 run's 2,276). `PLAN_PROMPT_MAX_CHARS=10000` unchanged, so the comparison is
+like-for-like. Code: `dbc7bc9` (#226 — plan-phase contract alignment, #212) + `a9182f5` (#227 —
+conversation-mirror removal, #224).
+
+| metric | 060 run | 061 run | this run |
+| --- | --- | --- | --- |
+| shape-invalid rate | 2.1% → 89.2% | 3.6% → 96.1% | **0.0% (0/5,467)** |
+| `plan-invalid` total | 1,537 | 1,446 | **0** |
+| `plan-repair` | 884 | 799 | **0** |
+| avg prompt chars Q1→Q5 | 9,435 → 17,783 | 8,984 → 9,885 | 8,426 → 8,571 (**flat**) |
+| `[plan-context]` top grower | — | **`objects` 1541/2276** | horizon 3,274 / system-feedback 1,857 — **no `objects`** |
+| AC-8 gate | NOT MET | NOT MET | **MET** (final quintile 0.0% ≤ run-wide 0.0% and ≤ 10%) |
+
+`repairs=0` is the load-bearing detail: with the directives plan-shaped the prompt no longer
+instructs anything the plan parser rejects, so there is nothing to repair. The leak's `objects`
+grower is absent from the context budget. The wrong-tool metric recorded nothing. Both diagnosed
+mechanisms are confirmed gone rather than merely quiet.
+
+### The clean rate is NOT the whole story — plan formation collapsed
+
+| diagnostic | 061 run | this run |
+| --- | --- | --- |
+| `plan-create` | 1,717 (**0.75/prompt**) | 1,092 (**0.20/prompt**) |
+| `plan-failed` | 516 | **1,657** |
+| `plan-floor` | 207 | 741 |
+| `plan-repeat` | 182 | 676 |
+| `execute` | 4,852 (**2.13/prompt**) | 1,764 (**0.32/prompt**) |
+
+Cause, measured: **3,993 of the dropped steps target `talk_to`** (`help` 398, `observe_agent`
+289) while the plan value space has no such affordance, and the agents' social drive holds at
+0.80–0.83 for the entire run. Plans fail their bounded retry ("LLM plan violates the affordance
+enum after retry"), degrade to `observe` (603) / `wait` (243) filler, and are then suppressed by
+the floor and repeat guards. Filed as **#229**.
+
+**Lesson, recorded because it will recur:** the shape-invalid rate reached zero while the plan
+channel was mostly idle. A rate that can only measure rejection cannot detect a phase that has
+stopped doing work — so `plan-create` and `execute` **per prompt** belong beside it in every
+future verdict, exactly as executions-per-prompt sat beside skip-share in the 056 verdict.
