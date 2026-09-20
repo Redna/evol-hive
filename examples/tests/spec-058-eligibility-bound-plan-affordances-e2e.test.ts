@@ -16,11 +16,13 @@
  * constructed but never invoked).
  *
  * Coverage:
- *   AC-4-RS (R1/R2/R3) — a CLOSED conversation in the greenhouse still declares
- *     join/contribute/leave/observe in the registry, yet none of join/
- *     contribute/leave reaches `prunedAffordances` or the `formulate_plan`
- *     enum; the real non-conversation `observe` affordances survive (only the
- *     conversation's copy is filtered — R2).
+ *   AC-4-RS (R1/R2/R3) — a CLOSED conversation is REMOVED from the registry and
+ *     the room when it closes (issue #224; spec 033's "no unbounded growth"
+ *     constraint), so none of join/contribute/leave can reach
+ *     `prunedAffordances` or the `formulate_plan` enum, while the real
+ *     non-conversation affordances survive. For an OPEN conversation the
+ *     per-object eligibility filter — never a flat-id lookup — removes exactly
+ *     the ineligible conversation copy (the R2 collision AC-3 protects).
  *   AC-1-RS (R1) — an open conversation: a participant's real value space
  *     yields contribute/leave (never join); a co-located bystander's yields
  *     join/observe (never contribute/leave).
@@ -173,20 +175,17 @@ function availableObserveCount(core: EngineCore, roomId: string): number {
 // ── AC-1-RS / AC-4-RS: the closed conversation (the skip-storm shape) ────────
 
 describe('spec 058 E2E — a closed real conversation never reaches the plan value space', () => {
-  it('the mirror still declares the four affordances; the filter — not absence — removes them', async () => {
+  it('a closed conversation is removed from the room — absence, not the filter (#224)', async () => {
     const world = buildScene();
     const conversationId = await openGreenhouseConversation(world);
     world.core.conversationManager.close(conversationId, 'qa-close');
 
-    // The conversation object and its declared affordances persist in the
-    // real registry — this is what makes the closed case the skip-storm shape
-    // (the affordance is offered-but-ineligible, not missing).
-    const declared = world.core.smartObjectRegistry
-      .getAffordancesInRoom(GREENHOUSE)
-      .map((a) => a.id);
-    for (const id of ['join', 'contribute', 'leave', 'observe']) {
-      expect(declared).toContain(id);
-    }
+    // Spec 033's constraint is "no unbounded growth anywhere". A mirror that
+    // outlived its conversation accumulated one room object plus four
+    // affordances per conversation ever opened — 62 dead mirrors in one
+    // 26-minute run — so closing now undoes both halves of registration.
+    expect(world.core.smartObjectRegistry.get(conversationId)).toBeNull();
+    expect(world.core.sceneManager.getRoom(GREENHOUSE)!.objectIds).not.toContain(conversationId);
 
     const perception = await perceive(world.core, 'iris-1');
     const ids = prunedIds(perception);
@@ -197,12 +196,10 @@ describe('spec 058 E2E — a closed real conversation never reaches the plan val
     expect(ids).toContain('rest_among_seedlings');
     expect(ids).toContain('pick_herbs');
 
-    // R2 collision: exactly the conversation's `observe` copy is removed; every
-    // non-conversation `observe` (potting table, seed shelf, greenhouse door)
-    // is preserved. A flat-id lookup would drop the common affordance wholesale.
-    expect(availableObserveCount(world.core, GREENHOUSE)).toBeGreaterThan(1);
+    // With the mirror gone, every remaining `observe` is a non-conversation
+    // one, so all of them survive.
     expect(ids.filter((id) => id === 'observe')).toHaveLength(
-      availableObserveCount(world.core, GREENHOUSE) - 1,
+      availableObserveCount(world.core, GREENHOUSE),
     );
 
     // The plan tool enum and the affordance tool list consume the same set.
@@ -216,6 +213,28 @@ describe('spec 058 E2E — a closed real conversation never reaches the plan val
     for (const id of CONVERSATION_ONLY_IDS) {
       expect(names).not.toContain(id);
     }
+  });
+
+  it('an OPEN conversation still exercises the R2 collision: only the ineligible copy is filtered', async () => {
+    const world = buildScene();
+    await openGreenhouseConversation(world);
+
+    // A participant's conversation affordances are contribute/leave, so the
+    // conversation mirror's own `observe` copy is offered-but-ineligible. That
+    // is the same collision AC-3 protects, and it is still reachable now that
+    // issue #224 removed the closed mirror that used to provide it.
+    const perception = await perceive(world.core, 'iris-1');
+    const ids = prunedIds(perception);
+
+    expect(availableObserveCount(world.core, GREENHOUSE)).toBeGreaterThan(1);
+    expect(ids.filter((id) => id === 'observe')).toHaveLength(
+      availableObserveCount(world.core, GREENHOUSE) - 1,
+    );
+    // A flat-id lookup would drop the common `observe` affordance wholesale.
+    expect(ids).toContain('rest_among_seedlings');
+    expect(ids).toContain('pick_herbs');
+    expect(ids).toContain('contribute');
+    expect(ids).not.toContain('join');
   });
 
   it('an agent in a conversation-free room sees no conversation affordance at all', async () => {
@@ -331,8 +350,8 @@ describe('spec 058 E2E — every [plan-enum] line is free of ineligible conversa
     expect(planEnumLines).toHaveLength(1);
     expect(planEnumLines[0]).toContain('agent=iris-1');
     expect(planEnumLines[0]).toContain(`room=${GREENHOUSE}`);
-    // The closed conversation is still declared in the room, yet the offered
-    // enum the orchestrator logged carries none of its ineligible affordances.
+    // The closed conversation's mirror is gone (issue #224) and the offered
+    // enum the orchestrator logged carries none of its affordances.
     for (const id of CONVERSATION_ONLY_IDS) {
       expect(planEnumLines[0]).not.toContain(id);
     }

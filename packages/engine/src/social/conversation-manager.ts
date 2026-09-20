@@ -548,6 +548,10 @@ export class ConversationManagerImpl implements ConversationBridge {
       closedAt: conversation.lastActivity,
     };
     this.conversations.set(conversationId, closed);
+    // Issue #224: this call REMOVES the mirror rather than refreshing it — a
+    // closed conversation is no longer a perceivable object. Removal runs before
+    // consolidation, which reads only this object and never the registry, so the
+    // mirror is gone even if the consolidation sink throws.
     this.syncMirror(closed);
     this.consolidate(closed, reason);
   }
@@ -702,8 +706,25 @@ export class ConversationManagerImpl implements ConversationBridge {
     this.syncMirror(conversation);
   }
 
-  /** Create or refresh the conversation's SmartObject mirror in the registry. */
+  /**
+   * Create or refresh the conversation's SmartObject mirror in the registry.
+   *
+   * Issue #224: a CLOSED conversation must have no mirror. Closing used to patch
+   * the mirror and leave it registered forever, so every conversation ever opened
+   * kept contributing a `Conversation: <topic>` object and its affordances to the
+   * room — `room.objectIds`, passive perception and the plan/tool enum all grew
+   * without bound (62 dead mirrors after 26 minutes of one live run).
+   *
+   * Enforcing the invariant here rather than in `close()` alone means every path
+   * that touches a conversation upholds it — `commit`, `close`, and
+   * `restoreConversations` (which can be handed a legacy snapshot that still
+   * contains closed conversations).
+   */
   private syncMirror(conversation: ConversationObject): void {
+    if (conversation.status === 'closed') {
+      this.removeMirror(conversation);
+      return;
+    }
     const dominant = dominantSentiment(aggregateCounts(conversation));
     const state: Record<string, unknown> = {
       topic: conversation.topic,
@@ -741,6 +762,23 @@ export class ConversationManagerImpl implements ConversationBridge {
     const room = this.sceneManager.getRoom(conversation.roomId);
     if (room !== null && !room.objectIds.includes(conversation.id)) {
       room.objectIds.push(conversation.id);
+    }
+  }
+
+  /**
+   * Undo {@link syncMirror}: drop the registry entry and the room reference.
+   *
+   * Both halves of registration must be undone. `registry.remove` alone leaves a
+   * dangling id in `room.objectIds` — and `room.objectIds` is what perception
+   * reads (assembly) — so the pair is removed together, exactly as `remove_object`
+   * does in scene-mutation-service. Idempotent: removing an absent object is a
+   * no-op and the room filter tolerates a missing id, so a double close is safe.
+   */
+  private removeMirror(conversation: ConversationObject): void {
+    this.registry.remove(conversation.id);
+    const room = this.sceneManager.getRoom(conversation.roomId);
+    if (room !== null) {
+      room.objectIds = room.objectIds.filter((id) => id !== conversation.id);
     }
   }
 
