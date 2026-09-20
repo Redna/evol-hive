@@ -193,7 +193,7 @@ export function formatPerceptionDriveHint(match: DriveAffordanceMatch): string {
  * Render the imperative-form hint line for one urgent drive (Plan builder,
  * spec 034, Req 2 — the spec-024 social-hint pattern):
  *
- *   `Your energy is low (23). The affordances in your tool list restore it directly (e.g., sit_outside at the Garden Bench). Call such an affordance NOW — do not formulate a search plan.`
+ *   `Your energy is low (23). The affordances in your tool list restore it directly (e.g., sit_outside at the Garden Bench). Make that affordance your plan's next step.`
  *
  * The example affordance is the first match in perception order. Affordances
  * without object attribution render as `(e.g., sit_outside)`.
@@ -204,7 +204,7 @@ export function formatPlanDriveHint(match: DriveAffordanceMatch): string {
     first.objectName !== undefined
       ? `${first.affordanceId} at the ${first.objectName}`
       : first.affordanceId;
-  return `Your ${match.drive} is low (${Math.round(match.driveValue)}). The affordances in your tool list restore it directly (e.g., ${example}). Call such an affordance NOW — do not formulate a search plan.`;
+  return `Your ${match.drive} is low (${Math.round(match.driveValue)}). The affordances in your tool list restore it directly (e.g., ${example}). Make that affordance your plan's next step.`;
 }
 
 /**
@@ -232,11 +232,11 @@ export function formatPerceptionChainHint(match: DriveAffordanceMatch): string {
  * emitted AFTER the direct-restoration imperative. The example is the first
  * chain ref in perception order — the NEXT step of the chain:
  *
- *   `Your hunger is low (23). planter-1 "plant_seeds" progresses the hunger chain (harvest → eat restores hunger) — call the next chain step NOW; the restoration lands at the chain's end.`
+ *   `Your hunger is low (23). planter-1 "plant_seeds" progresses the hunger chain (harvest → eat restores hunger) — make the next chain step your plan's next step; the restoration lands at the chain's end.`
  */
 export function formatPlanChainHint(match: DriveAffordanceMatch): string {
   const first = (match.chainProgress ?? [])[0]!;
-  return `Your ${match.drive} is low (${Math.round(match.driveValue)}). ${renderChainRef(first, match.drive)} — call the next chain step NOW; the restoration lands at the chain's end.`;
+  return `Your ${match.drive} is low (${Math.round(match.driveValue)}). ${renderChainRef(first, match.drive)} — make the next chain step your plan's next step; the restoration lands at the chain's end.`;
 }
 
 /** One `… progresses the <drive> chain` clause (shared by both renderers). */

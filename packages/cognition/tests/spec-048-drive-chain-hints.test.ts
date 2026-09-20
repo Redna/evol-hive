@@ -300,7 +300,7 @@ describe('renderers — chain hints are secondary (spec 048, Req 3)', () => {
     const chainIdx = dynamicLines.findIndex(
       (l) =>
         l.includes('planter-1 "plant_seeds" progresses the hunger chain') &&
-        l.includes('call the next chain step NOW'),
+        l.includes("make the next chain step your plan's next step"),
     );
     expect(directIdx).toBeGreaterThan(-1);
     expect(chainIdx).toBeGreaterThan(directIdx);
@@ -312,7 +312,7 @@ describe('renderers — chain hints are secondary (spec 048, Req 3)', () => {
       [eat(), plantSeeds(), harvest()],
     ).find((m) => m.drive === 'hunger')!;
     expect(formatPlanChainHint(match)).toBe(
-      'Your hunger is low (23). planter-1 "plant_seeds" progresses the hunger chain (harvest → eat restores hunger) — call the next chain step NOW; the restoration lands at the chain\'s end.',
+      'Your hunger is low (23). planter-1 "plant_seeds" progresses the hunger chain (harvest → eat restores hunger) — make the next chain step your plan\'s next step; the restoration lands at the chain\'s end.',
     );
   });
 
