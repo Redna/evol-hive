@@ -227,22 +227,24 @@ export class PlanBuilderImpl implements PlanBuilder {
     if (isSocialPrimary) {
       blocks.push({
         id: 'social-primary-hint',
-        text: 'Your social drive is your most urgent need. Make interacting with another agent in this room the FIRST step of your plan (targetAffordance: talk_to or help).',
+        text: 'Your social drive is your most urgent need. Interact with another agent in this room by calling the talk_to tool directly (or observe_agent / help).',
         required: true,
       });
     }
 
-    // Stronger social directive (spec 024, Req 3; issue #212): added to the
-    // dynamic section whenever agents are present. The wording is PLAN-shaped
-    // on purpose — the plan phase accepts only a `formulate_plan` call, so an
-    // imperative to "call talk_to directly / do not use formulate_plan" is a
-    // contradiction the model obeys and the phase then scores as a malformed
-    // plan. Measured: that contradiction was 1,002/1,446 (69%) of a run's
-    // `[plan-invalid]` lines.
+    // Stronger social directive (spec 024, Req 3; issue #212, corrected by
+    // #229): added to the dynamic section whenever agents are present.
+    // talk_to/observe_agent/help are COGNITIVE tools that completePlan executes
+    // mid-loop — they are NOT affordances and are not in the formulate_plan
+    // targetAffordance enum. #212's first fix made this PLAN-shaped ("make it a
+    // plan step whose targetAffordance is talk_to"), which pointed the model at
+    // a value the enum rejects: it obeyed, 3,993 steps were dropped at bind, the
+    // social drive stayed maxed and the channel degraded to observe/wait filler
+    // (#229). Route social action back to the tools it is.
     if (hasAgentsPresent) {
       blocks.push({
         id: 'social-directive',
-        text: 'IMPORTANT: Other agents are present. If you want to interact with them, make it a plan step whose targetAffordance is talk_to, observe_agent, help, or ignore.',
+        text: 'IMPORTANT: Other agents are present. If you want to interact with them, call the talk_to, observe_agent, or help tool directly — social actions are their own tools, not plan steps. Use formulate_plan only for the object affordances listed in its enum (or "wait").',
         required: true,
       });
     }
@@ -386,7 +388,7 @@ function buildSystemPrompt(
   // creating a conditional override. When false/undefined, the prompt is
   // byte-identical to the pre-spec-024 implementation (KV cache preserved).
   const socialDirective =
-    'When other agents are present and your social drive is urgent, make the social action the first step of your plan (targetAffordance: talk_to, observe_agent, help, or ignore).';
+    'When other agents are present and your social drive is urgent, interact with them by calling the talk_to, observe_agent, or help tool directly — social actions are their own tools, not formulate_plan steps.';
   if (persona) {
     const personaText = formatPersona(persona);
     // Spec 055, Req 5 (issue #198): the Aspirations line renders immediately

@@ -135,12 +135,12 @@ describe('E2E-1: real scene + real perception + real PlanBuilder — social cont
     const payload = new PlanBuilderImpl().build(perception);
 
     // Real production perception context is what the LLM sees.
-    expect(payload.systemPrompt).toContain('first step of your plan');
+    expect(payload.systemPrompt).toContain('calling the talk_to, observe_agent, or help tool directly');
     expect(payload.perceptionContext).toContain(
-      'make it a plan step whose targetAffordance is talk_to, observe_agent, help, or ignore',
+      'call the talk_to, observe_agent, or help tool directly',
     );
     expect(payload.perceptionContext).toContain(
-      'Make interacting with another agent in this room the FIRST step of your plan',
+      'Interact with another agent in this room by calling the talk_to tool directly',
     );
 
     const all = `${payload.systemPrompt}\n${payload.perceptionContext}`;
