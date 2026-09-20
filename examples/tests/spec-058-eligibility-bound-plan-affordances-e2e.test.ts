@@ -215,6 +215,26 @@ describe('spec 058 E2E — a closed real conversation never reaches the plan val
     }
   });
 
+  it('a closed conversation leaves passive.objectsPresent — perception, not just the registry (#224 impact #2)', async () => {
+    const world = buildScene();
+    const conversationId = await openGreenhouseConversation(world);
+
+    // The leak's second impact was perception pollution: the dead mirror stayed
+    // in `passive.objectsPresent` and rode every prompt. An OPEN conversation
+    // is perceivable; a CLOSED one must not be.
+    const openPerception = await perceive(world.core, 'iris-1');
+    expect(openPerception.passive.objectsPresent.map((o) => o.objectId)).toContain(conversationId);
+
+    world.core.conversationManager.close(conversationId, 'qa-close');
+
+    const closedPerception = await perceive(world.core, 'iris-1');
+    expect(closedPerception.passive.objectsPresent.map((o) => o.objectId)).not.toContain(
+      conversationId,
+    );
+    // Real scene objects are untouched.
+    expect(closedPerception.passive.objectsPresent.length).toBeGreaterThan(0);
+  });
+
   it('an OPEN conversation still exercises the R2 collision: only the ineligible copy is filtered', async () => {
     const world = buildScene();
     await openGreenhouseConversation(world);
