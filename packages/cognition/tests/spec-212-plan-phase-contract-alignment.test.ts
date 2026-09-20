@@ -13,9 +13,17 @@
  *
  * The probe also showed the model emits `talk_to` even when the tool is REMOVED
  * from `tools` — the text drives it — so the wording must change; removing
- * tools is not sufficient. This file locks both halves: the instructions are
- * plan-shaped, and a non-`formulate_plan` call is named as `reason=wrong-tool`
- * instead of being hidden behind a "malformed plan" reason.
+ * tools is not sufficient. This file locks both halves: the instructions never
+ * tell the model to bury a social action in a plan step, and a
+ * non-`formulate_plan` call is named as `reason=wrong-tool` instead of being
+ * hidden behind a "malformed plan" reason.
+ *
+ * Issue #229 corrected this fix's first form: making the wording PLAN-shaped
+ * ("make it a plan step whose targetAffordance is talk_to") pointed the model at
+ * a value the plan enum rejects, so it obeyed, the steps were dropped at bind
+ * and plans degraded to observe/wait filler. talk_to/observe_agent/help are
+ * COGNITIVE tools completePlan executes mid-loop — the wording now routes social
+ * action to those tools and reserves formulate_plan for object affordances.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { PassivePerception, PerceptionResult } from '@evol-hive/shared';
@@ -51,11 +59,22 @@ describe('issue #212 — plan-phase instructions match the plan phase contract',
     }
   });
 
-  it('renders the social instructions in plan form', () => {
+  it('routes social actions to their tools, never into a plan step (#229)', () => {
     const payload = builder.build(makeSocialPerception());
-    expect(payload.systemPrompt).toContain('first step of your plan');
-    expect(payload.perceptionContext).toContain('make it a plan step');
-    expect(payload.perceptionContext).toContain('FIRST step of your plan');
+    // Social action is a direct tool call, not a formulate_plan step.
+    expect(payload.systemPrompt).toContain(
+      'calling the talk_to, observe_agent, or help tool directly',
+    );
+    expect(payload.perceptionContext).toContain(
+      'call the talk_to, observe_agent, or help tool directly',
+    );
+    expect(payload.perceptionContext).toContain(
+      'Interact with another agent in this room by calling the talk_to tool directly',
+    );
+    // And no instruction points a social tool at the plan's targetAffordance.
+    const all = `${payload.systemPrompt}\n${payload.perceptionContext}`;
+    expect(all).not.toContain('targetAffordance: talk_to');
+    expect(all).not.toContain('targetAffordance is talk_to');
   });
 });
 

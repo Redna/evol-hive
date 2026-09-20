@@ -392,14 +392,14 @@ describe('PlanBuilder — imperative drive→affordance hint (spec 034 Req 2)', 
     );
     // The energy hint fires…
     expect(payload.perceptionContext).toContain(PLAN_HINT);
-    // …and the spec-018/024 social directive + strengthened hint are untouched
-    // (issue #212: both are PLAN-shaped now, so they no longer instruct a direct
-    // talk_to call the plan phase would reject).
+    // …and the spec-018/024 social directive + strengthened hint route social
+    // action to the tools (issue #229 corrected #212's plan-shaped form, which
+    // pointed talk_to at a targetAffordance value the plan enum rejects).
     expect(payload.perceptionContext).toContain(
-      'IMPORTANT: Other agents are present. If you want to interact with them, make it a plan step whose targetAffordance is talk_to, observe_agent, help, or ignore.',
+      'IMPORTANT: Other agents are present. If you want to interact with them, call the talk_to, observe_agent, or help tool directly — social actions are their own tools, not plan steps. Use formulate_plan only for the object affordances listed in its enum (or "wait").',
     );
     expect(payload.perceptionContext).toContain(
-      'Your social drive is your most urgent need. Make interacting with another agent in this room the FIRST step of your plan (targetAffordance: talk_to or help).',
+      'Your social drive is your most urgent need. Interact with another agent in this room by calling the talk_to tool directly (or observe_agent / help).',
     );
   });
 });

@@ -178,14 +178,16 @@ describe('spec-212 QA — the assembled plan payload never instructs a bypass (A
     });
   }
 
-  it('renders the plan-shaped social directive and primary hint for a co-located agent', () => {
+  it('renders the tool-routing social directive and primary hint for a co-located agent', () => {
     const payload = builder.build(makeSocialPerception());
-    expect(payload.systemPrompt).toContain('first step of your plan');
-    expect(payload.perceptionContext).toContain(
-      'IMPORTANT: Other agents are present. If you want to interact with them, make it a plan step whose targetAffordance is talk_to, observe_agent, help, or ignore.',
+    expect(payload.systemPrompt).toContain(
+      'calling the talk_to, observe_agent, or help tool directly',
     );
     expect(payload.perceptionContext).toContain(
-      'Your social drive is your most urgent need. Make interacting with another agent in this room the FIRST step of your plan (targetAffordance: talk_to or help).',
+      'IMPORTANT: Other agents are present. If you want to interact with them, call the talk_to, observe_agent, or help tool directly — social actions are their own tools, not plan steps. Use formulate_plan only for the object affordances listed in its enum (or "wait").',
+    );
+    expect(payload.perceptionContext).toContain(
+      'Your social drive is your most urgent need. Interact with another agent in this room by calling the talk_to tool directly (or observe_agent / help).',
     );
   });
 
