@@ -197,3 +197,32 @@ spec:
   lifecycle/economy question for specs 044–051, not a value-space fix.
   The issue's headline plan-channel pathology (500/503 skips, one agent) is addressed here; the
   drive-decay amplifier is tracked by the follow-ups.
+
+## Amendment (issue #224 — a closed conversation is removed, not filtered)
+
+The AC-4-RS mechanism originally assumed a **closed** conversation's mirror persists in the registry,
+so the eligibility filter — not absence — is what keeps its affordances out of the value space, and
+AC-3 used such a mirror to prove the filter is per-object rather than a flat-id lookup.
+
+Issue **#224** invalidated that assumption: the mirror was never removed, so every conversation ever
+opened kept contributing a room object plus its four affordances — unbounded room state, perception
+pollution and enum growth (62 dead mirrors after 26 minutes of one live run). That is precisely the bug
+class spec 033 forbids in its own Constraints ("**No unbounded growth anywhere** (Redna/yaam#124 class of
+bug)"), so the bounded-state constraint wins: `close()` now removes both halves of registration
+(`registry.remove` + the `room.objectIds` reference).
+
+What changes here and what does not:
+
+- **Unchanged (R1/R3 property):** a closed conversation contributes nothing to `prunedAffordances`, the
+  `formulate_plan` enum or the affordance tool list. The property is now *stronger* — the offer is
+  absent rather than offered-and-rejected, so a closed conversation cannot fuel a skip storm at all.
+- **Unchanged (R2 protection):** the filter must still be per-object, never a flat id. That protection is
+  now exercised through an **open** conversation instead: a participant's eligible set is
+  `contribute`/`leave`, so the conversation mirror's own `observe` copy is the offered-but-ineligible
+  collision case — the single copy the filter removes, with every non-conversation `observe` preserved.
+- **Changed:** the closed case is no longer the offered-but-ineligible shape, and spec 033's
+  `getEligibleAffordances` closed→`[]` rule is now belt-and-braces rather than the only guard.
+
+Mechanism coverage: `examples/tests/spec-058-eligibility-bound-plan-affordances-e2e.test.ts` (both the
+closed→absent case and the open-collision case) plus
+`packages/engine/tests/spec-224-conversation-mirror-lifecycle.test.ts`.
