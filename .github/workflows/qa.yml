@@ -60,6 +60,36 @@ jobs:
           echo "Checking out branch '$BRANCH'"
           git checkout -B "$BRANCH"
 
+      # Issue #217: a docs-only PR (every spec PR) has no implementation whose
+      # coverage QA could verify — its task is "map each acceptance criterion to
+      # existing tests" and "write missing tests", which for an unimplemented spec
+      # yields nothing (QA reported 0/6 code ACs testable on spec 060) while still
+      # holding the shared `agent-pipeline` slot for ~15 minutes and delaying the
+      # Developer run that follows it. Detect that here, before the toolchain and
+      # the agent, and short-circuit the work below. The check still reports
+      # SUCCESS rather than being skipped: a never-reported required check leaves
+      # the PR at "Expected — waiting for status", which is what this fixes.
+      - name: Detect a docs-only PR (issue #217)
+        id: docs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: |
+          # `--paginate` matters: `gh pr view --json files` caps its list at 100
+          # entries, so a large PR would look docs-only and skip QA silently.
+          CHANGED=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
+          echo "Changed files:"; printf '%s\n' "$CHANGED"
+          # Documentation = `docs/**` (specs, their notes and assets), `.pi/**`
+          # (agent/task prompt templates) and any `*.md` file.
+          NON_DOC=$(printf '%s\n' "$CHANGED" | grep -vE '^(docs/|\.pi/|.*\.md$)' | grep -v '^$' || true)
+          if [ -z "$NON_DOC" ]; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=QA skipped (docs-only PR)::No code to verify coverage for — acceptance-criterion coverage is deferred to the implementation PR for this spec. This PR's gate is the human spec review, not verify-coverage."
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "Non-doc files present — running the full QA verification."
+          fi
+
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -68,28 +98,33 @@ jobs:
           cache: pnpm
 
       - name: Cache YAAM binary
+        if: steps.docs.outputs.docs_only != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.yaam-cache
           key: yaam-binary-v3
 
       - name: Cache ONNX model
+        if: steps.docs.outputs.docs_only != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.yaam/models
           key: yaam-model-v1
 
       - name: Restore YAAM memory
+        if: steps.docs.outputs.docs_only != 'true'
         run: bash scripts/restore-memory.sh
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Bootstrap agent environment
+        if: steps.docs.outputs.docs_only != 'true'
         env:
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
         run: bash scripts/bootstrap-agent.sh
 
       - name: Run QA Agent
+        if: steps.docs.outputs.docs_only != 'true'
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -126,6 +161,7 @@ jobs:
             --verbose
 
       - name: Push QA test commits
+        if: steps.docs.outputs.docs_only != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -153,7 +189,7 @@ jobs:
           fi
 
       - name: Save YAAM memory
-        if: always()
+        if: always() && steps.docs.outputs.docs_only != 'true'
         run: bash scripts/save-memory.sh
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
