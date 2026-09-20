@@ -62,9 +62,15 @@ describe('issue #212 — plan-phase instructions match the plan phase contract',
   it('routes social actions to their tools, never into a plan step (#229)', () => {
     const payload = builder.build(makeSocialPerception());
     // Social action is a direct tool call, not a formulate_plan step.
-    expect(payload.systemPrompt).toContain('calling the talk_to, observe_agent, or help tool directly');
-    expect(payload.perceptionContext).toContain('call the talk_to, observe_agent, or help tool directly');
-    expect(payload.perceptionContext).toContain('Interact with another agent in this room by calling the talk_to tool directly');
+    expect(payload.systemPrompt).toContain(
+      'calling the talk_to, observe_agent, or help tool directly',
+    );
+    expect(payload.perceptionContext).toContain(
+      'call the talk_to, observe_agent, or help tool directly',
+    );
+    expect(payload.perceptionContext).toContain(
+      'Interact with another agent in this room by calling the talk_to tool directly',
+    );
     // And no instruction points a social tool at the plan's targetAffordance.
     const all = `${payload.systemPrompt}\n${payload.perceptionContext}`;
     expect(all).not.toContain('targetAffordance: talk_to');

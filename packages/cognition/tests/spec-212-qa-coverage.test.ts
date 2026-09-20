@@ -180,7 +180,9 @@ describe('spec-212 QA — the assembled plan payload never instructs a bypass (A
 
   it('renders the tool-routing social directive and primary hint for a co-located agent', () => {
     const payload = builder.build(makeSocialPerception());
-    expect(payload.systemPrompt).toContain('calling the talk_to, observe_agent, or help tool directly');
+    expect(payload.systemPrompt).toContain(
+      'calling the talk_to, observe_agent, or help tool directly',
+    );
     expect(payload.perceptionContext).toContain(
       'IMPORTANT: Other agents are present. If you want to interact with them, call the talk_to, observe_agent, or help tool directly — social actions are their own tools, not plan steps. Use formulate_plan only for the object affordances listed in its enum (or "wait").',
     );
