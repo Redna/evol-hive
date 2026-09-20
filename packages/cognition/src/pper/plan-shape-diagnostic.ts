@@ -64,6 +64,26 @@ export function logPlanInvalid(
   );
 }
 
+/**
+ * `[plan-invalid] … reason=wrong-tool tool=<name>` — the model called a tool that
+ * is not `formulate_plan` (issue #212). Kept distinct from the shape reasons on
+ * purpose: the plan phase's own context used to instruct direct `talk_to` calls
+ * (*"do not use formulate_plan for social actions"*), so the obedient answer was
+ * scored `missing-description` — a "malformed plan" metric that hid the
+ * contradiction through two specs (1,002/1,446 = 69% of a run's invalids).
+ * Reporting the chosen tool keeps the two failure modes separable in logs.
+ */
+export function logPlanWrongTool(
+  agentId: string | undefined,
+  toolName: string,
+  size: PlanPromptSize,
+): void {
+  console.error(
+    `[plan-invalid] agent=${agentId ?? '?'} reason=wrong-tool tool=${toolName} ` +
+      `chars=${size.chars} estTokens=${size.estTokens}`,
+  );
+}
+
 /** `[plan-repair]` — one line when a bounded client-seam repair is issued (spec 060, R3). */
 export function logPlanRepair(
   agentId: string | undefined,

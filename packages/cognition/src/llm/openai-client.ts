@@ -39,6 +39,7 @@ import {
   logPlanInvalid,
   logPlanPrompt,
   logPlanRepair,
+  logPlanWrongTool,
 } from '../pper/plan-shape-diagnostic.js';
 import { writeLargestPlanPayload } from './plan-payload-dump.js';
 
@@ -396,7 +397,11 @@ export class OpenAICompatibleLLMClient {
       // diagnostics only
     }
 
-    let { args } = await this.requestChat(messages, payload.tools, payload.agentId, 'plan');
+    const firstCall = await this.requestChat(messages, payload.tools, payload.agentId, 'plan');
+    let args = firstCall.args;
+    // Issue #212: record the *tool* the model chose when it is not formulate_plan,
+    // so an obedient social/affordance call is not scored as a malformed plan.
+    const calledWrongTool = firstCall.toolName !== 'formulate_plan';
 
     // Spec 060, R1/R3: decode defensively, then classify through the SHARED
     // classifier, so client and service agree on every shape reason. The old
@@ -411,7 +416,11 @@ export class OpenAICompatibleLLMClient {
     // than repair-loop).
     if (reason !== null) {
       try {
-        logPlanInvalid(payload.agentId, reason, promptSize);
+        if (calledWrongTool) {
+          logPlanWrongTool(payload.agentId, firstCall.toolName, promptSize);
+        } else {
+          logPlanInvalid(payload.agentId, reason, promptSize);
+        }
       } catch {
         // spec 049
       }
@@ -444,7 +453,13 @@ export class OpenAICompatibleLLMClient {
       // compatible backends reject it with 400 (observed 508× for
       // apprentice-1 in the grand10 run, masking every repair).
       const retryMessages = [...messages, { role: 'user' as const, content: correction }];
-      args = (await this.requestChat(retryMessages, payload.tools, payload.agentId, 'plan')).args;
+      const retryCall = await this.requestChat(
+        retryMessages,
+        payload.tools,
+        payload.agentId,
+        'plan',
+      );
+      args = retryCall.args;
       decoded = decodeFormulatePlanArgs(args);
       const retryReason = classifyPlanShape(decoded);
       if (retryReason !== null) {
@@ -454,7 +469,11 @@ export class OpenAICompatibleLLMClient {
           tools: payload.tools,
         });
         try {
-          logPlanInvalid(payload.agentId, retryReason, retrySize);
+          if (retryCall.toolName !== 'formulate_plan') {
+            logPlanWrongTool(payload.agentId, retryCall.toolName, retrySize);
+          } else {
+            logPlanInvalid(payload.agentId, retryReason, retrySize);
+          }
         } catch {
           // spec 049
         }

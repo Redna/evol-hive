@@ -227,18 +227,22 @@ export class PlanBuilderImpl implements PlanBuilder {
     if (isSocialPrimary) {
       blocks.push({
         id: 'social-primary-hint',
-        text: 'Your social drive is your most urgent need. Call talk_to or help NOW to interact with another agent in this room. Do not formulate a plan first.',
+        text: 'Your social drive is your most urgent need. Make interacting with another agent in this room the FIRST step of your plan (targetAffordance: talk_to or help).',
         required: true,
       });
     }
 
-    // Stronger social directive (spec 024, Req 3): added to the dynamic section
-    // whenever agents are present (regardless of primary drive). This is an
-    // imperative that counters the system prompt's "You must formulate a plan".
+    // Stronger social directive (spec 024, Req 3; issue #212): added to the
+    // dynamic section whenever agents are present. The wording is PLAN-shaped
+    // on purpose — the plan phase accepts only a `formulate_plan` call, so an
+    // imperative to "call talk_to directly / do not use formulate_plan" is a
+    // contradiction the model obeys and the phase then scores as a malformed
+    // plan. Measured: that contradiction was 1,002/1,446 (69%) of a run's
+    // `[plan-invalid]` lines.
     if (hasAgentsPresent) {
       blocks.push({
         id: 'social-directive',
-        text: 'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them. Do not use formulate_plan for social actions.',
+        text: 'IMPORTANT: Other agents are present. If you want to interact with them, make it a plan step whose targetAffordance is talk_to, observe_agent, help, or ignore.',
         required: true,
       });
     }
@@ -382,7 +386,7 @@ function buildSystemPrompt(
   // creating a conditional override. When false/undefined, the prompt is
   // byte-identical to the pre-spec-024 implementation (KV cache preserved).
   const socialDirective =
-    'When other agents are present and your social drive is urgent, call talk_to, observe_agent, help, or ignore directly — do not use formulate_plan for social actions.';
+    'When other agents are present and your social drive is urgent, make the social action the first step of your plan (targetAffordance: talk_to, observe_agent, help, or ignore).';
   if (persona) {
     const personaText = formatPersona(persona);
     // Spec 055, Req 5 (issue #198): the Aspirations line renders immediately

@@ -57,15 +57,15 @@ function makeAgentsPresent() {
 }
 
 const SOCIAL_DIRECTIVE_PLAN =
-  'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them. Do not use formulate_plan for social actions.';
+  'IMPORTANT: Other agents are present. If you want to interact with them, make it a plan step whose targetAffordance is talk_to, observe_agent, help, or ignore.';
 const SOCIAL_DIRECTIVE_PERCEPTION =
   'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them.';
 const STRENGTHENED_HINT =
-  'Your social drive is your most urgent need. Call talk_to or help NOW to interact with another agent in this room. Do not formulate a plan first.';
+  'Your social drive is your most urgent need. Make interacting with another agent in this room the FIRST step of your plan (targetAffordance: talk_to or help).';
 const OLD_HINT =
   'You feel a strong need for social interaction. Consider using talk_to or help to engage with other agents in the room.';
 const SYSTEM_PROMPT_DIRECTIVE =
-  'When other agents are present and your social drive is urgent, call talk_to, observe_agent, help, or ignore directly — do not use formulate_plan for social actions.';
+  'When other agents are present and your social drive is urgent, make the social action the first step of your plan (targetAffordance: talk_to, observe_agent, help, or ignore).';
 
 function toolNames(tools: { function: { name: string } }[]): string[] {
   return tools.map((t) => t.function.name);

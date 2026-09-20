@@ -1083,7 +1083,7 @@ describe('AC-48: PlanBuilderImpl social drive hint', () => {
     const payload = builder.build(pr);
     // Spec 024, Req 4: the old hedging hint is replaced by a stronger imperative.
     expect(payload.perceptionContext).toContain(
-      'Your social drive is your most urgent need. Call talk_to or help NOW to interact with another agent in this room. Do not formulate a plan first.',
+      'Your social drive is your most urgent need. Make interacting with another agent in this room the FIRST step of your plan (targetAffordance: talk_to or help).',
     );
     // The old soft hint should no longer be present.
     expect(payload.perceptionContext).not.toContain(

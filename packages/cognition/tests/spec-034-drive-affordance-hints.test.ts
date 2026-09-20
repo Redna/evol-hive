@@ -100,7 +100,7 @@ function splitSections(context: string): { stable: string; dynamic: string } {
 const PERCEPTION_HINT =
   'Your energy is low (23). Here, you can restore it: garden-bench-1 "sit_outside" (restores energy), garden-bench-1 "relax" (restores energy).';
 const PLAN_HINT =
-  'Your energy is low (23). The affordances in your tool list restore it directly (e.g., sit_outside at the Garden Bench). Call such an affordance NOW — do not formulate a search plan.';
+  "Your energy is low (23). The affordances in your tool list restore it directly (e.g., sit_outside at the Garden Bench). Make that affordance your plan's next step.";
 
 // ── Matcher: data-driven core (AC-4, Req 3) ─────────────────────────────────
 
@@ -374,7 +374,7 @@ describe('PlanBuilder — imperative drive→affordance hint (spec 034 Req 2)', 
       ]),
     );
     expect(payload.perceptionContext).toContain(
-      'Your energy is low (23). The affordances in your tool list restore it directly (e.g., sit_outside). Call such an affordance NOW — do not formulate a search plan.',
+      "Your energy is low (23). The affordances in your tool list restore it directly (e.g., sit_outside). Make that affordance your plan's next step.",
     );
   });
 
@@ -392,12 +392,14 @@ describe('PlanBuilder — imperative drive→affordance hint (spec 034 Req 2)', 
     );
     // The energy hint fires…
     expect(payload.perceptionContext).toContain(PLAN_HINT);
-    // …and the spec-018/024 social directive + strengthened hint are untouched.
+    // …and the spec-018/024 social directive + strengthened hint are untouched
+    // (issue #212: both are PLAN-shaped now, so they no longer instruct a direct
+    // talk_to call the plan phase would reject).
     expect(payload.perceptionContext).toContain(
-      'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them. Do not use formulate_plan for social actions.',
+      'IMPORTANT: Other agents are present. If you want to interact with them, make it a plan step whose targetAffordance is talk_to, observe_agent, help, or ignore.',
     );
     expect(payload.perceptionContext).toContain(
-      'Your social drive is your most urgent need. Call talk_to or help NOW to interact with another agent in this room. Do not formulate a plan first.',
+      'Your social drive is your most urgent need. Make interacting with another agent in this room the FIRST step of your plan (targetAffordance: talk_to or help).',
     );
   });
 });
@@ -414,12 +416,12 @@ describe('PlanBuilder — hint suppression (spec 034 Req 4 / AC-2)', () => {
         { drives: { energy: 40, hunger: 80, social: 80, comfort: 80, curiosity: 80 } },
       ),
     );
-    expect(payload.perceptionContext).not.toContain('Call such an affordance NOW');
+    expect(payload.perceptionContext).not.toContain("Make that affordance your plan's next step");
   });
 
   it('AC-2b: no matching affordance → no imperative hint', () => {
     const payload = builder.build(makePerceptionResult({}, {}, [plainWork()]));
-    expect(payload.perceptionContext).not.toContain('Call such an affordance NOW');
+    expect(payload.perceptionContext).not.toContain("Make that affordance your plan's next step");
   });
 
   it('AC-2c: urgent social drive → no drive→affordance hint', () => {
@@ -438,7 +440,7 @@ describe('PlanBuilder — hint suppression (spec 034 Req 4 / AC-2)', () => {
       ),
     );
     expect(payload.perceptionContext).not.toContain('Your social is low');
-    expect(payload.perceptionContext).not.toContain('Call such an affordance NOW');
+    expect(payload.perceptionContext).not.toContain("Make that affordance your plan's next step");
   });
 });
 

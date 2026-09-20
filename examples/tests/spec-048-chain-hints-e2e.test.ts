@@ -183,7 +183,7 @@ describe('AC-6-E2E-1: fresh planter — chain-only hint surfaces through the pro
     makeHungryGardener(core, 23);
     const { planContext } = await perceiveThroughProductionStack(core);
     expect(planContext).toContain(
-      'Your hunger is low (23). planter-1 "plant_seeds" progresses the hunger chain (harvest → eat restores hunger) — call the next chain step NOW; the restoration lands at the chain\'s end.',
+      'Your hunger is low (23). planter-1 "plant_seeds" progresses the hunger chain (harvest → eat restores hunger) — make the next chain step your plan\'s next step; the restoration lands at the chain\'s end.',
     );
     expect(planContext).not.toContain('restore it directly');
   });
