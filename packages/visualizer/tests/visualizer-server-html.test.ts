@@ -78,13 +78,12 @@ function readSource(relative: string): string {
 describe('served HTML — grid-cell positioning (spec 042, AC-1)', () => {
   it('contains the module grid-cell positioning expressions', async () => {
     const html = await fetchPage();
-    // canvas-renderer.ts computes:
-    //   roomPos.x + (agent.position.x + 0.5) * roomPos.w / 12
-    //   roomPos.y + (agent.position.y + 0.5) * roomPos.h / 8
-    expect(html).toContain('agent.position.x + 0.5');
-    expect(html).toContain('agent.position.y + 0.5');
-    expect(html).toContain('* roomPos.w / 12');
-    expect(html).toContain('* roomPos.h / 8');
+    // spec 062 moved cell projection into the pure `layoutWorld` seam
+    // (`cellCenter`), which the served page bundles.
+    expect(html).toContain('layoutWorld');
+    expect(html).toContain('GRID_COLS');
+    expect(html).toContain('GRID_ROWS');
+    expect(html).toContain('+ 0.5');
   });
 
   it('no longer serves the legacy static-row slot formula', async () => {
@@ -98,7 +97,7 @@ describe('served HTML — grid-cell positioning (spec 042, AC-1)', () => {
     // not reimplemented — the only remaining legacy slot arithmetic is the
     // module's, guarded by the `position === undefined` check for old states
     // (esbuild prints `undefined` as `void 0`).
-    expect(html).toContain('agent.position !== void 0');
+    expect(html).toContain('.position !== void 0');
   });
 });
 
@@ -106,8 +105,8 @@ describe('served HTML — spec-038/039/033 behavior from the module (spec 042, A
   it('contains the fog fill constant, anchor-cell math, and sentiment tint', async () => {
     const html = await fetchPage();
     expect(html).toContain('rgba(10, 10, 24, 0.78)'); // FOG_CELL_FILL (spec 039)
-    expect(html).toContain('obj.cell.x * roomW / 12'); // anchor cell (spec 038)
-    expect(html).toContain('obj.cell.y * roomH / 8');
+    expect(html).toContain('GRID_COLS'); // anchor-cell projection (spec 038)
+    expect(html).toContain('cellCenter');
     expect(html).toContain('sentimentTint'); // conversation chips (spec 033)
   });
 });
@@ -121,7 +120,7 @@ describe('served HTML — no duplicated drawing logic (spec 042, AC-3)', () => {
     expect(src).toContain('getClientBundle');
   });
 
-  it('keeps drawing formulas only in canvas-renderer.ts (repo-wide search)', () => {
+  it('keeps drawing formulas only under src/renderer/** (repo-wide search)', () => {
     // A repo-wide (package-wide) search: drawing calls may appear only in the
     // renderer module. The server, bundle helper, and client glue hold none.
     const srcRoot = new URL('../src/', import.meta.url);
@@ -131,7 +130,7 @@ describe('served HTML — no duplicated drawing logic (spec 042, AC-3)', () => {
     expect(files.length).toBeGreaterThan(0);
     const drawingCall = /fillRect\(|fillText\(|strokeRect\(|beginPath\(/;
     for (const file of files) {
-      if (file.endsWith('renderer/canvas-renderer.ts')) continue; // the one source
+      if (file.includes('/renderer/')) continue; // spec 062: drawing lives under src/renderer/**
       const content = readFileSync(new URL(file, srcRoot), 'utf8');
       expect(drawingCall.test(content), `${file} contains drawing calls`).toBe(false);
       expect(content.includes('idx * 60'), `${file} contains the legacy slot formula`).toBe(false);

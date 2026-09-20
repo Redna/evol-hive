@@ -111,15 +111,14 @@ describe('dist bundle E2E — built @evol-hive/visualizer artifact (spec 042)', 
         // The esbuild client bundle succeeded inside the dist artifact and the
         // module's formulas reached the served page (AC-1, AC-2 parity in the
         // production artifact).
-        expect(html).toContain('agent.position.x + 0.5'); // grid-cell math (AC-1)
-        expect(html).toContain('* roomPos.w / 12');
-        expect(html).toContain('* roomPos.h / 8');
+        expect(html).toContain('layoutWorld'); // grid-cell seam (AC-1)
+        expect(html).toContain('GRID_COLS');
+        expect(html).toContain('cellCenter');
         expect(html).toContain('rgba(10, 10, 24, 0.78)'); // fog fill (AC-2)
-        expect(html).toContain('obj.cell.x * roomW / 12'); // anchor cells (AC-2)
         expect(html).toContain('sentimentTint'); // conversation chips (AC-2)
         // Decision 4: the guarded legacy-slot fallback is inherited, and the
         // legacy template's unconditional slot line stays gone (AC-1).
-        expect(html).toContain('agent.position !== void 0');
+        expect(html).toContain('.position !== void 0');
         expect(html).not.toContain('rp.x + 40 + idx * 60');
         // Spec-023 browser contract: single inline script, no external src.
         expect(html.match(/<script/g)?.length).toBe(1);

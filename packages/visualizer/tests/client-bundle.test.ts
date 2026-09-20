@@ -30,17 +30,17 @@ describe('client bundle (spec 042, AC-3)', () => {
 
   it('keeps the module grid-cell positioning formulas verbatim (AC-1)', () => {
     const js = getClientBundle();
-    expect(js).toContain('agent.position.x + 0.5');
-    expect(js).toContain('agent.position.y + 0.5');
-    expect(js).toContain('* roomPos.w / 12');
-    expect(js).toContain('* roomPos.h / 8');
+    expect(js).toContain('layoutWorld');
+    expect(js).toContain('GRID_COLS');
+    expect(js).toContain('GRID_ROWS');
+    expect(js).toContain('+ 0.5');
   });
 
   it('keeps the fog fill, anchor-cell math, and sentiment tint verbatim (AC-2)', () => {
     const js = getClientBundle();
     expect(js).toContain('rgba(10, 10, 24, 0.78)'); // FOG_CELL_FILL
-    expect(js).toContain('obj.cell.x * roomW / 12');
-    expect(js).toContain('obj.cell.y * roomH / 8');
+    expect(js).toContain('cellCenter');
+    expect(js).toContain('GRID_COLS');
     expect(js).toContain('sentimentTint');
   });
 
