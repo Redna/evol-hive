@@ -27,6 +27,51 @@ import { getClientBundle } from './client-bundle.js';
 /** The WebSocket GUID from RFC 6455. */
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
+/**
+ * Hand-written service worker (spec 063, R4). No dependency, no build step.
+ * Network-first for same-origin GETs with a shell cache fallback; the live
+ * channel is a WebSocket, which never reaches this handler and is never cached.
+ * Bump `SHELL_CACHE` whenever the page shell changes.
+ */
+const SERVICE_WORKER_JS = `
+const SHELL_CACHE = 'evol-hive-visualizer-shell-v1';
+const SHELL = ['./', 'manifest.webmanifest', 'icon.svg'];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()),
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== SHELL_CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+        return response;
+      })
+      .catch(() => caches.match(request).then((hit) => hit || caches.match('./'))),
+  );
+});
+`;
+
+/** App icon served at `/icon.svg` (relative URLs keep it working behind a path prefix). */
+const APP_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0b0f1a"/><circle cx="256" cy="256" r="150" fill="none" stroke="#5eead4" stroke-width="26"/><circle cx="256" cy="256" r="58" fill="#5eead4"/></svg>`;
+
 /** Constructor options for {@link VisualizerServer}. */
 export interface VisualizerServerOptions {
   adapter: VisualizerInterface;
@@ -116,6 +161,30 @@ export class VisualizerServer {
         'Cache-Control': 'no-store',
       });
       res.end(this.buildHtmlPage());
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/manifest.webmanifest') {
+      res.writeHead(200, {
+        'Content-Type': 'application/manifest+json; charset=utf-8',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(this.buildManifest());
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/sw.js') {
+      res.writeHead(200, {
+        'Content-Type': 'text/javascript; charset=utf-8',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(SERVICE_WORKER_JS);
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/icon.svg') {
+      res.writeHead(200, {
+        'Content-Type': 'image/svg+xml; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400',
+      });
+      res.end(APP_ICON_SVG);
       return;
     }
     res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -317,6 +386,27 @@ export class VisualizerServer {
 
   // ── HTML page (spec 023, Req 15) ──────────────────────────────────────────
 
+  /** Web app manifest (spec 063, R4). Relative URLs so a path prefix works. */
+  private buildManifest(): string {
+    return JSON.stringify(
+      {
+        name: 'evol-hive visualizer',
+        short_name: 'evol-hive',
+        start_url: './',
+        scope: './',
+        display: 'standalone',
+        background_color: '#0b0f1a',
+        theme_color: '#0b0f1a',
+        icons: [
+          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+        ],
+      },
+      null,
+      2,
+    );
+  }
+
   /** Build the single HTML page with inline CSS + bundled JS (spec 042). */
   private buildHtmlPage(): string {
     // The page JS is the esbuild bundle of `src/client/main.ts` +
@@ -329,6 +419,8 @@ export class VisualizerServer {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0f1a" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon.svg" />
 <title>evol-hive Visualizer</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -363,6 +455,23 @@ export class VisualizerServer {
   }
   #bottom button:active { background: #243149; }
   #bottom button.on { border-color: rgba(94, 234, 212, 0.5); color: #5eead4; }
+  .hidden { display: none !important; }
+  #detail {
+    position: fixed; left: 12px; right: 12px; z-index: 12;
+    top: calc(env(safe-area-inset-top, 0px) + 56px);
+    background: rgba(18, 25, 41, 0.92); border: 1px solid #26344d; border-radius: 16px;
+    padding: 12px 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  }
+  #detail .row { display: flex; align-items: center; gap: 10px; }
+  #detail h2 { font-size: 16px; font-weight: 700; }
+  #detail .sub { color: #8b9bb4; font-size: 12px; margin-top: 2px; }
+  #detail .close { margin-left: auto; border: none; background: transparent; color: #8b9bb4; font-size: 22px; line-height: 1; padding: 4px 8px; cursor: pointer; }
+  #detail .drives { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 10px; }
+  #detail .drive { font-size: 10px; color: #8b9bb4; text-align: center; }
+  #detail .drive .bar { height: 6px; border-radius: 4px; background: #1e2941; overflow: hidden; margin-bottom: 4px; }
+  #detail .drive .bar > i { display: block; height: 100%; border-radius: 4px; }
+  #detail .plan { margin-top: 10px; font-size: 12px; }
+  #detail .plan em { color: #8b9bb4; font-style: normal; }
   .seg { display: flex; gap: 2px; background: #161e30; border-radius: 12px; padding: 2px; border: 1px solid #26344d; }
   .seg button { border: none; background: transparent; color: #8b9bb4; padding: 10px 12px; min-height: 40px; }
 </style>
@@ -371,6 +480,17 @@ export class VisualizerServer {
 <canvas id="canvas"></canvas>
 <div id="top">
   <span class="pill" id="net">connecting…</span>
+</div>
+<div id="detail" class="hidden">
+  <div class="row">
+    <div>
+      <h2 id="dName">—</h2>
+      <div class="sub" id="dSub">—</div>
+    </div>
+    <button class="close" id="dClose" aria-label="Clear selection">&#215;</button>
+  </div>
+  <div class="drives" id="dDrives"></div>
+  <div class="plan" id="dPlan"></div>
 </div>
 <div id="bottom">
   <button id="btnPlay">&#9654; Play</button>
@@ -381,6 +501,7 @@ export class VisualizerServer {
     <button class="speed" data-speed="5">5&times;</button>
   </span>
   <button id="btnFog">Fog</button>
+  <button id="btnInstall" class="hidden">Install</button>
   <button id="btnSave">Save</button>
   <button id="btnLoad">Load</button>
   <select id="sceneSelect"></select>

@@ -37,5 +37,7 @@ export type {
 } from './renderer/layout.js';
 export { CanvasSkin } from './renderer/skin.js';
 export type { Skin } from './renderer/skin.js';
+export { cameraFor, transformLayout, worldBounds, FIT_ALL_CAMERA } from './renderer/camera.js';
+export type { Camera } from './renderer/camera.js';
 export { VisualizerServer } from './server/visualizer-server.js';
 export type { VisualizerServerOptions } from './server/visualizer-server.js';

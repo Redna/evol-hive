@@ -128,24 +128,35 @@ interface SandboxOptions {
   topInset?: number;
   bottomInset?: number;
   protocol?: string;
+  /** Install a manually-driven requestAnimationFrame (advanced by `tick`). */
+  raf?: boolean;
 }
 
 interface Sandbox {
   ctx: RecordingContext;
   canvas: { width: number; height: number; style: { width?: string; height?: string } };
   listeners: Record<string, ((ev?: unknown) => void)[]>;
+  canvasListeners: Record<string, ((ev?: unknown) => void)[]>;
+  detailEl: { classList: { contains(c: string): boolean } };
+  nameEl: { textContent: string };
+  fogButton: { onclick: (() => void) | null };
   setViewport(width: number, height: number): void;
+  tick(ts?: number): void;
   ws: MockWebSocket;
 }
 
 /** Execute the served page bundle against a mock canvas/DOM. */
 function makeSandbox(opts: SandboxOptions): Sandbox {
   const ctx = new RecordingContext();
+  const canvasListeners: Record<string, ((ev?: unknown) => void)[]> = {};
   const canvas = {
     width: 0,
     height: 0,
     style: {} as { width?: string; height?: string },
     getContext: (_type: string) => ctx,
+    addEventListener(type: string, fn: (ev?: unknown) => void): void {
+      (canvasListeners[type] ??= []).push(fn);
+    },
   };
   const view = {
     w: opts.width,
@@ -155,6 +166,32 @@ function makeSandbox(opts: SandboxOptions): Sandbox {
     bottomInset: opts.bottomInset ?? 0,
   };
   const listeners: Record<string, ((ev?: unknown) => void)[]> = {};
+  function makeClassList(): {
+    add(c: string): void;
+    remove(c: string): void;
+    toggle(c: string, on?: boolean): boolean;
+    contains(c: string): boolean;
+  } {
+    const set = new Set<string>();
+    return {
+      add: (c) => {
+        set.add(c);
+      },
+      remove: (c) => {
+        set.delete(c);
+      },
+      toggle: (c, on) => {
+        const next = on ?? !set.has(c);
+        if (next) set.add(c);
+        else set.delete(c);
+        return next;
+      },
+      contains: (c) => set.has(c),
+    };
+  }
+  const detailEl = { classList: makeClassList(), innerHTML: '', textContent: '' };
+  const nameEl = { textContent: '' };
+  const fogButton = { onclick: null as (() => void) | null, classList: makeClassList() };
   const win = {
     get innerWidth(): number {
       return view.w;
@@ -184,14 +221,18 @@ function makeSandbox(opts: SandboxOptions): Sandbox {
     value: '',
     text: '',
     textContent: '',
+    innerHTML: '',
     appendChild() {},
-    classList: { add() {}, remove() {}, toggle() {} },
+    classList: makeClassList(),
   });
   const doc = {
     getElementById(id: string): Record<string, unknown> {
       if (id === 'canvas') return canvas as unknown as Record<string, unknown>;
       if (id === 'top') return topEl as unknown as Record<string, unknown>;
       if (id === 'bottom') return bottomEl as unknown as Record<string, unknown>;
+      if (id === 'detail') return detailEl as unknown as Record<string, unknown>;
+      if (id === 'dName') return nameEl as unknown as Record<string, unknown>;
+      if (id === 'btnFog') return fogButton as unknown as Record<string, unknown>;
       return makeStub();
     },
     querySelectorAll(_sel: string): Record<string, unknown>[] {
@@ -202,6 +243,17 @@ function makeSandbox(opts: SandboxOptions): Sandbox {
     },
   };
   const location = { host: 'localhost:9', protocol: opts.protocol ?? 'http:' };
+
+  // Optional, manually-driven rAF so a test can advance the camera pan.
+  let rafCallback: ((ts: number) => void) | null = null;
+  if (opts.raf === true) {
+    (
+      win as unknown as { requestAnimationFrame: (fn: (ts: number) => void) => number }
+    ).requestAnimationFrame = (fn) => {
+      rafCallback = fn;
+      return 1;
+    };
+  }
 
   MockWebSocket.instances = [];
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
@@ -222,7 +274,23 @@ function makeSandbox(opts: SandboxOptions): Sandbox {
     view.h = height;
   }
 
-  return { ctx, canvas, listeners, setViewport, ws };
+  function tick(ts = 1000): void {
+    const fn = rafCallback;
+    if (fn !== null) fn(ts);
+  }
+
+  return {
+    ctx,
+    canvas,
+    listeners,
+    canvasListeners,
+    detailEl,
+    nameEl,
+    fogButton,
+    setViewport,
+    tick,
+    ws,
+  };
 }
 
 /** One room, one positioned agent — enough to assert geometry and draws. */
@@ -357,5 +425,95 @@ describe('served mobile shell integration (spec 062, AC-8 / R7)', () => {
       ([x, y]) => Math.abs(x - projected.x) < 0.01 && Math.abs(y - projected.y) < 0.01,
     );
     expect(atCell.length).toBeGreaterThanOrEqual(2); // phase ring + avatar
+  });
+});
+
+describe('served selection + follow camera (spec 063, AC-7)', () => {
+  it('selects an agent on tap, follows it, and clears on an empty tap', () => {
+    const sb = makeSandbox({ width: 800, height: 600, dpr: 1, raf: true });
+    const state = makeState();
+    sb.ws.onmessage?.({ data: JSON.stringify(state) });
+
+    // First frame: fit-all, card hidden, world at the layout's own origin.
+    sb.tick(1000);
+    expect(sb.detailEl.classList.contains('hidden')).toBe(true);
+    const floorBefore = fillRects(sb.ctx)
+      .filter((r) => r.fill === THEME.roomFloor)
+      .at(-1)?.rect;
+    expect(floorBefore?.[0]).toBe(0);
+
+    // Tap the agent (screen coords from the pure seam).
+    const layout = layoutWorld(state, { width: 800, height: 600, insets: ZERO_INSETS });
+    const agent = layout.agents[0]!;
+    const handlers = sb.canvasListeners['pointerdown'] ?? [];
+    expect(handlers.length).toBeGreaterThan(0);
+    for (const fn of handlers) fn({ clientX: agent.x, clientY: agent.y });
+    expect(sb.detailEl.classList.contains('hidden')).toBe(false);
+
+    // Advance frames: the camera zooms to FOLLOW_SCALE and pans toward the agent.
+    sb.ctx.calls.length = 0;
+    sb.tick(1100);
+    sb.tick(1200);
+    sb.tick(1300);
+    const floorAfter = fillRects(sb.ctx)
+      .filter((r) => r.fill === THEME.roomFloor)
+      .at(-1)?.rect;
+    expect(floorAfter?.[0]).not.toBe(floorBefore?.[0]); // world layer moved
+    expect(floorAfter?.[2] ?? 0).toBeGreaterThan(floorBefore?.[2] ?? 0); // follow zoom
+
+    // Tap empty space → selection cleared, card hidden again.
+    for (const fn of handlers) fn({ clientX: 1, clientY: 599 });
+    expect(sb.detailEl.classList.contains('hidden')).toBe(true);
+  });
+
+  it('makes a fog-hidden agent selectable once the fog view toggle is off', () => {
+    // Regression (found only in the live check): with fog OFF the renderer
+    // draws everything, but hit-testing still consulted the fog-derived
+    // `visible` flag, so drawn agents were not tappable.
+    const sb = makeSandbox({ width: 800, height: 600, dpr: 1 });
+    const state = {
+      ...makeState(),
+      agents: [
+        {
+          agentId: 'a1',
+          name: 'Watcher',
+          location: 'kitchen',
+          position: { x: 1, y: 1 },
+          drives: { energy: 50, hunger: 50, social: 50, comfort: 50, curiosity: 50 },
+          currentGoal: '',
+          currentPlan: null,
+          pperPhase: 'perceive',
+          isThinking: false,
+          relationships: [],
+          fog: { visitedRooms: ['kitchen'], exploredCells: { kitchen: ['1,1'] } },
+        },
+        {
+          agentId: 'a2',
+          name: 'Hidden',
+          location: 'kitchen',
+          position: { x: 11, y: 4 },
+          drives: { energy: 50, hunger: 50, social: 50, comfort: 50, curiosity: 50 },
+          currentGoal: '',
+          currentPlan: null,
+          pperPhase: 'perceive',
+          isThinking: false,
+          relationships: [],
+        },
+      ],
+    } as unknown as VisualizerState;
+    sb.ws.onmessage?.({ data: JSON.stringify(state) });
+
+    const layout = layoutWorld(state, { width: 800, height: 600, insets: ZERO_INSETS });
+    const hidden = layout.agents.find((a) => a.id === 'a2')!;
+    const handlers = sb.canvasListeners['pointerdown'] ?? [];
+
+    // Fog ON: a2 is outside the viewer's explored cells → not selectable.
+    for (const fn of handlers) fn({ clientX: hidden.x, clientY: hidden.y });
+    expect(sb.nameEl.textContent).not.toBe('Hidden');
+
+    // Fog OFF (view override) → drawn, therefore selectable.
+    sb.fogButton.onclick?.();
+    for (const fn of handlers) fn({ clientX: hidden.x, clientY: hidden.y });
+    expect(sb.nameEl.textContent).toBe('Hidden');
   });
 });
