@@ -12,6 +12,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import type { VisualizerState, VisualizerCommand, SceneDefinition } from '@evol-hive/shared';
 import { VisualizerServer } from '../src/server/visualizer-server.js';
+import { layoutWorld, cellCenter, legacySlot, ZERO_INSETS } from '../src/renderer/layout.js';
 
 interface RecordedCall {
   method: string;
@@ -282,19 +283,28 @@ describe('served renderer integration (spec 042, AC-4)', () => {
     // 3. Feed the real snapshot through the page's WebSocket wiring.
     wsMock.onmessage?.({ data: snapshotJson });
 
-    // ── Grid-cell positioning (canvas-renderer.ts math) ────────────────────
-    // Layout for 2 rooms on an 800×600 canvas: cols=2, cellW=380, cellH=520,
-    // room 360×500; garden at (30, 50). Grid cell (11, 4) →
-    //   x = 30 + (11.5 × 360) / 12 = 375
-    //   y = 50 + (4.5 × 500) / 8 = 331.25
+    // ── Grid-cell positioning (spec 062 pure layout seam) ─────────────────
+    // Expected positions come from the module's own `layoutWorld` seam, so the
+    // assertion stays stable under layout tuning while still proving the
+    // SERVED code renders where the module says.
+    const garden = layoutWorld(fogState, {
+      width: 800,
+      height: 600,
+      insets: ZERO_INSETS,
+    }).rooms.find((r) => r.roomId === 'garden');
+    if (garden === undefined) throw new Error('no garden room');
+    const gridCell = cellCenter(garden.rect, { x: 11, y: 4 });
     const arcsAt = ctx.calls.filter((c) => c.method === 'arc').map((c) => c.args as number[]);
     const agentCenter = arcsAt.filter(
-      ([x, y]) => Math.abs(x - 375) < 0.01 && Math.abs(y - 331.25) < 0.01,
+      ([x, y]) => Math.abs(x - gridCell.x) < 0.01 && Math.abs(y - gridCell.y) < 0.01,
     );
     expect(agentCenter.length).toBeGreaterThanOrEqual(2); // phase ring + avatar
-    // The legacy static row would place agent 0 at (30 + 40 + 0, 50 + 500 − 50).
-    const legacySlot = arcsAt.filter(([x, y]) => x === 70 && y === 500);
-    expect(legacySlot.length).toBe(0);
+    // A positioned agent must never use the legacy slot.
+    const slot = legacySlot(garden.rect, 0);
+    const atSlot = arcsAt.filter(
+      ([x, y]) => Math.abs(x - slot.x) < 0.01 && Math.abs(y - slot.y) < 0.01,
+    );
+    expect(atSlot.length).toBe(0);
 
     // ── Fog shading (spec 039, R8) ─────────────────────────────────────────
     // 12×8 = 96 cells per room; 4 garden cells explored, workshop unseen →
@@ -342,17 +352,23 @@ describe('served renderer integration (spec 042, AC-4)', () => {
     const wsMock = executePageJs(match[1]!);
     wsMock.onmessage?.({ data: JSON.stringify(legacyState) });
 
-    // Layout for 2 rooms on an 800×600 canvas (see the grid-cell test):
-    // garden at (30, 50, 360×500). Agent idx 0 without position →
-    //   x = 30 + 40 + 0×60 = 70 · y = 50 + 500 − 50 = 500
+    const garden = layoutWorld(legacyState, {
+      width: 800,
+      height: 600,
+      insets: ZERO_INSETS,
+    }).rooms.find((r) => r.roomId === 'garden');
+    if (garden === undefined) throw new Error('no garden room');
     const arcsAt = ctx.calls.filter((c) => c.method === 'arc').map((c) => c.args as number[]);
-    const legacySlot = arcsAt.filter(([x, y]) => x === 70 && y === 500);
-    expect(legacySlot.length).toBeGreaterThanOrEqual(2); // phase ring + avatar
-    // No grid cell was computed — the positionless agent never lands at (11.5
-    // × 360) / 12 + 30 = 375, (4.5 × 500) / 8 + 50 = 331.25.
-    const gridCell = arcsAt.filter(
-      ([x, y]) => Math.abs(x - 375) < 0.01 && Math.abs(y - 331.25) < 0.01,
+    const slot = legacySlot(garden.rect, 0);
+    const atSlot = arcsAt.filter(
+      ([x, y]) => Math.abs(x - slot.x) < 0.01 && Math.abs(y - slot.y) < 0.01,
     );
-    expect(gridCell.length).toBe(0);
+    expect(atSlot.length).toBeGreaterThanOrEqual(2); // phase ring + avatar
+    // No grid cell was computed for the positionless agent.
+    const cell = cellCenter(garden.rect, { x: 11, y: 4 });
+    const atCell = arcsAt.filter(
+      ([x, y]) => Math.abs(x - cell.x) < 0.01 && Math.abs(y - cell.y) < 0.01,
+    );
+    expect(atCell.length).toBe(0);
   });
 });

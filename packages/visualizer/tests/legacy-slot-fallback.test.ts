@@ -1,25 +1,22 @@
 /**
  * Spec 042 — Visualizer Single Renderer (issue #155) — QA coverage.
- * Decision 4 / R1: the legacy slot formula (`roomPos.x + 40 + idx * 60`,
- * `roomPos.y + roomPos.h - 50`) applies ONLY when `agent.position ===
- * undefined`, so pre-grid saves and legacy states keep rendering.
+ * Decision 4 / R1: the legacy slot formula applies ONLY when
+ * `agent.position === undefined`, so pre-grid saves and legacy states keep
+ * rendering.
  *
- * Before this file the fallback branch had zero coverage at any level: the
- * grid-cell path was asserted (canvas-renderer-fog.test.ts,
- * served-renderer-integration.test.ts) but every fixture carried a position,
- * so the `position === undefined` ternary arms were never executed.
- *
- * Layout math (canvas 800×600, 2 rooms → cols 2): garden room is 360×500 at
- * (30, 50), workshop room is 360×500 at (410, 50). Legacy slots:
- *   garden agent idx 0 → (30 + 40 + 0×60, 50 + 500 − 50) = (70, 500)
- *   workshop agent idx 1 → (410 + 40 + 1×60, 50 + 500 − 50) = (510, 500)
- * Grid cell for position (11, 4) in the garden:
- *   x = 30 + (11.5 × 360) / 12 = 375 · y = 50 + (4.5 × 500) / 8 = 331.25
+ * Spec 062 replaced the old insertion-order layout, so the absolute worked
+ * examples moved. The BEHAVIOUR under test is unchanged and is asserted
+ * against the pure `layoutWorld` seam (spec 062, Decision 2) rather than
+ * hardcoded old coordinates:
+ *   - a positioned agent draws at its grid cell (`cellCenter`), never a slot;
+ *   - an unpositioned agent draws at its legacy slot (`legacySlot`);
+ *   - a positionless agent is never fog-hidden.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { VisualizerState } from '@evol-hive/shared';
 import { CanvasRenderer } from '../src/renderer/canvas-renderer.js';
+import { layoutWorld, cellCenter, legacySlot, ZERO_INSETS } from '../src/renderer/layout.js';
 
 interface RecordedCall {
   method: string;
@@ -115,23 +112,20 @@ function makeState(agents: Record<string, unknown>[]): VisualizerState {
     isRunning: false,
     timeScale: 1,
     rooms: [
-      {
-        id: 'garden',
-        name: 'Garden',
-        description: '',
-        connections: ['workshop'],
-        objects: [],
-      },
-      {
-        id: 'workshop',
-        name: 'Workshop',
-        description: '',
-        connections: ['garden'],
-        objects: [],
-      },
+      { id: 'garden', name: 'Garden', description: '', connections: ['workshop'], objects: [] },
+      { id: 'workshop', name: 'Workshop', description: '', connections: ['garden'], objects: [] },
     ],
     agents,
   } as unknown as VisualizerState;
+}
+
+const VIEWPORT = { width: 800, height: 600, insets: ZERO_INSETS };
+
+function roomRect(state: VisualizerState, roomId: string) {
+  const layout = layoutWorld(state, VIEWPORT);
+  const room = layout.rooms.find((r) => r.roomId === roomId);
+  if (room === undefined) throw new Error(`no room ${roomId}`);
+  return room.rect;
 }
 
 let ctx: MockContext;
@@ -147,47 +141,47 @@ describe('CanvasRenderer legacy-slot fallback — position === undefined (spec 0
       .map((c) => ({ x: Number(c.args[0]), y: Number(c.args[1]) }));
   }
 
-  it('renders an agent without position at the legacy slot (70, 500)', () => {
+  function near(actual: { x: number; y: number }[], target: { x: number; y: number }) {
+    return actual.filter((p) => Math.abs(p.x - target.x) < 0.01 && Math.abs(p.y - target.y) < 0.01);
+  }
+
+  it('renders an agent without position at the legacy slot, not its grid cell', () => {
+    const state = makeState([makeAgent('a1', 'Alice', 'garden')]);
     const renderer = new CanvasRenderer(ctx as unknown as CanvasRenderingContext2D);
-    renderer.render(makeState([makeAgent('a1', 'Alice', 'garden')]));
-    // The avatar circle (r=16) and phase ring (r=20) both center on the slot.
-    const atSlot = arcsAt().filter((p) => p.x === 70 && p.y === 500);
-    expect(atSlot.length).toBeGreaterThanOrEqual(2);
-    // And the grid-cell math is NOT applied to a positionless agent.
-    const atGrid = arcsAt().filter((p) => p.x === 375 && p.y === 331.25);
-    expect(atGrid.length).toBe(0);
+    renderer.render(state);
+    const rect = roomRect(state, 'garden');
+    const slot = legacySlot(rect, 0);
+    expect(near(arcsAt(), slot).length).toBeGreaterThanOrEqual(2); // ring + avatar
+    // The grid-cell path was NOT taken for a positionless agent.
+    expect(near(arcsAt(), cellCenter(rect, { x: 11, y: 4 })).length).toBe(0);
   });
 
   it('mixed state: positioned agent at its grid cell, unpositioned at its own slot', () => {
+    const state = makeState([
+      makeAgent('a1', 'Alice', 'garden', { x: 11, y: 4 }), // idx 0 → grid cell
+      makeAgent('a2', 'Bob', 'workshop'), // idx 1 → workshop legacy slot
+    ]);
     const renderer = new CanvasRenderer(ctx as unknown as CanvasRenderingContext2D);
-    renderer.render(
-      makeState([
-        makeAgent('a1', 'Alice', 'garden', { x: 11, y: 4 }), // idx 0 → grid cell
-        makeAgent('a2', 'Bob', 'workshop'), // idx 1 → workshop legacy slot
-      ]),
-    );
-    const arcs = arcsAt();
-    const grid = arcs.filter((p) => Math.abs(p.x - 375) < 0.01 && Math.abs(p.y - 331.25) < 0.01);
-    expect(grid.length).toBeGreaterThanOrEqual(2); // Alice: phase ring + avatar
-    // Bob: workshop room at (410, 50, 360×500), idx 1 → (410+40+60, 50+500−50).
-    const slot = arcs.filter((p) => p.x === 510 && p.y === 500);
-    expect(slot.length).toBeGreaterThanOrEqual(2);
+    renderer.render(state);
+    const garden = roomRect(state, 'garden');
+    const workshop = roomRect(state, 'workshop');
+    expect(near(arcsAt(), cellCenter(garden, { x: 11, y: 4 })).length).toBeGreaterThanOrEqual(2);
+    expect(near(arcsAt(), legacySlot(workshop, 1)).length).toBeGreaterThanOrEqual(2);
   });
 
   it('an unpositioned agent is never fog-hidden (old saves keep rendering)', () => {
-    // The fog-hide branch (spec 039 R8) requires `agent.position !==
-    // undefined` — a legacy agent without position always renders, even
-    // standing in a cell the fogged viewer never explored.
+    // The fog-hide branch (spec 039 R8) requires `agent.position !== undefined`
+    // — a legacy agent without position always renders, even standing in a cell
+    // the fogged viewer never explored.
     const a1 = {
       ...makeAgent('a1', 'Alice', 'garden', { x: 11, y: 4 }),
       fog: { visitedRooms: ['garden'], exploredCells: { garden: ['11,4'] } },
     };
+    const state = makeState([a1, makeAgent('a2', 'Bob', 'workshop')]);
     const renderer = new CanvasRenderer(ctx as unknown as CanvasRenderingContext2D);
-    renderer.render(makeState([a1, makeAgent('a2', 'Bob', 'workshop')]));
-    // Bob stands in the never-explored workshop but has no grid position →
-    // the hide branch cannot evaluate him, and he renders at his slot.
-    const slot = arcsAt().filter((p) => p.x === 510 && p.y === 500);
-    expect(slot.length).toBeGreaterThanOrEqual(2);
+    renderer.render(state);
+    const workshop = roomRect(state, 'workshop');
+    expect(near(arcsAt(), legacySlot(workshop, 1)).length).toBeGreaterThanOrEqual(2);
     const names = ctx.calls.filter((c) => c.method === 'fillText').map((c) => String(c.args[0]));
     expect(names).toContain('Bob');
   });

@@ -106,10 +106,15 @@ export class VisualizerServer {
 
   // ── HTTP ──────────────────────────────────────────────────────────────────
 
-  /** Serve the HTML page at GET /. */
+  /** Serve the HTML page at GET /. Query strings are ignored (cache-busters). */
   private handleHttpRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
-    if (req.method === 'GET' && req.url === '/') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+    if (req.method === 'GET' && pathname === '/') {
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        // The page is rebuilt from source at dev time; never cache it.
+        'Cache-Control': 'no-store',
+      });
       res.end(this.buildHtmlPage());
       return;
     }
@@ -322,35 +327,62 @@ export class VisualizerServer {
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0f1a" />
 <title>evol-hive Visualizer</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #1a1a2e; color: #e0e0e0; font-family: monospace; overflow: hidden; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: #0b0f1a; color: #e6edf7; overscroll-behavior: none;
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  }
   #canvas { display: block; width: 100vw; height: 100vh; }
-  #controls {
-    position: fixed; top: 8px; left: 8px; z-index: 10;
-    background: rgba(22, 33, 62, 0.85); padding: 8px 12px; border-radius: 6px;
-    display: flex; gap: 8px; align-items: center; font-size: 13px; flex-wrap: wrap;
+  #top {
+    position: fixed; top: calc(env(safe-area-inset-top, 0px) + 8px); left: 12px; right: 12px;
+    z-index: 10; display: flex; justify-content: space-between; pointer-events: none;
   }
-  #controls button, #controls select {
-    background: #0f3460; color: #e0e0e0; border: 1px solid #4a6fa5;
-    padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: monospace;
+  .pill {
+    background: rgba(18, 25, 41, 0.82); border: 1px solid #26344d; border-radius: 999px;
+    padding: 6px 12px; font-size: 12px; color: #8b9bb4;
   }
-  #controls button:hover { background: #1a4a80; }
+  #net.live { color: #5eead4; border-color: rgba(94, 234, 212, 0.5); }
+  #bottom {
+    position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); z-index: 10;
+    left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    width: max-content; max-width: calc(100vw - 24px);
+    background: rgba(18, 25, 41, 0.82); border: 1px solid #26344d; border-radius: 16px;
+    padding: 8px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  }
+  #bottom button, #bottom select {
+    -webkit-appearance: none; appearance: none;
+    background: #1b2438; color: #e6edf7; border: 1px solid #26344d;
+    border-radius: 11px; padding: 11px 14px; font: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer; min-height: 44px;
+  }
+  #bottom button:active { background: #243149; }
+  #bottom button.on { border-color: rgba(94, 234, 212, 0.5); color: #5eead4; }
+  .seg { display: flex; gap: 2px; background: #161e30; border-radius: 12px; padding: 2px; border: 1px solid #26344d; }
+  .seg button { border: none; background: transparent; color: #8b9bb4; padding: 10px 12px; min-height: 40px; }
 </style>
 </head>
 <body>
 <canvas id="canvas"></canvas>
-<div id="controls">
+<div id="top">
+  <span class="pill" id="net">connecting…</span>
+</div>
+<div id="bottom">
   <button id="btnPlay">&#9654; Play</button>
   <button id="btnPause">&#9208; Pause</button>
-  <span>Speed:</span>
-  <button class="speed" data-speed="1">1&times;</button>
-  <button class="speed" data-speed="2">2&times;</button>
-  <button class="speed" data-speed="5">5&times;</button>
-  <button id="btnSave">&#128190; Save</button>
-  <button id="btnLoad">&#128194; Load</button>
+  <span class="seg">
+    <button class="speed" data-speed="1">1&times;</button>
+    <button class="speed" data-speed="2">2&times;</button>
+    <button class="speed" data-speed="5">5&times;</button>
+  </span>
+  <button id="btnFog">Fog</button>
+  <button id="btnSave">Save</button>
+  <button id="btnLoad">Load</button>
   <select id="sceneSelect"></select>
 </div>
 <script>

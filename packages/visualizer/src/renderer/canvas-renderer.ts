@@ -1,423 +1,152 @@
 /**
- * renderer/ — Canvas 2D renderer for the simulation (spec 023, Req 12)
- * ─────────────────────────────────────────────────────────────────────
- * Draws rooms (labeled rectangles), objects (icons + state text), agents
- * (avatars with name labels, drive bars, PPER phase rings, thought bubbles),
- * and relationship lines. Uses only the Canvas 2D API — no external
- * dependencies.
+ * renderer/canvas-renderer.ts — Canvas 2D renderer for the simulation.
+ * ─────────────────────────────────────────────────────────────────────────
+ * Orchestration only (spec 062): it reads the pure `layoutWorld` geometry,
+ * applies fog visibility, and dispatches every draw call to a `Skin`. All
+ * layout math lives in `layout.ts`, all colours in `theme.ts`, all drawing in
+ * `skin.ts` — so this file holds no geometry and no colour literals.
+ *
+ * Backward-compatible surface: `CanvasRenderer`, `FOG_CELL_FILL` and
+ * `formatStateLine` are still exported from here (existing imports/tests).
  */
 
-import type { VisualizerState, VisualizerAgent } from '@evol-hive/shared';
+import type { VisualizerState } from '@evol-hive/shared';
+import { layoutWorld, unexploredRects, ZERO_INSETS } from './layout.js';
+import type { Insets, Point } from './layout.js';
+import { CanvasSkin } from './skin.js';
+import type { Skin } from './skin.js';
 
-/** PPER phase → ring color (spec 023, Req 12). */
-const PHASE_COLORS: Record<string, string> = {
-  perceive: '#4a90d9', // blue
-  plan: '#f1c40f', // yellow
-  execute: '#e67e22', // orange
-  reflect: '#9b59b6', // purple
-};
-
-/**
- * Fog shading fill for unexplored cells (spec 038 AC-5 / spec 039 R8).
- * Exported so tests can identify the fog pass among the fill calls.
- */
-export const FOG_CELL_FILL = 'rgba(10, 10, 24, 0.78)';
-
-/** Grid dimensions per room — must match the engine's RoomGrid (spec 038). */
-const FOG_GRID_WIDTH = 12;
-const FOG_GRID_HEIGHT = 8;
-
-/** Drive keys in canonical order, with display labels and colors. */
-const DRIVES: { key: keyof VisualizerAgent['drives']; label: string; color: string }[] = [
-  { key: 'energy', label: 'E', color: '#e74c3c' },
-  { key: 'hunger', label: 'H', color: '#e67e22' },
-  { key: 'social', label: 'S', color: '#3498db' },
-  { key: 'comfort', label: 'C', color: '#2ecc71' },
-  { key: 'curiosity', label: 'B', color: '#9b59b6' },
-];
+/** Fog shading fill for unexplored cells (re-exported for spec-039 tests). */
+export { FOG_CELL_FILL } from './theme.js';
+/** Object state-line formatting (re-exported for issue-#105 tests). */
+export { formatStateLine } from './format.js';
 
 /** A canvas-like rendering context (CanvasRenderingContext2D or a mock). */
 type RenderContext = CanvasRenderingContext2D;
 
-/**
- * Format an object state key/value line for the object chip (issue #105).
- * Numeric values are rounded to 1 decimal (state rules decay by fractions,
- * which used to render as "95.666666674" and overflow the chip). The VALUE is
- * always visible — the KEY is truncated first, then the whole line is clamped
- * to the 60px chip width with an ellipsis.
- */
-export function formatStateLine(key: string, val: unknown, maxWidthPx = 56): string {
-  let valueText: string;
-  if (typeof val === 'number') {
-    valueText = String(Math.round(val * 10) / 10);
-  } else if (typeof val === 'string' || typeof val === 'boolean') {
-    valueText = String(val);
-  } else {
-    valueText = JSON.stringify(val);
-  }
-  // Approximate rendered width (10px sans-serif ≈ 5.5px/char in Node; on the
-  // browser we could measureText, but approximation keeps this DOM-free).
-  const approxWidth = (s: string): number => s.length * 5.5;
-  const maxKeyChars = 10;
-  let shortKey = key.length > maxKeyChars ? key.slice(0, maxKeyChars) : key;
-  let line = `${shortKey}: ${valueText}`;
-  // If still too wide, shrink the key further (value stays visible).
-  while (approxWidth(line) > maxWidthPx && shortKey.length > 1) {
-    shortKey = shortKey.slice(0, -1);
-    line = `${shortKey}: ${valueText}`;
-  }
-  return line;
+export interface RenderOptions {
+  /** Space the DOM HUD occupies; measured by the client (spec 062, R7). */
+  insets?: Insets;
+  /**
+   * CSS-pixel viewport size. The canvas backing store is DPR-scaled (spec 062,
+   * R7) while the 2D context carries a DPR transform, so layout must work in
+   * CSS pixels — passing the backing-store size here made phones draw rooms
+   * `dpr` times too large and off-screen.
+   */
+  width?: number;
+  height?: number;
+  /** Agent selected for the detail card (draws a highlight ring). */
+  selectedAgentId?: string;
+  /**
+   * Fog of war as a VIEW, not a state change (spec 062, R6). Default true.
+   * False lifts the shading AND the fog-based entity hiding so the whole world
+   * is observable.
+   */
+  showFog?: boolean;
+  /**
+   * Smoothed screen positions by agent id (spec 062, R2). The client owns the
+   * time dimension; when supplied these override the layout's projected cell
+   * centres so agents glide between snapshots instead of teleporting.
+   */
+  agentPositions?: ReadonlyMap<string, Point>;
 }
 
 /**
- * Draws the full simulation scene to a `<canvas>` element's 2D context
- * (spec 023, Req 12). The renderer is stateless — each `render()` call clears
- * the canvas and redraws everything from the provided `VisualizerState`.
+ * Draws the full simulation scene to a `<canvas>` element's 2D context. Each
+ * `render()` call clears the canvas and redraws everything from the provided
+ * `VisualizerState` — the renderer keeps no scene state of its own.
  */
 export class CanvasRenderer {
   private readonly ctx: RenderContext;
-  private readonly canvasWidth: number;
-  private readonly canvasHeight: number;
+  private readonly skin: Skin;
 
-  constructor(ctx: RenderContext) {
+  constructor(ctx: RenderContext, skin?: Skin) {
     this.ctx = ctx;
-    // Read dimensions from the canvas if available (tests pass a mock).
-    const canvas = (ctx as unknown as { canvas?: { width?: number; height?: number } }).canvas;
-    this.canvasWidth = canvas?.width ?? 800;
-    this.canvasHeight = canvas?.height ?? 600;
+    this.skin = skin ?? new CanvasSkin();
   }
 
   /** Render the full scene from a `VisualizerState` snapshot. */
-  render(state: VisualizerState): void {
+  render(state: VisualizerState, options: RenderOptions = {}): void {
     const ctx = this.ctx;
-    // Clear canvas with a dark background.
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+    // Read dimensions from the canvas each frame — never cache them at
+    // construction (spec 062: the old constructor capture went stale on
+    // resize/rotation). Tests pass a mock with a `canvas` object.
+    const canvas = (ctx as unknown as { canvas?: { width?: number; height?: number } }).canvas;
+    const width = options.width ?? canvas?.width ?? 800;
+    const height = options.height ?? canvas?.height ?? 600;
+    const viewport = { width, height, insets: options.insets ?? ZERO_INSETS };
+    const layout = layoutWorld(state, viewport);
+    const scale = Math.max(0.72, Math.min(layout.size / 300, 1.5));
 
-    // Layout: position rooms in a grid.
-    const roomLayout = this.layoutRooms(state.rooms);
-
-    // The fog viewer (spec 039, R8): the first agent carrying fog data.
-    // Its fog shades unexplored cells and hides out-of-fog agents/objects.
-    // No agent carries fog (legacy state) → everything renders normally.
-    const viewer = state.agents.find((a) => a.fog !== undefined) ?? null;
-
-    // (1) Draw rooms.
-    for (const room of state.rooms) {
-      const pos = roomLayout.get(room.id);
-      if (!pos) continue;
-      this.drawRoom(room, pos.x, pos.y, pos.w, pos.h);
-    }
-
-    // (1.5) Fog shading over unexplored cells (spec 039, R8): a translucent
-    // dark overlay per unexplored cell of each room, derived from the
-    // viewer's spatial memory (exploredCells / visitedRooms).
-    if (viewer?.fog !== undefined) {
-      this.drawFog(state, roomLayout, viewer.fog);
-    }
-
-    // (2) Draw connection lines between rooms (doors).
-    ctx.strokeStyle = '#444466';
-    ctx.lineWidth = 2;
-    for (const room of state.rooms) {
-      const from = roomLayout.get(room.id);
-      if (!from) continue;
-      for (const connId of room.connections) {
-        const to = roomLayout.get(connId);
-        if (!to) continue;
-        ctx.beginPath();
-        ctx.moveTo(from.x + from.w / 2, from.y + from.h / 2);
-        ctx.lineTo(to.x + to.w / 2, to.y + to.h / 2);
-        ctx.stroke();
+    if (options.agentPositions !== undefined) {
+      for (const at of layout.agents) {
+        const override = options.agentPositions.get(at.id);
+        if (override !== undefined) {
+          at.x = override.x;
+          at.y = override.y;
+        }
       }
     }
 
-    // (3) Draw objects within rooms — objects anchored in cells outside the
-    // viewer's fog do not render for that viewer (spec 039, R8). Objects
-    // without a cell (legacy) always render.
-    for (const room of state.rooms) {
-      const pos = roomLayout.get(room.id);
-      if (!pos) continue;
-      const fog = viewer?.fog;
-      const objects =
-        fog !== undefined
-          ? room.objects.filter(
-              (obj) => obj.cell === undefined || this.cellInFog(room.id, obj.cell, fog),
-            )
-          : room.objects;
-      this.drawObjects(objects, pos.x, pos.y, pos.w, pos.h);
+    this.skin.drawBackground(ctx, viewport);
+
+    // Corridors are drawn BEFORE rooms so any segment crossing a room interior
+    // is painted over and only the gutter portion remains visible (R1).
+    for (const door of layout.doors) {
+      if (door.kind === 'corridor') this.skin.drawCorridor(ctx, door, scale);
     }
 
-    // (4) Draw agents within their rooms.
-    // Spec 038: agents render at their true grid cell when the engine
-    // provides one (they walk cell-by-cell); legacy slot otherwise.
-    // Spec 039, R8: agents outside the viewer's fog do not render for that
-    // viewer (the viewer itself always renders).
-    const agentPositions = new Map<string, { x: number; y: number }>();
-    for (const agent of state.agents) {
-      if (
-        viewer?.fog !== undefined &&
-        agent !== viewer &&
-        agent.position !== undefined &&
-        !this.cellInFog(agent.location, agent.position, viewer.fog)
-      ) {
+    const viewer = state.agents.find((a) => a.fog !== undefined) ?? null;
+    const fogOn = options.showFog ?? true;
+    const fogActive = fogOn && viewer?.fog !== undefined;
+    for (const room of layout.rooms) {
+      const fogRects = fogActive
+        ? unexploredRects(room.rect, new Set(viewer?.fog?.exploredCells[room.roomId] ?? []))
+        : [];
+      this.skin.drawRoom(ctx, room, { fogRects, showFog: fogActive, scale });
+    }
+
+    for (const door of layout.doors) {
+      if (door.kind === 'opening') this.skin.drawDoorOpening(ctx, door, scale);
+    }
+
+    const roomById = new Map(layout.rooms.map((r) => [r.roomId, r]));
+    for (const at of layout.objects) {
+      if (!fogOn && at.visible === false) {
+        // Fog off is a view override: draw everything (spec 062, R6).
+      } else if (!at.visible) {
         continue;
       }
-      const roomPos = roomLayout.get(agent.location);
-      if (!roomPos) continue;
-      const idx = state.agents.indexOf(agent);
-      const ax =
-        agent.position !== undefined
-          ? roomPos.x + ((agent.position.x + 0.5) * roomPos.w) / 12
-          : roomPos.x + 40 + idx * 60;
-      const ay =
-        agent.position !== undefined
-          ? roomPos.y + ((agent.position.y + 0.5) * roomPos.h) / 8
-          : roomPos.y + roomPos.h - 50;
-      agentPositions.set(agent.agentId, { x: ax, y: ay });
-      this.drawAgent(agent, ax, ay);
+      const room = state.rooms.find((r) => r.id === at.roomId);
+      const obj = room?.objects.find((o) => o.id === at.id);
+      const rl = roomById.get(at.roomId);
+      if (obj === undefined || rl === undefined) continue;
+      this.skin.drawObject(ctx, obj, at, rl.rect, scale);
     }
 
-    // (5) Draw relationship lines between agents.
-    this.drawRelationships(state, agentPositions);
-
-    // (6) Draw the status overlay (tick, running, speed).
-    this.drawStatus(state);
-  }
-
-  /**
-   * Fog pass (spec 039, R8): paint a translucent dark cell over every
-   * UNEXPLORED cell of each room. A room counts as explored cell-wise when
-   * its cell key is present in `exploredCells`; unvisited rooms are fully
-   * fogged. Deterministic — cells iterate in row-major order.
-   */
-  private drawFog(
-    state: VisualizerState,
-    roomLayout: Map<string, { x: number; y: number; w: number; h: number }>,
-    fog: { visitedRooms: string[]; exploredCells: Record<string, string[]> },
-  ): void {
-    const ctx = this.ctx;
-    for (const room of state.rooms) {
-      const pos = roomLayout.get(room.id);
-      if (!pos) continue;
-      const explored = new Set(fog.exploredCells[room.id] ?? []);
-      for (let y = 0; y < FOG_GRID_HEIGHT; y++) {
-        for (let x = 0; x < FOG_GRID_WIDTH; x++) {
-          if (explored.has(`${x},${y}`)) continue;
-          const fx = pos.x + (x * pos.w) / FOG_GRID_WIDTH;
-          const fy = pos.y + (y * pos.h) / FOG_GRID_HEIGHT;
-          ctx.fillStyle = FOG_CELL_FILL;
-          ctx.fillRect(fx, fy, pos.w / FOG_GRID_WIDTH, pos.h / FOG_GRID_HEIGHT);
-        }
-      }
-    }
-  }
-
-  /** Is a grid cell inside the fog set for a room? (No fog for a room → false.) */
-  private cellInFog(
-    roomId: string,
-    cell: { x: number; y: number },
-    fog: { exploredCells: Record<string, string[]> },
-  ): boolean {
-    const cells = fog.exploredCells[roomId];
-    if (cells === undefined) return false;
-    return cells.includes(`${cell.x},${cell.y}`);
-  }
-
-  /** Position rooms in a simple grid layout. */
-  private layoutRooms(
-    rooms: VisualizerState['rooms'],
-  ): Map<string, { x: number; y: number; w: number; h: number }> {
-    const layout = new Map<string, { x: number; y: number; w: number; h: number }>();
-    const cols = Math.ceil(Math.sqrt(rooms.length));
-    const cellW = Math.floor((this.canvasWidth - 40) / Math.max(cols, 1));
-    const cellH = Math.floor(
-      (this.canvasHeight - 80) / Math.max(Math.ceil(rooms.length / cols), 1),
-    );
-    const roomW = Math.max(cellW - 20, 200);
-    const roomH = Math.max(cellH - 20, 150);
-    rooms.forEach((room, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      layout.set(room.id, {
-        x: 20 + col * cellW + 10,
-        y: 40 + row * cellH + 10,
-        w: roomW,
-        h: roomH,
+    const positions = new Map<string, Point>();
+    state.agents.forEach((agent, index) => {
+      const at = layout.agents.find((e) => e.id === agent.agentId);
+      if (at === undefined) return;
+      positions.set(agent.agentId, { x: at.x, y: at.y });
+      if (at.visible === false && fogOn) return;
+      this.skin.drawAgent(ctx, agent, at, {
+        index,
+        scale,
+        selected: options.selectedAgentId === agent.agentId,
       });
     });
-    return layout;
-  }
 
-  /** Draw a room as a labeled rectangle (spec 023, Req 12 — layer 1). */
-  private drawRoom(
-    room: VisualizerState['rooms'][number],
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-  ): void {
-    const ctx = this.ctx;
-    ctx.fillStyle = '#16213e';
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = '#0f3460';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, w, h);
-    // Room name label.
-    ctx.fillStyle = '#e0e0e0';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(room.name, x + 8, y + 6);
-  }
-
-  /** Draw objects as icons with state text (spec 023, Req 12 — layer 2). */
-  private drawObjects(
-    objects: VisualizerState['rooms'][number]['objects'],
-    roomX: number,
-    roomY: number,
-    roomW: number,
-    roomH: number,
-  ): void {
-    const ctx = this.ctx;
-    objects.forEach((obj, i) => {
-      // Spec 038: objects render at their grid anchor cells when available;
-      // legacy fixed chip grid otherwise.
-      const ox =
-        obj.cell !== undefined ? roomX + (obj.cell.x * roomW) / 12 + 6 : roomX + 12 + (i % 3) * 70;
-      const oy =
-        obj.cell !== undefined
-          ? roomY + (obj.cell.y * roomH) / 8 + 6
-          : roomY + 30 + Math.floor(i / 3) * 50;
-      // Icon background — conversation objects use their sentiment-derived
-      // tint (spec 033, R9/AC-10); everything else keeps the default chip.
-      ctx.fillStyle = obj.conversation?.sentimentTint ?? '#2a2a4a';
-      ctx.fillRect(ox, oy, 60, 30);
-      // Object name.
-      ctx.fillStyle = '#c0c0d0';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(obj.name.slice(0, 8), ox + 2, oy + 2);
-      // State text — first key/value pair, rounded and clamped to the chip.
-      // Conversation chips show the topic (spec 033, R9) so the live dialogue
-      // is readable at a glance; the default state line for a conversation
-      // object would be a participants array.
-      if (obj.conversation !== undefined) {
-        ctx.fillText(`topic: ${obj.conversation.topic}`.slice(0, 14), ox + 2, oy + 16);
-      } else {
-        const stateEntries = Object.entries(obj.state);
-        if (stateEntries.length > 0) {
-          const [key, val] = stateEntries[0]!;
-          ctx.fillText(formatStateLine(key, val), ox + 2, oy + 16);
-        }
-      }
-    });
-  }
-
-  /** Draw an agent avatar with name, drive bars, and PPER phase ring (spec 023, Req 12 — layer 3). */
-  private drawAgent(agent: VisualizerAgent, x: number, y: number): void {
-    const ctx = this.ctx;
-    const radius = 16;
-
-    // PPER phase indicator ring.
-    const phaseColor = PHASE_COLORS[agent.pperPhase] ?? '#888888';
-    ctx.strokeStyle = phaseColor;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Avatar circle.
-    ctx.fillStyle = agent.isThinking ? '#555577' : '#3498db';
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Initials.
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(this.initials(agent.name), x, y);
-
-    // Name label.
-    ctx.fillStyle = '#e0e0e0';
-    ctx.font = '11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(agent.name, x, y + radius + 6);
-
-    // Drive bars (five horizontal bars below the avatar).
-    const barX = x - radius;
-    const barW = radius * 2;
-    const barH = 4;
-    DRIVES.forEach((drive, i) => {
-      const by = y + radius + 22 + i * (barH + 2);
-      const value = agent.drives[drive.key];
-      // Background bar.
-      ctx.fillStyle = '#333355';
-      ctx.fillRect(barX, by, barW, barH);
-      // Filled portion (value 0–100).
-      ctx.fillStyle = drive.color;
-      ctx.fillRect(barX, by, (barW * Math.max(0, Math.min(100, value))) / 100, barH);
-    });
-
-    // Thought bubble — current plan description.
-    if (agent.currentPlan) {
-      ctx.fillStyle = '#888899';
-      ctx.font = '9px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      const text = agent.currentPlan.description.slice(0, 24);
-      ctx.fillText(`💭 ${text}`, x, y + radius + 50);
-    }
-  }
-
-  /** Draw relationship lines between agents (spec 023, Req 12 — layer 4). */
-  private drawRelationships(
-    state: VisualizerState,
-    positions: Map<string, { x: number; y: number }>,
-  ): void {
-    const ctx = this.ctx;
     for (const agent of state.agents) {
       const from = positions.get(agent.agentId);
-      if (!from) continue;
+      if (from === undefined) continue;
       for (const rel of agent.relationships) {
         const to = positions.get(rel.agentId);
-        if (!to) continue;
-        // Trust-based opacity (0–100 → 0.1–0.7).
-        const opacity = 0.1 + (Math.max(0, Math.min(100, rel.trust)) / 100) * 0.6;
-        ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(from.x, from.y);
-        ctx.lineTo(to.x, to.y);
-        ctx.stroke();
+        if (to === undefined) continue;
+        this.skin.drawRelationship(ctx, from, to, rel.trust);
       }
     }
-  }
 
-  /** Draw a status overlay with tick/time/running info. */
-  private drawStatus(state: VisualizerState): void {
-    const ctx = this.ctx;
-    ctx.fillStyle = '#e0e0e0';
-    ctx.font = '12px monospace';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
-    const status = state.isRunning ? '▶ running' : '⏸ paused';
-    ctx.fillText(
-      `tick ${state.tickNumber} · ${state.simulationTime.toFixed(1)}s · ${status} · ${state.timeScale}×`,
-      this.canvasWidth - 12,
-      8,
-    );
-  }
-
-  /** Extract up to two initials from a name. */
-  private initials(name: string): string {
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 0) return '?';
-    if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-    return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
+    this.skin.drawStatus(ctx, state, viewport);
   }
 }
