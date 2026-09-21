@@ -108,6 +108,9 @@ function executePageJs(pageJs: string): MockWebSocket {
     width: 800,
     height: 600,
     getContext: (_type: string) => ctx,
+    // The client wires pointerdown for selection (spec 063); a no-op is enough
+    // here — the selection/camera coverage lives in mobile-shell.integration.
+    addEventListener: (_type: string, _fn: (ev?: unknown) => void) => {},
   };
   const doc = {
     getElementById(id: string): Record<string, unknown> {

@@ -13,6 +13,8 @@
 import type { VisualizerState } from '@evol-hive/shared';
 import { layoutWorld, unexploredRects, ZERO_INSETS } from './layout.js';
 import type { Insets, Point } from './layout.js';
+import { transformLayout } from './camera.js';
+import type { Camera } from './camera.js';
 import { CanvasSkin } from './skin.js';
 import type { Skin } from './skin.js';
 
@@ -49,6 +51,12 @@ export interface RenderOptions {
    * centres so agents glide between snapshots instead of teleporting.
    */
   agentPositions?: ReadonlyMap<string, Point>;
+  /**
+   * View transform over the WORLD layer only (spec 063, R1). The HUD is DOM
+   * and the canvas status line is drawn untransformed, so the camera never
+   * moves the chrome.
+   */
+  camera?: Camera;
 }
 
 /**
@@ -75,11 +83,11 @@ export class CanvasRenderer {
     const width = options.width ?? canvas?.width ?? 800;
     const height = options.height ?? canvas?.height ?? 600;
     const viewport = { width, height, insets: options.insets ?? ZERO_INSETS };
-    const layout = layoutWorld(state, viewport);
-    const scale = Math.max(0.72, Math.min(layout.size / 300, 1.5));
+    const baseLayout = layoutWorld(state, viewport);
+    const scale = Math.max(0.72, Math.min(baseLayout.size / 300, 1.5));
 
     if (options.agentPositions !== undefined) {
-      for (const at of layout.agents) {
+      for (const at of baseLayout.agents) {
         const override = options.agentPositions.get(at.id);
         if (override !== undefined) {
           at.x = override.x;
@@ -87,6 +95,8 @@ export class CanvasRenderer {
         }
       }
     }
+    const layout =
+      options.camera !== undefined ? transformLayout(baseLayout, options.camera) : baseLayout;
 
     this.skin.drawBackground(ctx, viewport);
 
