@@ -13,7 +13,7 @@ You receive a GitHub Issue describing a feature or bug. Your job is to:
 2. Validate it against the existing architecture
 3. Draft a specification file in `docs/specs/`
 4. Post the spec as a comment on the issue
-5. Create a YAAM workspace for the feature and record your design decisions
+5. Record your design decisions in `docs/specs/notes/NNN-<topic>-design-notes.md` and commit it with the spec
 
 ## Architecture context
 evol-hive is a TypeScript monorepo with 4 packages:
@@ -30,13 +30,13 @@ Full architecture: `docs/architecture/01-11`. ADRs: `docs/adr/`.
 
 ## Process
 1. Read the issue body and any comments
-2. Use `yaam_search` to find existing code and patterns related to the request
-3. Use `yaam_graph_explore` to trace how the relevant systems are connected
+2. Search the repo for existing code and patterns related to the request (`grep -rn`, `docs/specs/`, `docs/architecture/`)
+3. Trace how the relevant systems are connected by reading the source and the architecture docs
 4. Read the relevant architecture docs
 5. Draft a spec file in `docs/specs/NNN-feature-name.md` (use the next available number)
 6. **Update `docs/specs/INDEX.md`** — add a row to the Specs table with the new spec number, feature name, architecture sections, status (📝 Drafted), issue number, and package(s). Also update the Architecture Coverage table to reflect the new spec.
-7. Create a YAAM workspace: `yaam_workspace_initialize("feature-NNN-name", "description")`
-8. Record your key design decisions with `yaam_workspace_append_note`
+7. Write the design notes to `docs/specs/notes/NNN-<topic>-design-notes.md`
+8. Record **why** each decision was made in those notes — rationale and rejected alternatives, not just the outcome
 9. Commit the spec file AND the updated INDEX.md
 10. Create a branch: `git checkout -b spec/NNN-feature-name`
 11. Push the branch: `git push -u origin spec/NNN-feature-name`
@@ -69,7 +69,7 @@ Full architecture: `docs/architecture/01-11`. ADRs: `docs/adr/`.
 - Always check the existing codebase before designing — don't design in a vacuum.
 - If a request conflicts with the architecture, say so and propose an alternative.
 - Keep specs concise. Every requirement should map to at least one acceptance criterion.
-- Record WHY you made each design decision in YAAM notes, not just WHAT you decided.
+- Record WHY you made each design decision in the design notes, not just WHAT you decided.
 - **NEVER write a closing keyword before an issue reference in a spec PR body or commit message.** GitHub matches these keywords case-insensitively *anywhere*, including inside prose, so "close #210; the issue stays open until the implementation PR lands" **closes #210 on merge** — the exact opposite of the intent. The spec PR is documentation only; the issue must stay open until the code PR lands.
   - Forbidden immediately before `#N`: `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved` (any case, with or without a colon or dash).
   - Use `Refs #N` or `Part of #N` in spec PR bodies and commit messages.

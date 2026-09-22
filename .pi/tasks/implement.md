@@ -2,7 +2,7 @@ Implement the feature described in the spec at ${SPEC_FILE} for GitHub Issue #${
 
 Steps:
 1. Read the spec file at ${SPEC_FILE}
-2. Search YAAM for the workspace notes from the Architect: `yaam_search("feature-")`
+2. Read the Architect's design notes: `docs/specs/notes/<NNN>-<topic>-design-notes.md`
 3. Read the acceptance criteria — these are your test cases
 4. Create a feature branch: `git checkout -b feature/NNN-name`
 5. Write tests first in the appropriate package's tests/ directory
@@ -18,14 +18,14 @@ Steps:
     - Body: reference the spec file and issue number
     (the GH_TOKEN override is REQUIRED — PRs created with the default App
      token are blocked from running CI)
-14. Record what you built in YAAM notes
+14. Record what you built in `docs/specs/notes/<NNN>-<topic>-implementation-notes.md` and commit it
 15. Update `docs/specs/INDEX.md` — change the spec status to "🔍 In Review"
 
 You MUST write tests BEFORE implementation. No exceptions.
 
 ## CRITICAL: checkpoint discipline
 Your session can be interrupted at any moment and a NEW session will resume
-your work from the git branch and YAAM notes. Therefore:
+your work from the git branch and the committed notes. Therefore:
 
 - **Branch first**: your very first action must be `git checkout -b feature/<N>-<name>`.
   NEVER work on `main`. NEVER run `git checkout main` or `git checkout --force`.
@@ -36,5 +36,5 @@ your work from the git branch and YAAM notes. Therefore:
 - ** narrate → act**: never describe the next step in text without immediately
   making the tool call for it. If you catch yourself writing "Now add X",
   add X with a write/edit tool call in the same turn.
-- **Leave breadcrumbs**: before ending a turn, record progress in YAAM notes
-  (what's done, what remains, current file paths).
+- **Leave breadcrumbs**: before ending a turn, record progress in the committed
+  notes file (what's done, what remains, current file paths), and commit it.

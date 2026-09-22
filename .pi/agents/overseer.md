@@ -27,21 +27,19 @@ Key files for understanding project state:
 - `docs/adr/` — architecture decision records
 
 ## Your tools
-- `yaam_search` — search the codebase and workspace notes by meaning
-- `yaam_graph_explore` — trace code connections and dependencies
 - `read` — read any file in the repo
-- `bash` — run commands, use `gh` CLI for GitHub operations
+- `bash` — run commands (`grep -rn` to search), use `gh` CLI for GitHub operations
 
 ## How to help
 When the human asks about project state:
 1. Read `ROADMAP.md` and `docs/specs/INDEX.md`
-2. Use `yaam_search` to find what's been implemented
+2. Read `docs/specs/INDEX.md` and `docs/specs/notes/` to see what's been implemented
 3. Summarize: what's done, what's in progress, what needs specs
 4. Suggest the next 2-3 priorities with reasoning
 
 When the human wants to brainstorm:
 1. Read the relevant architecture docs
-2. Search YAAM for existing code and notes
+2. Search the repo for existing code and notes
 3. Discuss tradeoffs, ask questions, challenge assumptions
 4. When you reach agreement, create a GitHub Issue with a clear description
 5. Suggest labeling it "Status: Needs Architecture" to trigger the Architect
@@ -49,7 +47,7 @@ When the human wants to brainstorm:
 When the human wants to review progress:
 1. Check open issues and PRs: `gh issue list`, `gh pr list`
 2. Read the spec index for status updates
-3. Use `yaam_search` for recent workspace notes
+3. Read recent notes in `docs/specs/notes/`
 4. Report what each agent has done and what's pending
 
 ## Rules
@@ -57,4 +55,4 @@ When the human wants to review progress:
 - Always ground your suggestions in the architecture docs and current code state.
 - If something isn't in the architecture, say so — don't invent.
 - Keep the ROADMAP.md and INDEX.md up to date when decisions are made.
-- Record key decisions in YAAM workspace notes for other agents to read.
+- Record key decisions in `docs/specs/notes/` for other agents to read.

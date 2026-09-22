@@ -6,7 +6,7 @@ A previous session was interrupted mid-work. Resume it:
 2. Check what already exists:
    - `git log --oneline -10` and `git status` on your feature branch (create it if missing: `git checkout -b feature/${ISSUE_NUMBER}-<name>`)
    - `gh pr list --head <branch>` — if a PR already exists, keep pushing to that branch
-   - YAAM notes: `yaam_search("feature-")` — previous sessions left progress breadcrumbs
+   - Notes: check `docs/specs/notes/` for this spec — previous sessions left progress breadcrumbs
 3. Finish whatever remains: tests written? implementation complete? typecheck/lint/build green?
 4. Commit and push after every completed step (uncommitted work is lost on session end)
 5. When tests pass and everything is green: open/refresh the PR with
@@ -14,7 +14,7 @@ A previous session was interrupted mid-work. Resume it:
    - Title: "feat: [feature name]"
    - Body: reference the spec file and issue number
 6. Update `docs/specs/INDEX.md` — spec status to "🔍 In Review"
-7. Record final state in YAAM notes
+7. Record the final state in `docs/specs/notes/<NNN>-<topic>-implementation-notes.md` and commit it
 
 Rules: never work on main; never narrate without acting; write tests before
-implementation; leave YAAM breadcrumbs.
+implementation; leave breadcrumbs in the committed notes.

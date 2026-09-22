@@ -97,26 +97,6 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Cache YAAM binary
-        if: steps.docs.outputs.docs_only != 'true'
-        uses: actions/cache@v4
-        with:
-          path: ~/.yaam-cache
-          key: yaam-binary-v3
-
-      - name: Cache ONNX model
-        if: steps.docs.outputs.docs_only != 'true'
-        uses: actions/cache@v4
-        with:
-          path: ~/.yaam/models
-          key: yaam-model-v1
-
-      - name: Restore YAAM memory
-        if: steps.docs.outputs.docs_only != 'true'
-        run: bash scripts/restore-memory.sh
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-
       - name: Bootstrap agent environment
         if: steps.docs.outputs.docs_only != 'true'
         env:
@@ -187,10 +167,3 @@ jobs:
           else
             echo "No unpushed commits."
           fi
-
-      - name: Save YAAM memory
-        if: always() && steps.docs.outputs.docs_only != 'true'
-        run: bash scripts/save-memory.sh
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          GITHUB_RUN_ID: ${{ github.run_id }}

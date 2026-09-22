@@ -1,5 +1,12 @@
 # Distributed Memory & Compaction Pipeline
 
+> **Superseded by [ADR-003](../adr/0003-memory-is-local-ci-runs-none.md) (2026-09-22).**
+> This describes a CI pipeline that no longer runs: the agent workflows do not
+> install, restore or save YAAM, and `.github/workflows/compaction.yml` has been
+> deleted. It is retained as a record of how the retired pipeline worked. The
+> scripts it documents (`restore-memory.sh`, `save-memory.sh`, `run-compaction.sh`)
+> remain in the repo for local, manual use.
+
 > How evol-hive agents share persistent memory across CI runs using a Git-based event sourcing architecture with YAAM's append-only JSONL format, distributed locking, and automatic compaction.
 
 ## Architecture Overview

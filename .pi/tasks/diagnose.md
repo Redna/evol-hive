@@ -4,9 +4,9 @@ Steps:
 1. Get the PR diff: `gh pr diff ${PR_NUMBER}`
 2. Get the CI failure output: `gh run view --log-failed` or read the check run annotations
 3. Read the changed files to understand what was modified
-4. Search YAAM for related code and previous failure notes: `yaam_search` with relevant keywords
+4. Search the repo for related code and previous failure notes (`grep -rn`, `docs/specs/notes/`)
 5. Diagnose the root cause
-6. Document the diagnosis in a YAAM note
+6. Document the diagnosis in the PR comment
 7. If the fix is clear and isolated (≤3 files, no API changes, no new deps):
    - Apply the fix
    - Run `pnpm typecheck && pnpm test && pnpm lint`
