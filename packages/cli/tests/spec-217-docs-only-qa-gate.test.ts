@@ -55,11 +55,13 @@ function findStep(fragment: string): WorkflowStep {
   return step as WorkflowStep;
 }
 
-/** Steps that must NOT run on a docs-only PR (issue #217 "heavy steps"). */
+/**
+ * Steps that must NOT run on a docs-only PR (issue #217 "heavy steps").
+ *
+ * The YAAM cache/restore/save steps were removed from this list by ADR-003 —
+ * CI no longer runs memory machinery at all, so there is nothing left to gate.
+ */
 const GATED_STEPS = [
-  'Cache YAAM binary',
-  'Cache ONNX model',
-  'Restore YAAM memory',
   'Bootstrap agent environment',
   'Run QA Agent',
   'Push QA test commits',
@@ -145,12 +147,6 @@ describe('Issue #217 — qa.yml docs-only short-circuit', () => {
     // Guard the artifact contract itself: the push commits only test/notes paths.
     expect(push.run).toContain('packages/*/tests');
     expect(push.run).toContain('docs/specs/notes');
-  });
-
-  it('keeps the memory save running on failure but still skips docs-only', () => {
-    const save = findStep('Save YAAM memory');
-    expect(save.if).toContain('always()');
-    expect(save.if).toContain("steps.docs.outputs.docs_only != 'true'");
   });
 
   it('does not use paths-ignore — the check must always be reported', () => {

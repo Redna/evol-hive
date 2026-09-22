@@ -36,7 +36,20 @@ So: **local legs do the thinking; GitHub does the checking.**
 | Verification      | GitHub Actions | CI (build/test/typecheck/lint), QA coverage runs, GitGuardian, branch protection              |
 | Identity          | GitHub App     | `evol-hive-agent[bot]` commits/PRs; the PAT approves bot-authored PRs and vice versa          |
 | Intellectual work | **Local legs** | spec drafting + code-grounded review, implementation, unit tests, live validation, root-cause |
-| Memory            | Local YAAM     | durable notes/workspaces (the handoff channel); regenerable code topology                     |
+| Memory            | Local YAAM     | durable notes/workspaces, **local legs only** — CI runs no memory machinery ([ADR-003](adr/0003-memory-is-local-ci-runs-none.md)); the CI handoff is committed `docs/specs/notes/*.md` |
+
+**CI runs no memory machinery.** The five agent workflows no longer install,
+restore or save YAAM, and the compaction workflow is deleted
+([ADR-003](adr/0003-memory-is-local-ci-runs-none.md)). CI agents hand off through
+committed notes, read from the branch or PR:
+
+```
+docs/specs/notes/NNN-<topic>-design-notes.md          (Architect)
+docs/specs/notes/NNN-<topic>-implementation-notes.md  (Developer)
+docs/specs/notes/NNN-<topic>-qa-notes.md              (QA)
+```
+
+Local legs keep using YAAM notes as the briefing/handoff channel described below.
 
 ## Skills (pipeline stage → skill)
 

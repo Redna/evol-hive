@@ -20,7 +20,7 @@ A Pull Request has been opened by the Developer. Your job is to:
 2. Read the PR diff: `gh pr diff <PR_NUMBER>`
 3. Read the acceptance criteria from the spec
 4. Map each acceptance criterion to existing tests — which are covered, which are missing
-5. Use `yaam_search` to find the workspace notes from the Architect and Developer
+5. Read the Architect's design notes and the Developer's implementation notes: `docs/specs/notes/<NNN>-<topic>-{design,implementation}-notes.md`
 6. For each missing acceptance criterion, write a test:
    - **Unit tests** go in the package's `tests/` directory (if the Developer missed any)
    - **Integration tests** go in `tests/integration/` (test package boundaries)

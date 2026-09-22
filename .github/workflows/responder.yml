@@ -38,23 +38,6 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Cache YAAM binary
-        uses: actions/cache@v4
-        with:
-          path: ~/.yaam-cache
-          key: yaam-binary-v3
-
-      - name: Cache ONNX model
-        uses: actions/cache@v4
-        with:
-          path: ~/.yaam/models
-          key: yaam-model-v1
-
-      - name: Restore YAAM memory
-        run: bash scripts/restore-memory.sh
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-
       - name: Bootstrap agent environment
         env:
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
@@ -95,7 +78,7 @@ jobs:
           Post your response as a comment on the PR/issue using:
           gh issue comment $ISSUE_NUMBER --body \"your response\"
 
-          Use YAAM search and graph explore to understand the codebase.
+          Read the relevant files in the repo to understand the codebase.
           Use read to examine specific files. Be concise and helpful."
 
           # Resource heartbeat: log memory/disk/load every 20s — proves or
@@ -121,10 +104,3 @@ jobs:
             --thinking medium \
             --tools read,bash \
             --verbose
-
-      - name: Save YAAM memory
-        if: always()
-        run: bash scripts/save-memory.sh
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          GITHUB_RUN_ID: ${{ github.run_id }}

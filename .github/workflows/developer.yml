@@ -39,29 +39,12 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Cache YAAM binary
-        uses: actions/cache@v4
-        with:
-          path: ~/.yaam-cache
-          key: yaam-binary-v3
-
-      - name: Cache ONNX model
-        uses: actions/cache@v4
-        with:
-          path: ~/.yaam/models
-          key: yaam-model-v1
-
       - name: Generate App Token
         uses: actions/create-github-app-token@v1
         id: app-token
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
-      - name: Restore YAAM memory
-        run: bash scripts/restore-memory.sh
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Bootstrap agent environment
         env:
@@ -126,7 +109,8 @@ jobs:
           # Run the agent with a continuation loop. pi print-mode exits whenever
           # the model emits a text-only response instead of a tool call — common
           # with deepseek-v4.1-flash mid-implementation (it narrates "Now add X"
-          # and quits). Each pass resumes from the pushed branch + YAAM notes, so
+          # and quits). Each pass resumes from the pushed branch and committed
+          # notes files, so
           # checkpointed work survives; uncommitted work does not.
           PI_ARGS=(
             -p "$TASK_CONTENT"
@@ -189,13 +173,6 @@ jobs:
           else
             echo "No unpushed commits."
           fi
-
-      - name: Save YAAM memory
-        if: always()
-        run: bash scripts/save-memory.sh
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
 
       # GitHub-hosted runners intermittently cancel these long, mostly-idle
       # agent jobs ("The runner has received a shutdown signal", no auto-retry,

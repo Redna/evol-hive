@@ -2,6 +2,12 @@
 
 > How we bootstrapped an autonomous AI agent team for evol-hive using GitHub Actions, Ollama Cloud, Pi, pi-goal, YAAM, and a GitHub App for bot identity.
 
+> **Superseded in part by [ADR-003](adr/0003-memory-is-local-ci-runs-none.md) (2026-09-22).**
+> CI no longer installs, restores or saves YAAM, and the compaction workflow is
+> gone. The agent handoff is now committed notes (`docs/specs/notes/*.md`). YAAM
+> remains the handoff channel for local legs. Where this document describes
+> CI memory, read it as history.
+
 > **Current working model (2026-09-18):** see [`DELIVERY_PROCEDURE.md`](DELIVERY_PROCEDURE.md).
 > The intellectual work (spec drafting + code-grounded review, implementation, live
 > validation, root-cause) is done in **local relay legs** on the always-on box; GitHub
@@ -381,7 +387,7 @@ Specs are plain Markdown — no BDD libraries, no Given/When/Then ceremony.
 | Spec PRs (not direct push to main) | Branch protection requires PRs; human reviews spec before development |
 | Spec PRs never use "Closes #N" | Issue must stay open until the code PR is merged, not the spec PR |
 | Model A TDD (Developer writes tests, QA verifies) | Most practical: no blocking step, QA is a verification layer not a gate |
-| YAAM for inter-agent memory | Workspaces + scratchpad notes persist across runs via memory branch |
+| Committed notes for inter-agent memory | Handoff files (`docs/specs/notes/NNN-*-{design,implementation,qa}-notes.md`) ride the PR and are reviewable; CI runs no memory machinery ([ADR-003](adr/0003-memory-is-local-ci-runs-none.md)). YAAM remains for local legs |
 | Controller as circuit breaker | Prevents infinite loops, limits retries, escalates to human when needed |
 
 ## Bootstrapping Steps
