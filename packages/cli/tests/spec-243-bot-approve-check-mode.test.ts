@@ -35,8 +35,12 @@ const SCRIPT = join(REPO_ROOT, 'scripts/bot-approve.mjs');
 
 const OWNER = 'Redna';
 const REPO = 'evol-hive';
-const APP_ID = '4510218';
-const INSTALLATION_ID = '151796827';
+// Synthetic identifiers: the script is exercised through a mocked `fetch`, so
+// the real App ID / installation ID are irrelevant here. They must NOT be the
+// live values — this is a public repo, and environment identity belongs in
+// ~/.config/evol-hive/app.env, never in a committed file.
+const APP_ID = '123456';
+const INSTALLATION_ID = '78901234';
 
 const SANDBOX = mkdtempSync(join(tmpdir(), 'spec243-'));
 const KEY_PATH = join(SANDBOX, 'app-key.pem');
