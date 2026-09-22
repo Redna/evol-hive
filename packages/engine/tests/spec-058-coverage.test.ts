@@ -117,14 +117,20 @@ describe('Spec 058 — Document structure', () => {
 // ─── INDEX.md Validation ────────────────────────────────────────────────────
 
 describe('Spec 058 — INDEX.md update', () => {
-  it('INDEX.md contains the spec 058 row with the correct title and In Review status', () => {
+  it('INDEX.md contains the spec 058 row with the correct title and a status', () => {
     const content = readFile(INDEX_PATH);
     const row = content
       .split('\n')
       .find((line) => line.includes('[058](058-eligibility-bound-plan-affordances.md)'));
     expect(row).toBeDefined();
     expect(row).toContain('Eligibility-Bound Plan Affordances');
-    expect(row).toContain('🔍 In Review');
+    // The status is a MUTABLE ledger field — it moves from `🔍 In Review` to
+    // `✅ Done` when the PR merges. Pinning the exact value made this test fail
+    // the moment the INDEX was reconciled against merged PRs, so assert that a
+    // valid status marker is present instead of which one.
+    expect(row).toMatch(
+      /(📝 Drafted|🔨 In Development|🔍 In Review|✅ (Done|Implemented|Documented)|🚫 Blocked|⛔ Superseded)/,
+    );
   });
 
   it('INDEX.md references issue #206 for spec 058', () => {
