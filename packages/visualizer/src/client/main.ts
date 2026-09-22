@@ -252,7 +252,13 @@ function main(): void {
   // ── WebSocket (same origin; scheme follows the page — spec 063, R2) ──────
   const scheme =
     typeof location.protocol === 'string' && location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${scheme}://${location.host}/`);
+  // Same-origin includes the PATH: when the app is served behind a
+  // path-prefixed reverse proxy (e.g. `/viz/`), a socket to `host/` would be
+  // routed to whatever else owns the root. Carry the page's base path so the
+  // same proxy route carries the live channel.
+  const rawPath = typeof location.pathname === 'string' ? location.pathname : '/';
+  const basePath = rawPath.slice(0, Math.max(0, rawPath.lastIndexOf('/') + 1));
+  const ws = new WebSocket(`${scheme}://${location.host}${basePath === '' ? '/' : basePath}`);
   const net = document.getElementById('net');
   ws.onopen = () => {
     if (net !== null) {

@@ -46,6 +46,23 @@ Why path-prefixed and same-origin:
 Reload the proxy through its admin interface (graceful; it does not drop the
 existing route).
 
+**The site block must match the address the device will use.** If the device
+opens `https://<ip>:<tls-port>/viz/` but the site is only addressed by hostname,
+the proxy does not route the request and returns an **empty `200`** — which
+looks like a broken app rather than a routing miss. List every address the
+device will use in the site block (and make sure the certificate SANs them).
+
+**Verify the socket, not just the page.** A WebSocket handshake needs HTTP/1.1
+(HTTP/2 has no `Upgrade`), so a plain `curl` can report `200` and look fine:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' --http1.1 --cacert <ca> \
+  -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+  -H 'Sec-WebSocket-Version: 13' \
+  -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+  https://<host>:<tls-port>/viz/      # expect 101 Switching Protocols
+```
+
 ## 2. On the phone
 
 1. Install the host's **local root CA** on the device (the same CA the rest of
