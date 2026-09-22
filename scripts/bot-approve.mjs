@@ -116,9 +116,11 @@ async function resolveInstallationId(jwt, cfg) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const pr = args.find((a) => /^[0-9]+$/.test(a));
-  if (!pr) die('usage: node scripts/bot-approve.mjs <pr-number> [--body "..."] [--check]');
   const checkOnly = args.includes('--check');
+  const pr = args.find((a) => /^[0-9]+$/.test(a));
+  if (!pr && !checkOnly) {
+    die('usage: node scripts/bot-approve.mjs <pr-number> [--body "..."] | --check');
+  }
   const bodyIdx = args.indexOf('--body');
   const body =
     bodyIdx !== -1 && args[bodyIdx + 1]
@@ -149,8 +151,17 @@ async function main() {
   const repo = cfg['GH_REPO'] ?? 'evol-hive';
 
   if (checkOnly) {
-    const pull = await api(`/repos/${owner}/${repo}/pulls/${pr}`, { token });
-    console.log(`bot-approve: OK — bot can see ${owner}/${repo}#${pr} ("${pull.title}"), state=${pull.state}`);
+    if (pr) {
+      const pull = await api(`/repos/${owner}/${repo}/pulls/${pr}`, { token });
+      console.log(`bot-approve: OK — bot can see ${owner}/${repo}#${pr} ("${pull.title}"), state=${pull.state}`);
+    } else {
+      // No PR: prove the installation token actually works against the API.
+      const repos = await api('/installation/repositories', { token });
+      const names = (repos.repositories ?? []).map((r) => r.full_name);
+      console.log(
+        `bot-approve: OK — installation can see ${names.length} repo(s); ${owner}/${repo} ${names.includes(`${owner}/${repo}`) ? 'is' : 'is NOT'} among them`,
+      );
+    }
     console.log('bot-approve: config is valid; re-run without --check to approve.');
     return;
   }
