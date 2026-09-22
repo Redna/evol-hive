@@ -58,11 +58,11 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      68
+Total specs:      69
 ✅ Done:          66
 🔨 In Development: 0
 🔍 In Review:      0
-📝 Drafted:        0
+📝 Drafted:        1
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -116,3 +116,4 @@ Architecture sections fully implemented: 11/11
 | [061](061-plan-context-budget.md)                                   | Plan-Context Budgeting — Bound the Plan Prompt's Perception Context (Block-Priority Ceiling, `[plan-context]` Grower Diagnostic, H1/H2 Probe) | §6, §7, §10, §11        | ✅ Done | [#219](https://github.com/Redna/evol-hive/issues/219) | —                                                                                                    | cognition                          |
 | [062](062-visualizer-world-view.md) | Visualizer World View (1/2) — Topology-Aware Layout, Real Doors, Legible Entities, Interpolated Motion (pure `layoutWorld` seam, skin seam, DPR/resize fixes) | §2, §3, §4, §6 | ✅ Done | [#231](https://github.com/Redna/evol-hive/issues/231) | [#233](https://github.com/Redna/evol-hive/pull/233), [#234](https://github.com/Redna/evol-hive/pull/234) | visualizer, examples |
 | [063](063-visualizer-mobile-shell.md) | Visualizer Mobile Shell (2/2) — Secure Origin (reuses the environment's local CA + reverse proxy, same-origin `wss://`), Follow-Camera, Measured HUD & Installable PWA | §2, §3 | ✅ Done | [#232](https://github.com/Redna/evol-hive/issues/232) | [#233](https://github.com/Redna/evol-hive/pull/233), [#236](https://github.com/Redna/evol-hive/pull/236) | visualizer, examples |
+| [064](064-local-first-memory.md) | Local-First Memory — Retire YAAM from CI, Make the Repo the Handoff | — | 📝 Drafted | [#221](https://github.com/Redna/evol-hive/issues/221) | — | CI workflows, agent prompts, docs |
