@@ -49,6 +49,9 @@ rm -f events-*.jsonl
 LINES=$(wc -l < events.jsonl | cut -d' ' -f1)
 SIZE=$(du -h events.jsonl | cut -f1)
 echo "Restored and merged memory: $LINES events, $SIZE"
+# Spec 221 AC-7: one grep-able diagnostic so a stalled/!mismatched memory is
+# visible from logs alone (spec-049 discipline: zero-LLM, single line).
+echo "[yaam] restored=$LINES events size=$SIZE run=${GITHUB_RUN_ID:-local}"
 
 # Record how many lines we started with to compute the delta later!
 echo "$LINES" > .yaam_start_lines

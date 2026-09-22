@@ -9,15 +9,37 @@ if [ ! -f events.jsonl ]; then
   exit 0
 fi
 
-START_LINES=$(cat .yaam_start_lines 2>/dev/null || echo "0")
-CURRENT_LINES=$(wc -l < events.jsonl | cut -d' ' -f1)
+START_RAW=$(cat .yaam_start_lines 2>/dev/null || echo "0")
+case "$START_RAW" in
+  '' | *[!0-9]*)
+    echo "[yaam] marker-invalid start='$START_RAW' — treating as 0"
+    START_LINES=0
+    ;;
+  *) START_LINES="$START_RAW" ;;
+esac
+CURRENT_LINES=$(wc -l < events.jsonl | tr -d ' ')
 NEW_LINES=$((CURRENT_LINES - START_LINES))
 
-if [ "$NEW_LINES" -le 0 ]; then
-  echo "No new events to save."
+# Spec 221 fault 3: a marker NEWER than the store means the store was reset or
+# replaced after the last restore (restore-memory.sh sets the marker to the
+# restored line count). The old arithmetic produced a negative delta and exited
+# 0 with "No new events to save" — a SILENT no-op. Fail loudly, re-baseline so
+# the NEXT save is correct, and skip this one rather than pushing a wrong slice.
+if [ "$NEW_LINES" -lt 0 ]; then
+  echo "[yaam] saved=0 reason=stale-marker start=$START_LINES current=$CURRENT_LINES"
+  echo "[yaam] STALE MARKER: start > current — the store was reset after the last restore."
+  echo "[yaam] re-baselining .yaam_start_lines to $CURRENT_LINES (this run saves nothing)."
+  echo "[yaam] to force a full re-push instead: rm .yaam_start_lines && re-run."
+  echo "$CURRENT_LINES" > .yaam_start_lines
   exit 0
 fi
 
+if [ "$NEW_LINES" -eq 0 ]; then
+  echo "[yaam] saved=0 reason=no-new-events start=$START_LINES current=$CURRENT_LINES"
+  exit 0
+fi
+
+echo "[yaam] saving=$NEW_LINES start=$START_LINES current=$CURRENT_LINES"
 echo "Extracting delta: $NEW_LINES new events."
 
 # ── Compaction lock check (distributed safety) ──────────────────────────────
@@ -98,3 +120,4 @@ else
 fi
 
 echo "Memory save complete."
+echo "[yaam] saved=$NEW_LINES run=${GITHUB_RUN_ID:-local}"
