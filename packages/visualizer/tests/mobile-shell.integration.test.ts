@@ -128,6 +128,8 @@ interface SandboxOptions {
   topInset?: number;
   bottomInset?: number;
   protocol?: string;
+  /** Path the page was served from (e.g. `/viz/` behind a reverse proxy). */
+  pathname?: string;
   /** Install a manually-driven requestAnimationFrame (advanced by `tick`). */
   raf?: boolean;
 }
@@ -242,7 +244,11 @@ function makeSandbox(opts: SandboxOptions): Sandbox {
       return makeStub();
     },
   };
-  const location = { host: 'localhost:9', protocol: opts.protocol ?? 'http:' };
+  const location = {
+    host: 'localhost:9',
+    protocol: opts.protocol ?? 'http:',
+    pathname: opts.pathname ?? '/',
+  };
 
   // Optional, manually-driven rAF so a test can advance the camera pan.
   let rafCallback: ((ts: number) => void) | null = null;
@@ -515,5 +521,27 @@ describe('served selection + follow camera (spec 063, AC-7)', () => {
     sb.fogButton.onclick?.();
     for (const fn of handlers) fn({ clientX: hidden.x, clientY: hidden.y });
     expect(sb.nameEl.textContent).toBe('Hidden');
+  });
+
+  it('dials the socket on the page base path, with the scheme following the page', () => {
+    // Behind a path-prefixed reverse proxy the socket must stay on that route
+    // (`/viz/`), otherwise `host/` is routed to whatever else owns the root.
+    const proxied = makeSandbox({
+      width: 390,
+      height: 844,
+      dpr: 1,
+      protocol: 'https:',
+      pathname: '/viz/',
+    });
+    expect(proxied.ws.url).toBe('wss://localhost:9/viz/');
+
+    const local = makeSandbox({
+      width: 390,
+      height: 844,
+      dpr: 1,
+      protocol: 'http:',
+      pathname: '/',
+    });
+    expect(local.ws.url).toBe('ws://localhost:9/');
   });
 });
