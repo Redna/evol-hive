@@ -214,10 +214,10 @@ Three-layer caching strategy:
 | **events.jsonl** | Workspaces, scratchpad notes | Git `memory` branch | Permanent |
 
 - Code graph (Files, Functions, Sections) is **rebuilt from source** each run via `scheduleFull()` — no persistence needed
-- Workspaces and scratchpad notes persist via the `memory` git branch
-- `scripts/restore-memory.sh` fetches events.jsonl at the start of each run
-- `scripts/save-memory.sh` commits events.jsonl to the memory branch at the end (uses `git checkout -f` to handle uncommitted files)
-- First run builds the binary from source (~2 min), subsequent runs restore from cache (~30 sec)
+- Workspaces and scratchpad notes persisted via the `memory` git branch — **retired by [ADR-003](adr/0003-memory-is-local-ci-runs-none.md)**
+- ~~`scripts/restore-memory.sh` fetches events.jsonl at the start of each run~~ — deleted
+- ~~`scripts/save-memory.sh` commits events.jsonl to the memory branch at the end~~ — deleted
+- First run built the binary from source (~2 min), subsequent runs restored from cache (~30 sec) — **retired**; CI no longer installs YAAM
 
 ### Controller
 
@@ -286,9 +286,7 @@ evol-hive/
 ├── scripts/
 │   ├── bootstrap-agent.sh    # Per-job setup (Pi + YAAM + Ollama)
 │   ├── controller.sh         # Controller decision logic
-│   ├── ci-models.json        # Ollama Cloud model config for CI
-│   ├── restore-memory.sh     # Restore events.jsonl from memory branch
-│   └── save-memory.sh        # Save events.jsonl to memory branch
+│   └── ci-models.json        # Ollama Cloud model config for CI
 ├── docs/
 │   ├── architecture/         # §1–§11 architecture specification
 │   ├── adr/                  # Architecture Decision Records
@@ -400,7 +398,7 @@ To replicate this setup on a new repository:
 2. **Create the task templates** in `.pi/tasks/` (interpolated with `envsubst`)
 3. **Create the bootstrap script** `scripts/bootstrap-agent.sh`
 4. **Create the CI model config** `scripts/ci-models.json` (point to Ollama Cloud)
-5. **Create the memory scripts** `scripts/restore-memory.sh` and `scripts/save-memory.sh`
+5. ~~**Create the memory scripts** `scripts/restore-memory.sh` and `scripts/save-memory.sh`~~ — retired by ADR-003: CI runs no memory machinery, so no sync scripts are needed
 6. **Create the controller script** `scripts/controller.sh`
 7. **Create the GitHub Actions workflows** in `.github/workflows/` (architect, developer, qa, doctor, controller, ci)
 8. **Create the spec template** `docs/specs/TEMPLATE.md`
@@ -428,7 +426,7 @@ To replicate this setup on a new repository:
 ## Known Limitations
 
 - **GitHub App PRs don't trigger pull_request events**: App-created PRs don't fire `pull_request` workflow events (GitHub loop prevention). The Controller works around this by dispatching CI and QA via `workflow_dispatch` when the Developer completes.
-- **First-run cache miss**: The first run builds the YAAM binary from source (~2 min) and downloads the ONNX model (~30 sec). Subsequent runs use cached versions.
-- **Concurrent agent memory**: If two agents run simultaneously and both save memory, the last push wins. The save-memory script has a retry mechanism, but true concurrent writes are not fully handled.
+- **First-run cache miss** (retired by [ADR-003](adr/0003-memory-is-local-ci-runs-none.md)): the first run built the YAAM binary from source (~2 min) and downloaded the ONNX model (~30 sec). CI no longer installs either.
+- **Concurrent agent memory** (retired by [ADR-003](adr/0003-memory-is-local-ci-runs-none.md)): when two agents saved to one branch the last push won. CI no longer writes memory, so the failure mode is gone.
 - **No Reviewer agent yet**: The Code Reviewer agent (code quality, security, performance review) is designed but not yet implemented as a workflow.
 - **Controller can't read workflow_run context**: The `workflow_run` event doesn't provide the original issue/PR context. The Controller infers it from the current repo state (latest issue, latest PR). This works for sequential pipelines but could be ambiguous with concurrent work.

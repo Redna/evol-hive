@@ -94,14 +94,40 @@ describe('ADR-003: no memory machinery in CI', () => {
   });
 });
 
-describe('ADR-003: the local path is preserved', () => {
-  // The decision was "local-first", not "remove YAAM". Deleting these would be a
-  // silent scope change.
-  for (const script of ['restore-memory.sh', 'save-memory.sh', 'run-compaction.sh']) {
-    it(`scripts/${script} still exists for local use`, () => {
-      expect(existsSync(join(REPO_ROOT, 'scripts', script))).toBe(true);
+describe('ADR-003: the CI-only branch-sync toolchain is gone', () => {
+  // These existed to move events.jsonl through the `memory` branch for GitHub
+  // Actions. With CI out of the memory business they have no caller, so they are
+  // deleted rather than kept as vestigial "local" tooling: local memory is the
+  // daemon reading events.jsonl directly, with no branch sync.
+  for (const script of [
+    'restore-memory.sh',
+    'save-memory.sh',
+    'run-compaction.sh',
+    'compact.js',
+    'compact-stream.js',
+  ]) {
+    it(`scripts/${script} is deleted`, () => {
+      expect(existsSync(join(REPO_ROOT, 'scripts', script))).toBe(false);
     });
   }
+
+  it('nothing left in scripts/ drives the memory branch', () => {
+    const offenders = readdirSync(join(REPO_ROOT, 'scripts'), { withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => e.name)
+      .filter((f) =>
+        /refs\/remotes\/origin\/memory|origin memory:|run-compaction|save-memory|restore-memory|compaction\.lock/.test(
+          readFileSync(join(REPO_ROOT, 'scripts', f), 'utf8'),
+        ),
+      );
+    expect(offenders).toEqual([]);
+  });
+
+  it('the daemon log stays ignored, replay backups included', () => {
+    const ignore = readFileSync(join(REPO_ROOT, '.gitignore'), 'utf8');
+    expect(ignore).toMatch(/^events\.jsonl$/m);
+    expect(ignore).toMatch(/^events\.jsonl\.bak\*$/m);
+  });
 });
 
 describe('ADR-003: agent prompts hand off through committed notes', () => {
