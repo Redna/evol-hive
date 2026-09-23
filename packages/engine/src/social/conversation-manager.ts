@@ -383,8 +383,13 @@ export class ConversationManagerImpl implements ConversationBridge {
     const conversation = this.conversations.get(conversationId);
     if (conversation === undefined || conversation.status === 'closed') return [];
     const isParticipant = conversation.participants.some((p) => p.agentId === agentId);
-    // Role rules (R3): participants contribute/leave; co-located non-participants join/observe.
-    if (isParticipant) return ['contribute', 'leave'];
+    // Role rules (R3, amended by spec 064 / decision D1): participants `leave`;
+    // co-located non-participants `join`/`observe`. `contribute` is deliberately
+    // NOT offered: its handler is guidance-only and always fails
+    // (`assembly.ts`), and message-carrying is `talk_to` (spec 033 R3,
+    // open-or-contribute) — so offering it advertised an action the phase could
+    // never execute (#225 finding 1).
+    if (isParticipant) return ['leave'];
     if (this.agentManager.getState(agentId)?.location === conversation.roomId) {
       return ['join', 'observe'];
     }

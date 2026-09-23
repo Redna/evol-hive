@@ -110,7 +110,7 @@ describe('perception eligibility filtering (AC-2, R3/R8)', () => {
     world = buildWorld();
   });
 
-  it('a participant sees contribute/leave; a non-participant sees join/observe', () => {
+  it('a participant sees leave only (spec 064/D1); a non-participant sees join/observe', () => {
     const first = world.conversations.openOrContribute('agent-a', 'agent-b', 'hi', 'neutral', 11);
     const convId = first.conversation!.id;
 
@@ -124,11 +124,10 @@ describe('perception eligibility filtering (AC-2, R3/R8)', () => {
     // per-agent via the conversation manager (mirrors guardrail masking flow).
     expect(participantAffordances.length).toBeGreaterThanOrEqual(4);
 
-    // Role-gated per agent:
-    expect(world.conversations.getEligibleAffordances(convId, 'agent-a').sort()).toEqual([
-      'contribute',
-      'leave',
-    ]);
+    // Role-gated per agent. Spec 064 / decision D1: participants no longer see
+    // `contribute` — it is offered only when it can execute, and carrying a
+    // message is `talk_to` (spec 033 R3).
+    expect(world.conversations.getEligibleAffordances(convId, 'agent-a').sort()).toEqual(['leave']);
     expect(world.conversations.getEligibleAffordances(convId, 'agent-c').sort()).toEqual([
       'join',
       'observe',

@@ -16,9 +16,10 @@
  *   agents' prompts reflect the evolved identity; agents without a self-model
  *   fall back to the persona seed.
  * - AC-2 (R3, R8): perception-level conversation-affordance eligibility
- *   filtering (`getEligibleAffordancesInRoom`) — participants see
- *   contribute/leave, co-located non-participants see join/observe, and
- *   non-conversation affordances pass through unchanged.
+ *   filtering (`getEligibleAffordancesInRoom`) — participants see `leave`
+ *   (`contribute` withdrawn by spec 064 / decision D1), co-located
+ *   non-participants see join/observe, and non-conversation affordances pass
+ *   through unchanged.
  * - AC-5 / R7 (despawn support): a despawned agent leaves every conversation.
  *
  * All paths here are deterministic — no LLM anywhere (AC-14).
@@ -435,12 +436,14 @@ describe('perception eligibility filtering (AC-2, R3/R8)', () => {
     world.mutationService.applyPending(1);
   });
 
-  it('a participant sees contribute/leave of the conversation, not join/observe', () => {
+  it('a participant sees leave, not contribute (spec 064/D1), join or observe', () => {
     world.conversations.openOrContribute('agent-a', 'agent-b', 'hi', 'neutral', 2);
     const eligible = world.perception
       .getEligibleAffordancesInRoom(GARDEN, 'agent-a')
       .map((a) => a.id);
-    expect(eligible).toContain('contribute');
+    // Spec 064 / decision D1: `contribute` is withdrawn from the offered set —
+    // its handler is guidance-only and always fails; carrying a message is talk_to.
+    expect(eligible).not.toContain('contribute');
     expect(eligible).toContain('leave');
     expect(eligible).not.toContain('join');
     expect(eligible).not.toContain('observe');

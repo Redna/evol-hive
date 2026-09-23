@@ -111,10 +111,10 @@ describe('spec 058 AC-1 — conversation eligibility composes into visible affor
     world = buildWorld();
   });
 
-  it('an open conversation in the room yields contribute/leave to a participant, never join', () => {
+  it('an open conversation in the room yields leave to a participant (spec 064/D1), never contribute or join', () => {
     openConversation(world);
     const visible = ids(world.perception.getVisibleAffordancesInRoom('agent-a', GARDEN));
-    expect(visible).toContain('contribute');
+    expect(visible).not.toContain('contribute');
     expect(visible).toContain('leave');
     expect(visible).not.toContain('join');
     // Non-conversation affordances pass through (R1).

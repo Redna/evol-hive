@@ -316,11 +316,11 @@ describe('affordance eligibility (AC-2, R3)', () => {
     world = buildWorld();
   });
 
-  it('participants see contribute/leave; non-participants see join/observe', () => {
+  it('participants see leave only (spec 064/D1); non-participants see join/observe', () => {
     const first = world.manager.openOrContribute('agent-a', 'agent-b', 'hi', 'neutral', 11);
     const convId = first.conversation!.id;
     const participantEligible = world.manager.getEligibleAffordances(convId, 'agent-a').sort();
-    expect(participantEligible).toEqual(['contribute', 'leave']);
+    expect(participantEligible).toEqual(['leave']);
     const outsiderEligible = world.manager.getEligibleAffordances(convId, 'agent-c').sort();
     expect(outsiderEligible).toEqual(['join', 'observe']);
   });

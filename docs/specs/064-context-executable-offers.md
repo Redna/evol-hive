@@ -83,7 +83,7 @@ So when agents are present but `computeTalkEnum(...).valid` is empty, the model 
 
 ## Decision
 
-**D1 — `conversation_contribute`: withdraw it, don't implement it.** Recommendation, with the alternative recorded:
+**D1 — `conversation_contribute`: withdraw it. Decided** (operator-confirmed 2026-09-23). The alternative is recorded for the trail:
 
 - **Withdraw (recommended).** `talk_to` already owns open-or-contribute and message-carrying (spec 033 R3); `contribute` is args-free by construction, so implementing it means inventing a second message write path that spec 033 explicitly consolidated. Withdrawing removes an offer the phase can never honour and needs no new surface.
 - **Implement (rejected for now).** Closer to 033's literal text, but re-opens the args question (message text + sentiment must come from somewhere) and re-creates the two-path problem R3 resolved.

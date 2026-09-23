@@ -25,7 +25,7 @@ Each requirement is tagged with the acceptance criterion (AC) that verifies it.
 - **R2 — Lifecycle.** Conversations move through `open → active → closed`. Close happens on idle timeout or when the last participant leaves; close triggers consolidation (R5). (AC-1, AC-4, AC-5)
 - **R3 — Affordances.** The conversation object exposes exactly four affordances, subject to role and co-location rules:
   - `join` — non-participant, co-located agents only;
-  - `contribute` — participants only; carries the message text plus an LLM-tagged `sentiment` (`positive` / `neutral` / `negative`);
+  - `contribute` — **withdrawn from the offered set by [spec 064](064-context-executable-offers.md) (decision D1)**: the id stays declared but is never offered, because its handler is guidance-only and always fails (it returns "Use talk_to …"). Carrying a message — with an LLM-tagged `sentiment` (`positive` / `neutral` / `negative`) — is `talk_to` (R3, open-or-contribute).
   - `leave` — participants only;
   - `observe` — non-participants see `topic` + participants (not the full turn window).
 
@@ -60,8 +60,8 @@ Each requirement is tagged with the acceptance criterion (AC) that verifies it.
 
 ## Acceptance Criteria
 
-- [ ] **AC-1** (R1, R2, R3): Two co-located agents: A's `talk_to` opens a conversation object; B perceives it and can `join` / `contribute`; the conversation transitions `open → active` on B's first contribution.
-- [ ] **AC-2** (R3, R8): Conversation affordances are offered only to eligible agents (co-located non-participants see `join`/`observe`; participants see `contribute`/`leave`), and existing guardrail masking/rate-limiting applies to them.
+- [ ] **AC-1** (R1, R2, R3): Two co-located agents: A's `talk_to` opens a conversation object; B perceives it and can `join` (contributing is `talk_to` — `contribute` was withdrawn by [spec 064](064-context-executable-offers.md)); the conversation transitions `open → active` on B's first contribution.
+- [ ] **AC-2** (R3, R8; amended by [spec 064](064-context-executable-offers.md)): Conversation affordances are offered only to eligible agents (co-located non-participants see `join`/`observe`; **participants see `leave` only — `contribute` is withdrawn**, contributing is `talk_to`), and existing guardrail masking/rate-limiting applies to them.
 - [ ] **AC-3** (R1, R3, R4): Turns append to the rolling window with `{agentId, role, content, sentiment, tick}`; derived participant roles and per-participant sentiment aggregates update on each turn; the window never exceeds the cap.
 - [ ] **AC-4** (R2, R5): Conversation close (idle timeout or empty) produces per-participant `interaction` memories including derived role and sentiment summary.
 - [ ] **AC-5** (R2, R7): An agent leaving the room fails `contribute` gracefully (spec-031 guard) and exits the conversation; if it was the last participant, the conversation closes.

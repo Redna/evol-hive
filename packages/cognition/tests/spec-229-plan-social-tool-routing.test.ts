@@ -47,9 +47,7 @@ describe('issue #229 — the plan context never points a social tool at targetAf
     expect(payload.perceptionContext).toContain(
       'call the talk_to, observe_agent, or help tool directly',
     );
-    expect(payload.systemPrompt).toContain(
-      'calling the talk_to, observe_agent, or help tool directly',
-    );
+    expect(payload.systemPrompt).toContain('calling a social tool directly');
 
     // And no social tool is ever named as a targetAffordance value.
     for (const name of SOCIAL_TOOL_NAMES) {

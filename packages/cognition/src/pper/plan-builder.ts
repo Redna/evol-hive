@@ -102,15 +102,23 @@ export class PlanBuilderImpl implements PlanBuilder {
       prunedAffordances.map((a) => a.id),
       knownAreas,
     );
+    // Spec 051 (R1/R2) + spec 064 (R3): the plan-phase talk_to is enum-bound per
+    // cycle to the present, uncapped agent IDs — same construction as the
+    // perception builder; omitted entirely when nothing is valid. Computed ONCE
+    // and shared with the social context blocks below, so the tool list and the
+    // instructions that name tools cannot diverge (#225 finding 2).
+    const talkValidTargets = computeTalkEnum(
+      passive.agentsPresent,
+      perceptionResult.socialUrges,
+    ).valid;
+    const talkOffered = talkValidTargets.length > 0;
+
     const tools = buildPlanTools(
       hasAgentsPresent,
       affordanceTools,
       isSocialPrimary,
       planTool,
-      // Spec 051 (R1/R2): the plan-phase talk_to is enum-bound per cycle to
-      // the present, uncapped agent IDs — same construction as the
-      // perception builder; omitted entirely when nothing is valid.
-      computeTalkEnum(passive.agentsPresent, perceptionResult.socialUrges).valid,
+      talkValidTargets,
     );
 
     // ── Ordered context blocks (spec 061, R2) ─────────────────────────────────
@@ -136,7 +144,11 @@ export class PlanBuilderImpl implements PlanBuilder {
         id: 'agents-present',
         text: [
           `Agents present: ${agentsStr}`,
-          'You can call talk_to, observe_agent, help, or ignore directly to interact with other agents.',
+          // Spec 064 (R2): this block sits above the `---` separator, so it must
+          // stay cycle-independent (spec 021 KV-cache) — it therefore names only
+          // the social tools ALWAYS offered when agents are present. `talk_to` is
+          // named per-cycle by `social-directive` when it is actually offered.
+          'You can call observe_agent, help, or ignore directly to interact with other agents.',
         ].join('\n'),
       });
     }
@@ -227,7 +239,12 @@ export class PlanBuilderImpl implements PlanBuilder {
     if (isSocialPrimary) {
       blocks.push({
         id: 'social-primary-hint',
-        text: 'Your social drive is your most urgent need. Interact with another agent in this room by calling the talk_to tool directly (or observe_agent / help).',
+        // Spec 064 (R2): name only tools this cycle actually offers. With no
+        // valid talk target `talk_to` is absent from the tool list, so the hint
+        // must not instruct it (#225 finding 2).
+        text: talkOffered
+          ? 'Your social drive is your most urgent need. Interact with another agent in this room by calling the talk_to tool directly (or observe_agent / help).'
+          : 'Your social drive is your most urgent need. Interact with another agent in this room by calling the observe_agent or help tool directly.',
         required: true,
       });
     }
@@ -244,7 +261,12 @@ export class PlanBuilderImpl implements PlanBuilder {
     if (hasAgentsPresent) {
       blocks.push({
         id: 'social-directive',
-        text: 'IMPORTANT: Other agents are present. If you want to interact with them, call the talk_to, observe_agent, or help tool directly — social actions are their own tools, not plan steps. Use formulate_plan only for the object affordances listed in its enum (or "wait").',
+        // Spec 064 (R2): same predicate as buildPlanTools — byte-identical when
+        // talk_to IS offered (spec 058 legacy-path byte identity), and names only
+        // the tools that remain when it is not.
+        text: talkOffered
+          ? 'IMPORTANT: Other agents are present. If you want to interact with them, call the talk_to, observe_agent, or help tool directly — social actions are their own tools, not plan steps. Use formulate_plan only for the object affordances listed in its enum (or "wait").'
+          : 'IMPORTANT: Other agents are present. If you want to interact with them, call the observe_agent or help tool directly — social actions are their own tools, not plan steps. Use formulate_plan only for the object affordances listed in its enum (or "wait").',
         required: true,
       });
     }
@@ -387,8 +409,11 @@ function buildSystemPrompt(
   // directive is appended after the "You must formulate a plan" sentence,
   // creating a conditional override. When false/undefined, the prompt is
   // byte-identical to the pre-spec-024 implementation (KV cache preserved).
+  // Spec 064 (R2): the system prompt is the KV-cache prefix and cannot depend on
+  // per-cycle talk-enum state, so it names a social tool generically instead of
+  // `talk_to` — which is omitted entirely in cycles with no valid target.
   const socialDirective =
-    'When other agents are present and your social drive is urgent, interact with them by calling the talk_to, observe_agent, or help tool directly — social actions are their own tools, not formulate_plan steps.';
+    'When other agents are present and your social drive is urgent, interact with them by calling a social tool directly — social actions are their own tools, not formulate_plan steps.';
   if (persona) {
     const personaText = formatPersona(persona);
     // Spec 055, Req 5 (issue #198): the Aspirations line renders immediately
