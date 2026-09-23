@@ -228,7 +228,7 @@ describe('spec 047 — production stack: urge-gated urgency, asymmetric reward',
 
     // KV-cache: the stable prefix is unchanged — the capability line stays.
     expect(stable).toContain('Agents present: Bob (agent-bob)');
-    expect(stable).toContain('You can call talk_to, observe_agent, help, or ignore directly');
+    expect(stable).toContain('You can call observe_agent, help, or ignore directly');
     expect(stable).not.toContain(NO_OUTLET);
 
     // Spec 051 (R1/R2 — issue #186): with every present agent past the cap,

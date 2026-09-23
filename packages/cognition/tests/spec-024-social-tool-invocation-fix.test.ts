@@ -65,7 +65,7 @@ const STRENGTHENED_HINT =
 const OLD_HINT =
   'You feel a strong need for social interaction. Consider using talk_to or help to engage with other agents in the room.';
 const SYSTEM_PROMPT_DIRECTIVE =
-  'When other agents are present and your social drive is urgent, interact with them by calling the talk_to, observe_agent, or help tool directly — social actions are their own tools, not formulate_plan steps.';
+  'When other agents are present and your social drive is urgent, interact with them by calling a social tool directly — social actions are their own tools, not formulate_plan steps.';
 
 function toolNames(tools: { function: { name: string } }[]): string[] {
   return tools.map((t) => t.function.name);

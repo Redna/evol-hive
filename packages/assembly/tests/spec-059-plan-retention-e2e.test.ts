@@ -90,8 +90,9 @@ describe('spec 059 AC-2 — agent-scoped eligibility adapter reads the live proj
     );
     expect(opened.success).toBe(true);
 
-    // Participant agent-a: contribute/leave eligible, join not.
-    expect(guard.isAffordanceEligibleForAgent?.('contribute', ROOM, 'agent-a')).toBe(true);
+    // Participant agent-a: leave eligible, join not. Spec 064 / decision D1
+    // withdrew `contribute` from the offered set (its handler always fails).
+    expect(guard.isAffordanceEligibleForAgent?.('contribute', ROOM, 'agent-a')).toBe(false);
     expect(guard.isAffordanceEligibleForAgent?.('leave', ROOM, 'agent-a')).toBe(true);
     expect(guard.isAffordanceEligibleForAgent?.('join', ROOM, 'agent-a')).toBe(false);
 

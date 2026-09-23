@@ -183,7 +183,9 @@ describe('Spec 058 — Existing scaffolding: engine eligibility projection', () 
     const content = readFile(cmPath);
     expect(content).toContain("['join', 'contribute', 'leave', 'observe']");
     expect(content).toContain('getEligibleAffordances');
-    expect(content).toContain("['contribute', 'leave']");
+    // Spec 064 / decision D1: participants are offered `leave` only — the
+    // withdrawn `contribute` stays declared but is filtered out of offers.
+    expect(content).toContain("['leave']");
     expect(content).toContain("['join', 'observe']");
   });
 

@@ -90,6 +90,15 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     const hasAgentsPresent =
       passive.agentsPresent !== undefined && passive.agentsPresent.length > 0;
 
+    // Spec 064 (R3): computed ONCE per cycle and consumed by both the social
+    // context lines below and the tool list at the end of this builder, so an
+    // instruction can never name a tool the cycle does not offer (#225
+    // finding 2 — the perception half of the same defect).
+    const talkEnum = hasAgentsPresent
+      ? computeTalkEnum(passive.agentsPresent, perceptionResult.socialUrges)
+      : { present: [], valid: [], excluded: [] };
+    const talkOffered = talkEnum.valid.length > 0;
+
     if (hasAgentsPresent) {
       // Spec 046 (R4): agent IDs are rendered alongside display names so the
       // LLM can pass real IDs to talk_to and duplicate display names stay
@@ -99,8 +108,11 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
         .agentsPresent!.map((a) => `${a.name} (${a.agentId}) (${a.currentActivity})`)
         .join(', ');
       stableLines.push(`Agents present: ${agentsStr}`);
+      // Spec 064 (R2): stable section (above `---`) — cycle-independent by spec
+      // 021, so it names only the tools always offered when agents are present;
+      // `talk_to` is named per-cycle when it is actually offered.
       stableLines.push(
-        'You can call talk_to, observe_agent, help, or ignore directly to interact with other agents.',
+        'You can call observe_agent, help, or ignore directly to interact with other agents.',
       );
     }
 
@@ -227,7 +239,9 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
       !urgesAllDecayed
     ) {
       dynamicLines.push(
-        'You feel a strong need for social interaction. Consider using talk_to or help to engage with other agents in the room.',
+        talkOffered
+          ? 'You feel a strong need for social interaction. Consider using talk_to or help to engage with other agents in the room.'
+          : 'You feel a strong need for social interaction. Consider using observe_agent or help to engage with other agents in the room.',
       );
     }
 
@@ -244,7 +258,9 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
         dynamicLines.push(NO_SOCIAL_OUTLET_LINE);
       } else {
         dynamicLines.push(
-          'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them.',
+          talkOffered
+            ? 'IMPORTANT: Other agents are present. Call talk_to, observe_agent, help, or ignore directly to interact with them.'
+            : 'IMPORTANT: Other agents are present. Call observe_agent, help, or ignore directly to interact with them.',
         );
       }
     }
@@ -317,11 +333,11 @@ export class PerceptionBuilderImpl implements PerceptionBuilder {
     // per-cycle tool-definition block, never in the stable system prompt
     // prefix (KV-cache, spec 021).
     if (hasAgentsPresent) {
-      const talkEnum = computeTalkEnum(passive.agentsPresent, perceptionResult.socialUrges);
-      const socialTools =
-        talkEnum.valid.length > 0
-          ? [talkToToolFor(talkEnum.valid), observeAgentTool, helpTool, ignoreTool]
-          : [observeAgentTool, helpTool, ignoreTool];
+      // Spec 064 (R3): the SAME computed enum as the social context lines above
+      // — one source of truth for "is talk_to offered this cycle".
+      const socialTools = talkOffered
+        ? [talkToToolFor(talkEnum.valid), observeAgentTool, helpTool, ignoreTool]
+        : [observeAgentTool, helpTool, ignoreTool];
       tools = [...socialTools, ...tools];
     }
 

@@ -5,7 +5,8 @@
  * with no open conversation in its room sees an eligible set (pruned
  * affordances, the `formulate_plan` targetAffordance enum, and the affordance
  * tool list) free of `join`/`contribute`/`leave`, while non-conversation
- * affordances remain; an eligible participant yields `contribute`/`leave`.
+ * affordances remain; an eligible participant yields `leave` only (`contribute`
+ * was withdrawn by spec 064 / decision D1).
  *
  * Deterministic throughout — the LLM client is constructed but never invoked.
  */
@@ -123,7 +124,7 @@ describe('spec 058 AC-4 — assembled plan value space excludes ineligible conve
     expect(names).toContain('sit');
   });
 
-  it('an eligible participant yields contribute/leave in pruned, enum, and affordance tools', async () => {
+  it('an eligible participant yields leave only (spec 064/D1) in pruned, enum, and affordance tools', async () => {
     const { core, stack } = buildWorld();
     const opened = await stack!.cognitiveToolExecutor!.executeTalkTo(
       'agent-a',
@@ -135,20 +136,21 @@ describe('spec 058 AC-4 — assembled plan value space excludes ineligible conve
 
     const perception = await perceive(core, 'agent-a');
     const prunedIds = perception.prunedAffordances.map((a) => a.id);
-    expect(prunedIds).toContain('contribute');
+    // Spec 064 / D1: `contribute` is withdrawn from the offered set.
+    expect(prunedIds).not.toContain('contribute');
     expect(prunedIds).toContain('leave');
     expect(prunedIds).not.toContain('join');
     expect(prunedIds).toContain('sit');
 
     const payload = new PlanBuilderImpl().build(perception);
     const enumIds = formulateEnum(payload.tools);
-    expect(enumIds).toContain('contribute');
+    expect(enumIds).not.toContain('contribute');
     expect(enumIds).toContain('leave');
     expect(enumIds).not.toContain('join');
     expect(enumIds).toContain('sit');
 
     const names = toolNames(payload.tools);
-    expect(names).toContain('contribute');
+    expect(names).not.toContain('contribute');
     expect(names).toContain('leave');
     expect(names).not.toContain('join');
     expect(names).toContain('sit');
