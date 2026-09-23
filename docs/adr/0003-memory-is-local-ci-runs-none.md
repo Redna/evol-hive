@@ -72,9 +72,15 @@ Meanwhile the repository already carried the handoff: `docs/specs/notes/` holds
 
    Each leg reads the previous leg's file from the branch/PR — reviewable,
    diffable, and reachable with ordinary file tools.
-4. **Local YAAM is unchanged and remains the handoff for human-driven local
-   legs.** `scripts/restore-memory.sh`, `scripts/save-memory.sh`,
-   `scripts/run-compaction.sh` and the local daemon stay exactly as they are.
+4. **The branch-sync toolchain is deleted.** `scripts/restore-memory.sh`,
+   `scripts/save-memory.sh`, `scripts/run-compaction.sh`, `scripts/compact.js`
+   and `scripts/compact-stream.js` existed only to move `events.jsonl` through
+   the `memory` branch for GitHub Actions. With CI out of the memory business
+   they have no caller — nothing in the repo, the docs or the skills instructed
+   a human to run them — so they are removed rather than kept as vestigial
+   "local" tooling. **Local memory is unaffected**: the daemon reads and appends
+   `events.jsonl` directly, with no branch sync. `packages/memory` (in-engine
+   retrieval) and the engine's dormancy log are untouched.
 5. `origin/memory` is **frozen, not deleted** — history is retained and must not
    be rewritten.
 
@@ -83,11 +89,16 @@ Meanwhile the repository already carried the handoff: `docs/specs/notes/` holds
 **Gained.** One writer per log, so the class of defects above cannot recur.
 Nothing to compact, so the bot, the lock protocol and the delta artifacts go
 away. The handoff becomes reviewable and versioned with the change it describes.
-CI stops storing a 41.6 MB derivative of content it already has.
+CI stops storing a 41.6 MB derivative of content it already has. Roughly 1,500
+lines of branch-sync tooling (five shell/JS scripts, their e2e test, and
+`pipeline.sh`'s Phase 6) leave the repo, along with two unreferenced analysis
+scripts that hardcoded an operator's home directory.
 
 **Given up.** Semantic search over CI agents' notes *from inside CI* — those
 agents read the notes files instead. A single cross-run audit trail of agent
-activity — PRs, review comments and commits already provide one.
+activity — PRs, review comments and commits already provide one. And the frozen
+`memory` archive can no longer be replayed with the repo's own tooling, since
+that tooling is what was deleted; it is a read-only historical artifact.
 
 **Unchanged.** The engine's dormancy persistence
 (`packages/engine/src/world/mutations/yaam-event-log.ts`, spec 030 Req 12) is a
