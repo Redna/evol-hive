@@ -118,12 +118,16 @@ describe('ADR-003 (QA): every prompt names the committed-notes channel', () => {
   }
 });
 
-describe('ADR-003 (QA): origin/memory stays frozen, not deleted', () => {
-  it('the ADR states the decision and its scope', () => {
+describe('ADR-003 (QA): origin/memory is deleted, and no automation rewrites it', () => {
+  it('the ADR records the deletion and the recoverable tip', () => {
     expect(existsSync(ADR)).toBe(true);
     const adr = readFileSync(ADR, 'utf8');
     expect(adr).toContain('CI runs no memory machinery');
-    expect(adr).toContain('frozen, not deleted');
+    // The branch was frozen in the first draft and deleted later, so the ADR must
+    // now say "deleted" and record a tip SHA so the objects stay addressable.
+    expect(adr).not.toContain('frozen, not deleted');
+    expect(adr).toMatch(/origin\/memory` is \*\*deleted\*\*/);
+    expect(adr).toMatch(/tip `?[0-9a-f]{7,40}/i);
   });
 
   it('no workflow or script deletes or force-pushes the memory branch', () => {

@@ -6,7 +6,8 @@
 > deleted. It is retained as a record of how the retired pipeline worked. The
 > scripts it documents (`restore-memory.sh`, `save-memory.sh`, `run-compaction.sh`,
 > `compact.js`, `compact-stream.js`) have since been deleted as well — nothing
-> called them once CI stopped writing the branch.
+> called them once CI stopped writing the branch. The `memory` branch itself was
+> then deleted — its tip SHA is recorded in the ADR for recoverability.
 
 > How evol-hive agents share persistent memory across CI runs using a Git-based event sourcing architecture with YAAM's append-only JSONL format, distributed locking, and automatic compaction.
 
