@@ -58,8 +58,8 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      68
-✅ Done:          66
+Total specs:      69
+✅ Done:          67
 🔨 In Development: 0
 🔍 In Review:      0
 📝 Drafted:        0
@@ -76,6 +76,7 @@ Architecture sections fully implemented: 11/11
 | [020](020-pper-mask-leak-fix.md) | PPER Mask Leak Fix — Separate Unmasked and Masked Affordances in PerceptionResult | §6, §10 | ✅ Done | [#83](https://github.com/Redna/evol-hive/issues/83) | [#85](https://github.com/Redna/evol-hive/pull/85) | shared, cognition |
 | [021](021-kv-cache-prompt-optimization.md) | KV Cache Prompt Optimization — Freeze Prompt Prefix for Ollama Prompt Caching | §6, §7, §8 | ✅ Done | [#86](https://github.com/Redna/evol-hive/issues/86) | [#88](https://github.com/Redna/evol-hive/pull/88) | cognition |
 | [022](022-scene-authoring-declarative.md) | Scene Authoring — Declarative Tools for Defining Rooms, Objects, Agents | §2, §3, §4 | ✅ Done | [#90](https://github.com/Redna/evol-hive/issues/90) | [#92](https://github.com/Redna/evol-hive/pull/92), [#96](https://github.com/Redna/evol-hive/pull/96) | shared, engine, CLI |
+| [023](023-visual-output-canvas-renderer.md) | Visual Output — Canvas Renderer for the Simulation (2D canvas, WebSocket live updates, PPR phase rings, drive bars, speed control) | §2, §3, §4, §6, §9 | ✅ Done | [#89](https://github.com/Redna/evol-hive/issues/89) | [#95](https://github.com/Redna/evol-hive/pull/95) | shared, engine, visualizer |
 | [024](024-social-tool-invocation-fix.md) | Social Tool Invocation Fix — Make LLM Call `talk_to` Directly When Agents Are Present | §6, §8, §9, §10 | ✅ Done | [#98](https://github.com/Redna/evol-hive/issues/98) | — | cognition |
 | [025](025-memory-entry-flatten-and-fallback.md) | Memory Entry — Flatten Schema & Auto-Fallback | §6, §8, §11 | ✅ Done | [#99](https://github.com/Redna/evol-hive/issues/99) | — | shared, cognition |
 | [026](026-memory-entry-fix.md) | Memory Entry Fix — Flatten Reflect Schema & Auto-Fallback Memory Generation | §6, §7, §8, §11 | ✅ Done | [#99](https://github.com/Redna/evol-hive/issues/99) | — | shared, cognition, engine |
