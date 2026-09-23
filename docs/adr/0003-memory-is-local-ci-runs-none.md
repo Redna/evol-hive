@@ -81,8 +81,12 @@ Meanwhile the repository already carried the handoff: `docs/specs/notes/` holds
    "local" tooling. **Local memory is unaffected**: the daemon reads and appends
    `events.jsonl` directly, with no branch sync. `packages/memory` (in-engine
    retrieval) and the engine's dormancy log are untouched.
-5. `origin/memory` is **frozen, not deleted** — history is retained and must not
-   be rewritten.
+5. `origin/memory` is **deleted** (tip `3c20d804…`, a 41.6 MB blob). CI no longer
+   writes it and the tooling that read it is gone, so an unreviewable binary on a
+   branch nobody could diff bought nothing. The final contents were archived
+   out-of-repo before deletion, and the tip SHA is recorded here, so the branch
+   stays recoverable while GitHub retains the objects — nothing in the repo
+   depends on it (a guard test asserts no script drives the branch).
 
 ## Consequences
 
@@ -96,9 +100,10 @@ scripts that hardcoded an operator's home directory.
 
 **Given up.** Semantic search over CI agents' notes *from inside CI* — those
 agents read the notes files instead. A single cross-run audit trail of agent
-activity — PRs, review comments and commits already provide one. And the frozen
-`memory` archive can no longer be replayed with the repo's own tooling, since
-that tooling is what was deleted; it is a read-only historical artifact.
+activity — PRs, review comments and commits already provide one. And the
+`memory` archive is gone from the repo: the branch was deleted rather than left
+frozen, so recovering that history now rests on the out-of-repo archive instead
+of on `git fetch`.
 
 **Unchanged.** The engine's dormancy persistence
 (`packages/engine/src/world/mutations/yaam-event-log.ts`, spec 030 Req 12) is a

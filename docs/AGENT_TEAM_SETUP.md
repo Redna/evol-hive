@@ -211,10 +211,10 @@ Three-layer caching strategy:
 |---|---|---|---|
 | **Binary** (30MB) | Compiled Rust daemon | GitHub Actions cache (`yaam-binary-v1`) | 7 days |
 | **ONNX model** (134MB) | gte-small embedding model | GitHub Actions cache (`yaam-model-v1`) | 7 days |
-| **events.jsonl** | Workspaces, scratchpad notes | Git `memory` branch | Permanent |
+| **events.jsonl** | Workspaces, scratchpad notes | ~~Git `memory` branch~~ (deleted) | Retired |
 
 - Code graph (Files, Functions, Sections) is **rebuilt from source** each run via `scheduleFull()` — no persistence needed
-- Workspaces and scratchpad notes persisted via the `memory` git branch — **retired by [ADR-003](adr/0003-memory-is-local-ci-runs-none.md)**
+- Workspaces and scratchpad notes persisted via the `memory` git branch — **retired by [ADR-003](adr/0003-memory-is-local-ci-runs-none.md), branch since deleted**
 - ~~`scripts/restore-memory.sh` fetches events.jsonl at the start of each run~~ — deleted
 - ~~`scripts/save-memory.sh` commits events.jsonl to the memory branch at the end~~ — deleted
 - First run built the binary from source (~2 min), subsequent runs restored from cache (~30 sec) — **retired**; CI no longer installs YAAM
@@ -297,7 +297,7 @@ evol-hive/
 │   └── AGENT_TEAM_SETUP.md   # This document
 ├── ROADMAP.md                # Project phases, progress, decision log
 ├── AGENTS.md                 # Project context for coding agents
-└── events.jsonl              # YAAM memory (gitignored, on memory branch)
+└── events.jsonl              # YAAM memory (gitignored, local daemon only)
 ```
 
 ## Spec-Driven Development
@@ -381,7 +381,7 @@ Specs are plain Markdown — no BDD libraries, no Given/When/Then ceremony.
 | GitHub App (not PAT or GITHUB_TOKEN) | Distinct bot identity (`evol-hive-agent[bot]`), no manual approval, no "assigned to myself" confusion |
 | Controller dispatches CI/QA (not pull_request trigger) | GitHub App-created PRs don't trigger pull_request events (loop prevention). Controller works around this by dispatching via workflow_dispatch |
 | `pi -p` print mode (not pi-goal `/goal`) | Slash commands don't work in print mode; print mode does multi-turn tool use |
-| Git memory branch (not Actions cache) | Durable, versioned, no 7-day TTL, no 10GB limit, survives cache eviction |
+| ~~Git memory branch (not Actions cache)~~ | Retired by [ADR-003](adr/0003-memory-is-local-ci-runs-none.md) — it was durable and versioned, which was the point, but 99.96% of what it stored was a code graph CI already had in its checkout |
 | Spec PRs (not direct push to main) | Branch protection requires PRs; human reviews spec before development |
 | Spec PRs never use "Closes #N" | Issue must stay open until the code PR is merged, not the spec PR |
 | Model A TDD (Developer writes tests, QA verifies) | Most practical: no blocking step, QA is a verification layer not a gate |
