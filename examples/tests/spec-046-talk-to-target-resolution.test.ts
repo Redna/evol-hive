@@ -270,7 +270,7 @@ describe('spec 046 production stack — display-name targeting resolves to real 
     // Structure unchanged (R4): the social directive line still follows.
     const agentsLine = lines.findIndex((l) => l.startsWith('Agents present:'));
     expect(lines[agentsLine + 1]).toBe(
-      'You can call talk_to, observe_agent, help, or ignore directly to interact with other agents.',
+      'You can call observe_agent, help, or ignore directly to interact with other agents.',
     );
   });
 

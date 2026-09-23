@@ -135,7 +135,7 @@ describe('E2E-1: real scene + real perception + real PlanBuilder — social cont
     const payload = new PlanBuilderImpl().build(perception);
 
     // Real production perception context is what the LLM sees.
-    expect(payload.systemPrompt).toContain('calling the talk_to, observe_agent, or help tool directly');
+    expect(payload.systemPrompt).toContain('calling a social tool directly');
     expect(payload.perceptionContext).toContain(
       'call the talk_to, observe_agent, or help tool directly',
     );

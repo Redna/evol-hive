@@ -253,7 +253,7 @@ describe('spec 058 E2E — a closed real conversation never reaches the plan val
     // A flat-id lookup would drop the common `observe` affordance wholesale.
     expect(ids).toContain('rest_among_seedlings');
     expect(ids).toContain('pick_herbs');
-    expect(ids).toContain('contribute');
+    expect(ids).not.toContain('contribute'); // spec 064/D1
     expect(ids).not.toContain('join');
   });
 
@@ -278,11 +278,11 @@ describe('spec 058 E2E — real open conversation: participants vs bystanders', 
     for (const participant of ['iris-1', 'apprentice-1']) {
       const perception = await perceive(world.core, participant);
       const ids = prunedIds(perception);
-      expect(ids).toContain('contribute');
+      expect(ids).not.toContain('contribute'); // spec 064/D1
       expect(ids).toContain('leave');
       expect(ids).not.toContain('join');
       const enumIds = formulateEnum(new PlanBuilderImpl().build(perception).tools);
-      expect(enumIds).toContain('contribute');
+      expect(enumIds).not.toContain('contribute');
       expect(enumIds).not.toContain('join');
     }
 
