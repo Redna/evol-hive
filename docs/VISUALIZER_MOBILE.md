@@ -89,3 +89,26 @@ curl -s -o /dev/null -w '%{http_code} %{content_type}\n' http://localhost:<visua
 # served page links the manifest and registers the worker
 curl -s http://localhost:<visualizer-port>/ | grep -E 'rel="manifest"|serviceWorker'
 ```
+
+## Verification status
+
+The checks above cover the server-side and page-level acceptance criteria of
+spec 063 (routes, manifest/worker links, same-origin `wss://`).
+
+**AC-9 is still unverified.** It requires installing the PWA **on a real device**
+from a secure origin and confirming it launches standalone — nothing in this
+repository can assert that. Until it is done, AC-9 should be treated as open even
+though spec 063's row in `docs/specs/INDEX.md` reads ✅ Done.
+
+To close it:
+
+1. Serve the visualizer through the environment's TLS-terminating reverse proxy
+   (section 1), and confirm the device can actually **route** to that address —
+   assert the response **body**, not just the status code. An address that only
+   resolves from the host machine will look fine to `curl` and fail on a phone.
+2. Install the environment's local root CA on the device.
+3. Open the page, use *Add to Home Screen*, launch it from the home screen and
+   confirm it renders standalone with a live world (no browser chrome, no
+   address bar).
+4. Toggle airplane mode and reload — the app shell must still render from the
+   service-worker cache (the WebSocket may fail; that is expected).
