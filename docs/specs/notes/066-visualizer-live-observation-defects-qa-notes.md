@@ -110,3 +110,61 @@ Exactly the measured D1 symptom: a tap on the chip drawn on top (Bob) selected t
 - **AC-8, AC-9, AC-10 (R4, D4 truthful controls)** — deferred to leg 4.
 - **AC-12 (R5 docs)** — spec 062/063 amendment notes and `docs/specs/INDEX.md` status are the final leg's deliverable; not present yet, so not claimed.
 - **AC-3 real-device evidence.** The served-bundle test proves the glue is tap-correct against the shipped bundle; a live phone re-probe (the implementation notes' "What is left") remains the human close-out for AC-3 and is not automatable here.
+
+---
+
+# 066 — Visualizer Live-Observation Defects — QA notes (leg 3)
+
+- **PR:** [#262](https://github.com/Redna/evol-hive/pull/262) — `fix/066-leg3-motion-aliasing`
+- **Scope of this leg:** R3 / **AC-6, AC-7** (leg 3 of four; D1/R1 landed in leg 2, D4/R4 lands in leg 4 per the approved serialized chain).
+- **Spec:** `docs/specs/066-visualizer-live-observation-defects.md`
+- **Design/implementation notes:** `docs/specs/notes/066-…-implementation-notes.md` (updated by this PR with the Leg 3 section: cause, red-first evidence, design, three honest limitations).
+- **Verdict:** ✅ All testable leg-3 acceptance criteria have tests; full suite, `typecheck`, `lint` and `prettier` are green.
+
+## Coverage summary
+
+| AC       | Requirement                                                                                                                                                                                | Covered by                                                                                                                                                                                                       | Status |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| **AC-6** | Delta delivered over a known interval interpolates proportionally to elapsed time and arrives at the target as the interval completes; asserted as a pure function with no timers               | `packages/visualizer/tests/spec-066-motion-aliasing.test.ts` (proportional / arrives / clamps / no-frame-jump) **+** `mobile-shell.integration.test.ts` (served glue bridges each delta) **+ QA added** measured-cadence cases | ✅     |
+| **AC-7** | A larger delta over the same interval moves proportionally faster (no constant retuning for 5×)                                                                                            | `spec-066-motion-aliasing.test.ts` (pure 5× ratio + absolute half-interval fraction + reported 60 cells/s) **+** `mobile-shell.integration.test.ts` (served-glue 2-vs-10 cell case)                                 | ✅     |
+
+**2 / 2 leg-3 acceptance criteria tested.**
+
+AC-11 (full suite green, typecheck, prettier) is satisfied by the run below. AC-12 (spec 062/063 amendment notes, INDEX status) belongs to the final leg and is **not** claimed here — see Gaps.
+
+## Tests added by QA
+
+`packages/visualizer/tests/mobile-shell.integration.test.ts`
+— new describe block **"spec 066 leg 3 — the glide interval is measured from snapshot arrivals (AC-6)"**, two cases (slower 0.2 s cadence and faster 0.05 s cadence).
+
+**Why it was missing.** The Developer's served-glue cases all observe snapshots **exactly 0.1 s apart** — which is `DEFAULT_SNAPSHOT_INTERVAL_S`. They prove the delta is bridged over *a* 0.1 s interval, but they cannot distinguish a **measured** cadence from a hardcoded default, because both are 0.1. The implementation notes' headline claim is explicitly the opposite ("measured cadence, not a hardcoded rate… a server configured with a different `snapshotRateMs` or a jittery mesh link is paced correctly"), and spec 066 R3 requires the delta be traversed over *that snapshot's duration*. A regression that replaced `glide.intervalS = snapshotIntervalS` with the default constant — the original D3 aliasing in a new coat — leaves every existing test green. The two QA cases drive non-default cadences (0.2 s and 0.05 s) and assert the delta is half-traversed at half of *that* interval; both fail on a hardcoded default.
+
+## Red-first evidence
+
+Temporarily reverting the measured wiring (`glide.intervalS = snapshotIntervalS` → `= DEFAULT_SNAPSHOT_INTERVAL_S`) and running only the new cases:
+
+```
+× spec 066 leg 3 — the glide interval is measured from snapshot arrivals (AC-6)
+  > paces a slower 0.2 s cadence over 0.2 s, not the 0.1 s default
+  → expected 766.6666666666666 to be close to 466.66666666666663 (already arrived)
+× ... > paces a faster 0.05 s cadence over 0.05 s, not the 0.1 s default
+  → expected 316.66666666666663 to be close to 466.66666666666663 (only a quarter moved)
+```
+
+The source was restored immediately after (`git diff src/client/main.ts` clean). The Developer's own red-first evidence (`8 failed | 10 passed → 18 passed`) is confirmed by inspection: the pure `motionTowards` cases and the served-glue 0.1 s cases all discriminate against the pre-fix fixed-half-life glide.
+
+## Test results
+
+- `pnpm test` — **all green**: shared 399, memory 101, **visualizer 119** (+2 QA integration cases; 17 files), engine 922, cognition 1252, assembly 89, examples 253, cli 115.
+- `pnpm typecheck` — clean.
+- `pnpm lint` — clean.
+- `npx prettier --check` on the touched test file — clean.
+- Root `pnpm test` requires `pnpm build` first (shared resolves from `dist/`); built all packages before the run.
+
+## Gaps / not tested here
+
+- **AC-8, AC-9, AC-10 (R4, D4 truthful controls)** — deferred to leg 4.
+- **AC-12 (R5 docs)** — spec 062/063 amendment notes and `docs/specs/INDEX.md` status are the final leg's deliverable; not present yet, so not claimed.
+- **`hitTestAgent` vs interpolated draw position.** The implementation notes record (honestly) that a tap during a glide resolves against the layout *target* while the agent is drawn interpolated, so it can miss by up to one interval. This predates leg 3 and is outside AC-6/AC-7; recorded rather than silently widened.
+- **Frame-granularity speed wobble.** The measured interval is sampled at frame granularity (~16 ms at 60 FPS), so a jittery arrival cadence yields a small speed wobble rather than perfectly constant velocity. Deliberate (the alternative is a hardcoded protocol rate); not an AC and not automatable without a real clock.
+- **Live validation at 1× and 5×.** The implementation notes assign the real-run watch (observed speed scales with `timeScale`) to the dispatcher after merge; leg 3 deliberately did not restart the running sim. Not automatable here.

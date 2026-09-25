@@ -21,6 +21,7 @@ export {
   legacyObjectSlot,
   objectChipWidth,
   smoothTowards,
+  motionTowards,
   GRID_COLS,
   GRID_ROWS,
   ZERO_INSETS,

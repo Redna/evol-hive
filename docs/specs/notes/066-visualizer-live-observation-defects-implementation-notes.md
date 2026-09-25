@@ -2,7 +2,7 @@
 
 - **Spec:** `docs/specs/066-visualizer-live-observation-defects.md`
 - **Issue:** [#257](https://github.com/Redna/evol-hive/issues/257)
-- **Legs:** 1 of 4 (`#258`, merged `970e2ba`) · 2 of 4 · 3 pending · 4 pending
+- **Legs:** 1 of 4 (`#258`, merged `970e2ba`) · 2 of 4 (`#259`, merged `e9dfcc7`) · 3 of 4 (this branch) · 4 pending
 - These notes exist because the leg-1 QA pass flagged that spec 066 had **no design or
   implementation notes**, only a spec and PR bodies. Per ADR-003 the committed note *is*
   the handoff, so this file is the durable record rather than the PR text.
@@ -79,6 +79,59 @@ client glue smoothing policy). The probe approach is what made them measurable.
   drawing outside the cell and colliding with neighbours — out of scope, and it would trade a
   correctness bug for a layout lie.
 
+## Leg 3 — motion is paced against the snapshot interval
+
+- **Cause:** the engine steps one cell per game-loop tick at ~60 ticks/s
+  (`spatial/navigation.ts:243`, `loop/index.ts:111`) while the client receives
+  snapshots every `snapshotRateMs = 100`. The shipped glue smoothed each agent
+  toward its new cell with a FIXED `GLIDE_HALF_LIFE_S = 0.09` (`client/main.ts`),
+  so a delta delivered over a 0.1 s snapshot interval was never traversed over
+  that interval — at 1× it closed the gap in a few hundred ms (and lagged), at 5×
+  the lag was ~5× worse. The spec's D3 diagnosis (client-side aliasing, not engine
+  stepping) is confirmed by the fix: nothing in `engine/**` was touched.
+- **Red-first evidence:** the pure seam did not exist yet, so the six
+  `spec-066-motion-aliasing.test.ts` cases failed with
+  `TypeError: motionTowards is not a function`. The two served-bundle cases in
+  `mobile-shell.integration.test.ts` failed on the *behaviour*, which is the
+  stronger evidence: at the frame a new snapshot's delta was delivered the agent
+  had already jumped **322 px** (drawn `488.90` where it should still be at
+  `166.67`), and at half the interval the fixed half-life had closed **68.5%** of
+  the delta (`91.34 px` of a `133.33 px` 2-cell delta) instead of the required
+  **50%** (`66.67 px`). Counts before the fix: **8 failed | 10 passed (18)** across
+  the two files; after: **18 passed**. Package total: **108 → 117**.
+- **Design:** a new pure `motionTowards(from, to, elapsedSeconds, intervalSeconds)`
+  in `renderer/layout.ts` linearly interpolates the delta, clamped so elapsed 0 is
+  `from`, elapsed = interval is exactly `to`, and beyond that it holds — no
+  overshoot. Pacing is the interval, not a half-life, so a larger delta over the
+  same interval moves proportionally faster and 5× needs no retuned constant.
+  `smoothTowards` stays where it belongs: the camera still uses it via
+  `smoothCamera` (leg 1); only agent glide changed.
+- **Glue:** `client/main.ts` keeps one `AgentGlide` per agent (the delta it is
+  bridging, when it started, and the interval). The frame's rAF timestamp is the
+  only clock: a snapshot is observed by the next frame, the **measured** interval
+  since the previous observed snapshot paces every delta delivered since, and a
+  changed layout target restarts the glide from the position currently on screen.
+  So the pure function stays clock-free while the glue stays DOM/transport glue.
+  `GLIDE_HALF_LIFE_S` is removed rather than left dead.
+- **Measured cadence, not a hardcoded rate.** The interval comes from the actual
+  snapshot arrivals, so a server configured with a different `snapshotRateMs` or
+  a jittery mesh link is paced correctly without a protocol change. A min clamp
+  (`1/60 s`) keeps coalesced snapshots from dividing by zero, and a max clamp
+  (`1 s`) stops a stalled tab (rAF paused while snapshots keep arriving) from
+  crawling across a multi-second gap on resume.
+- **Honest limitations:**
+  1. The interval is measured at frame granularity (~16 ms at 60 FPS), so a
+     jittery arrival cadence produces a small speed wobble rather than a perfectly
+     constant velocity. Deliberate: the alternative is a hardcoded protocol rate.
+  2. `hitTestAgent` still resolves against the layout's *target* positions while
+     the agent is drawn at its interpolated position, so a tap during a glide can
+     miss by up to one interval. That divergence predates this leg and is out of
+     its scope (the tap-accuracy AC is AC-3, co-located *static* agents); it is
+     recorded here rather than silently widened.
+  3. A tab stalled for more than the 1 s cap resumes by gliding from the last
+     drawn position over 1 s — continuous, but a bounded catch-up rather than
+     true pacing of the missed cadence.
+
 ## Protocol finding — CI QA pushes to the PR branch, so the verified SHA is not the merged tree
 
 Measured, not inferred. Leg 1's merge commit `970e2ba` contains **two files I did not author**:
@@ -101,14 +154,16 @@ measurement. Two consequences worth carrying forward:
 
 ## What is left
 
-- **Leg 3** — R3/AC-6/AC-7: motion paced against the snapshot interval (~60 ticks/s engine vs
-  10 snapshots/s client ⇒ ~6 cells per snapshot on a fixed 0.09 s glide).
-- **Leg 4** — R4/AC-8/AC-9/AC-10: scene-select sync, Fog initial state, and removal of the
-  Save/Load controls (approved at the spec gate).
+- **Leg 4** — R4/AC-8/AC-9/AC-10: scene-select sync, Fog initial state, and removal of
+  the Save/Load controls (approved at the spec gate).
 - **AC-12 (docs)** — specs 062/063 amendment notes and the INDEX status are the final leg's
-  deliverable.
+  deliverable. Leg 3's change contradicts 062 R2's fixed-half-life wording, so that
+  amendment note is owed by leg 4.
 - Live validation after leg 2: rebuild, restart the sim, and re-probe the viewport to confirm
   that a probe at a drawn chip now returns that chip's agent (AC-3's real-device evidence).
+- Live validation after leg 3: a real run should be watched at 1× and 5× to confirm the
+  observed speed scales with the sim's speed. This is the dispatcher's job after merge —
+  leg 3 deliberately did not restart the running sim.
 
 ## Live validation — legs 1 and 2 (real path, new code)
 
@@ -150,19 +205,19 @@ provenance: unreviewed code merging under my name, and a matrix run that describ
 that is not the merged one. **Standing check: `git show --stat <merge>` before closing a leg**,
 and re-run the suite on merged `main` rather than trusting the pre-push number.
 
-## Handoff — legs 3 and 4
+## Handoff — leg 4
 
-State: `main` = legs 1–2 merged (`970e2ba`, `e9dfcc7`), visualizer 108 green, spec 066
-📝 In Development in the INDEX, issue #257 open.
+State: `main` = legs 1–2 merged (`970e2ba`, `e9dfcc7`), leg 3 on `fix/066-leg3-motion-aliasing`
+(visualizer 117 green), spec 066 📝 In Development in the INDEX, issue #257 open.
 
-- **Leg 3 (R3, AC-6, AC-7) — motion aliasing.** Engine steps one cell per tick at ~60 ticks/s
-  (`spatial/navigation.ts:243`, `loop/index.ts:111`); the client receives 10 snapshots/s, so
-  ~6 cells advance between snapshots while the glide uses a fixed `GLIDE_HALF_LIFE_S = 0.09`.
-  Seam: the motion function in `renderer/layout.ts` (clock-free: elapsed in, position out),
-  with `client/main.ts` passing the interval. Must be self-adjusting at 5× without retuning a
-  constant. No protocol change required.
+- **Leg 3 (R3, AC-6, AC-7) — DONE.** Pure `motionTowards(from, to, elapsed, interval)` in
+  `renderer/layout.ts`, paced by the measured snapshot interval in `client/main.ts`;
+  `GLIDE_HALF_LIFE_S` removed. See the Leg 3 section above for the red-first evidence and the
+  three honest limitations (frame-granularity wobble; hit test still uses targets; 1 s stall
+  cap). Nothing in `engine/**` changed.
 - **Leg 4 (R4, AC-8, AC-9, AC-10) — truthful controls.** Sync `sceneSelect` to the snapshot's
   scene (it currently shows the first option, `minimal`, while coffee-shop runs); make Fog's
   `on` class reflect the initial `showFog = true` (it is only toggled on click — a stale class
   that invalidated one of my own diagnostics); **remove Save/Load**, decided at the spec gate.
 - **AC-12 belongs to leg 4**: amendment notes in specs 062/063 and the INDEX status update.
+  Leg 3 deliberately did not touch the specs.

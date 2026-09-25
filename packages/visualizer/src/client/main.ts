@@ -17,7 +17,7 @@
  */
 
 import { CanvasRenderer } from '../renderer/canvas-renderer.js';
-import { layoutWorld, smoothTowards } from '../renderer/layout.js';
+import { layoutWorld, motionTowards } from '../renderer/layout.js';
 import type { Insets, Point, WorldLayout } from '../renderer/layout.js';
 import {
   CAMERA_HALF_LIFE_S,
@@ -39,11 +39,43 @@ type Command =
   | { type: 'load'; stateJson: string }
   | { type: 'selectScene'; sceneId: string };
 
-/** Seconds for an agent to close half the distance to its new cell. */
-const GLIDE_HALF_LIFE_S = 0.09;
+/**
+ * Snapshot-cadence fallback, in seconds, used only until the first interval is
+ * measured (the server's default `snapshotRateMs = 100`). Motion is paced
+ * against the MEASURED interval thereafter (spec 066, R3) — a bootstrap value,
+ * never a tuning knob for a given `timeScale`.
+ */
+const DEFAULT_SNAPSHOT_INTERVAL_S = 0.1;
+/**
+ * Clamp on the MEASURED interval (s). The minimum keeps a coalesced snapshot
+ * pair from dividing by zero; the maximum stops a stalled tab (rAF paused while
+ * snapshots kept arriving) from crawling across a multi-second gap when the view
+ * resumes. Neither is a pacing constant for a given `timeScale`.
+ */
+const MIN_SNAPSHOT_INTERVAL_S = 1 / 60;
+const MAX_SNAPSHOT_INTERVAL_S = 1;
 const MAX_DPR = 3;
 /** Tap radius for selecting an agent, in CSS pixels. */
 const TAP_RADIUS = 44;
+
+/**
+ * In-flight glide for one agent: the delta it is bridging and the pacing it was
+ * given. The position is recomputed from `motionTowards` every frame, so this
+ * holds no clock — the frame's timestamp is the only time source (spec 066, R3).
+ */
+interface AgentGlide {
+  /** Position currently on screen. */
+  x: number;
+  y: number;
+  fromX: number;
+  fromY: number;
+  targetX: number;
+  targetY: number;
+  /** Frame timestamp (ms) at which this delta was delivered. */
+  startTs: number;
+  /** Seconds over which this delta is traversed — the measured snapshot interval. */
+  intervalS: number;
+}
 
 function getElement(id: string): HTMLElement {
   const el = document.getElementById(id);
@@ -109,7 +141,14 @@ function main(): void {
 
   // ── Live state, glide and camera ─────────────────────────────────────────
   let latest: VisualizerState | null = null;
+  /** Screen position handed to the renderer each frame (spec 062, R2). */
   const smoothed = new Map<string, Point>();
+  /** In-flight glides, keyed by agent id (spec 066, R3). */
+  const glides = new Map<string, AgentGlide>();
+  /** Set when a snapshot arrives; consumed by the next frame to measure its cadence. */
+  let pendingSnapshot = false;
+  let lastSnapshotTs = 0;
+  let snapshotIntervalS = DEFAULT_SNAPSHOT_INTERVAL_S;
   let lastTs = 0;
   let showFog = true;
   let selectedAgentId: string | null = null;
@@ -138,14 +177,59 @@ function main(): void {
     lastTs = ts;
     const layout = baseLayout();
     if (latest !== null && layout !== null) {
-      // Agent glide: targets come from the pure layout (spec 062, R2).
-      for (const at of layout.agents) {
-        const current = smoothed.get(at.id) ?? { x: at.x, y: at.y };
-        smoothed.set(at.id, {
-          x: smoothTowards(current.x, at.x, dt, GLIDE_HALF_LIFE_S),
-          y: smoothTowards(current.y, at.y, dt, GLIDE_HALF_LIFE_S),
-        });
+      // Measure the snapshot cadence at the frame that first sees each snapshot.
+      // It paces every delta delivered since the previous one (spec 066, R3).
+      if (pendingSnapshot) {
+        if (lastSnapshotTs > 0) {
+          const measured = (ts - lastSnapshotTs) / 1000;
+          snapshotIntervalS = Math.min(
+            Math.max(measured, MIN_SNAPSHOT_INTERVAL_S),
+            MAX_SNAPSHOT_INTERVAL_S,
+          );
+        }
+        lastSnapshotTs = ts;
+        pendingSnapshot = false;
       }
+      const present = new Set<string>();
+      for (const at of layout.agents) {
+        present.add(at.id);
+        let glide = glides.get(at.id);
+        if (glide === undefined) {
+          // First sight renders exactly at its projected cell (spec 062, R2).
+          glide = {
+            x: at.x,
+            y: at.y,
+            fromX: at.x,
+            fromY: at.y,
+            targetX: at.x,
+            targetY: at.y,
+            startTs: ts,
+            intervalS: snapshotIntervalS,
+          };
+          glides.set(at.id, glide);
+        } else if (at.x !== glide.targetX || at.y !== glide.targetY) {
+          // A snapshot (or a resize) delivered a new target: bridge the delta
+          // from what is on screen now, paced over the interval it represents.
+          glide.fromX = glide.x;
+          glide.fromY = glide.y;
+          glide.targetX = at.x;
+          glide.targetY = at.y;
+          glide.startTs = ts;
+          glide.intervalS = snapshotIntervalS;
+        }
+        const next = motionTowards(
+          { x: glide.fromX, y: glide.fromY },
+          { x: glide.targetX, y: glide.targetY },
+          (ts - glide.startTs) / 1000,
+          glide.intervalS,
+        );
+        glide.x = next.x;
+        glide.y = next.y;
+        smoothed.set(at.id, next);
+      }
+      for (const id of [...smoothed.keys()]) if (!present.has(id)) smoothed.delete(id);
+      for (const id of [...glides.keys()]) if (!present.has(id)) glides.delete(id);
+
       // Camera follow: pure target + the same smoother (spec 063, R1). Scale is
       // smoothed too — assigning it outright made a release a hard zoom-out
       // followed by a slide (spec 066, AC-5).
@@ -277,9 +361,8 @@ function main(): void {
   ws.onmessage = (ev: MessageEvent) => {
     try {
       const parsed = JSON.parse(String(ev.data)) as VisualizerState;
-      const ids = new Set(parsed.agents.map((a) => a.agentId));
-      for (const id of [...smoothed.keys()]) if (!ids.has(id)) smoothed.delete(id);
       latest = parsed;
+      pendingSnapshot = true;
       renderCard();
       if (typeof window.requestAnimationFrame !== 'function') draw();
     } catch (e) {

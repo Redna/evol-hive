@@ -695,3 +695,224 @@ describe('spec 066 leg 2 — the served tap selects the agent it drew (AC-3)', (
     expect(sb.nameEl.textContent).toBe('Alice');
   });
 });
+
+/**
+ * Spec 066 leg 3, R3 — the SERVED glide is paced against the snapshot interval
+ * (AC-6, AC-7).
+ *
+ * The pure `motionTowards` tests (`spec-066-motion-aliasing.test.ts`) prove the
+ * seam, but the reported defect (D3) lived in the shipped glue: `main.ts`
+ * smoothed agents with a fixed `GLIDE_HALF_LIFE_S = 0.09`, so a delta delivered
+ * over a 0.1 s snapshot interval was never traversed over that interval. Leg 3's
+ * Test Seam 4 therefore names the served bundle + mock-DOM harness for the glue
+ * wiring: a regression that puts the old fixed half-life back would leave every
+ * pure `motionTowards` test green.
+ *
+ * The manual rAF makes the pacing deterministic — snapshots are observed on
+ * frames 0.1 s apart (10/s, the server default), and the agent's drawn x is read
+ * off the shipped skin's name pill, whose x is exactly the position the layout
+ * glide produced.
+ */
+describe('spec 066 leg 3 — the served glide bridges each delta over its interval (AC-6, AC-7)', () => {
+  it('traverses the delta across the measured interval and arrives as it completes', () => {
+    const W = 800;
+    const H = 600;
+    const sb = makeSandbox({ width: W, height: H, dpr: 1, raf: true });
+    const viewport = { width: W, height: H, insets: ZERO_INSETS };
+
+    // Two snapshots 0.1 s apart; the agent walks 9 cells along one row.
+    const before = {
+      ...makeState(),
+      agents: [coLocatedAgent('a1', 'Alice', { x: 2, y: 4 })],
+    } as unknown as VisualizerState;
+    const after = {
+      ...makeState(),
+      agents: [coLocatedAgent('a1', 'Alice', { x: 11, y: 4 })],
+    } as unknown as VisualizerState;
+    const p1 = layoutWorld(before, viewport).agents[0]!;
+    const p2 = layoutWorld(after, viewport).agents[0]!;
+    expect(p2.x).toBeGreaterThan(p1.x);
+
+    /** The shipped skin paints the agent's name pill at the layout position. */
+    const drawnX = (): number => {
+      const names = sb.ctx.calls
+        .filter((c) => c.method === 'fillText' && c.args[0] === 'Alice')
+        .map((c) => c.args as [string, number, number]);
+      expect(names.length).toBeGreaterThan(0);
+      return names.at(-1)![1];
+    };
+
+    // Snapshot 1 at frame 1000: first sight renders exactly at its cell.
+    sb.ws.onmessage?.({ data: JSON.stringify(before) });
+    sb.tick(1000);
+    expect(drawnX()).toBeCloseTo(p1.x, 3);
+
+    // Snapshot 2 is observed at frame 1100 (0.1 s later). On that frame the
+    // glide has elapsed 0, so the agent is still at p1 — no one-frame teleport.
+    sb.ws.onmessage?.({ data: JSON.stringify(after) });
+    sb.tick(1100);
+    expect(drawnX()).toBeCloseTo(p1.x, 3);
+
+    // Half-way through the interval the agent is half-way across the delta.
+    sb.tick(1150);
+    expect(drawnX()).toBeCloseTo((p1.x + p2.x) / 2, 3);
+
+    // As the interval completes it arrives exactly at the new cell.
+    sb.tick(1200);
+    expect(drawnX()).toBeCloseTo(p2.x, 3);
+
+    // Beyond the interval it holds there — clamped, never overshooting.
+    sb.tick(1232);
+    expect(drawnX()).toBeCloseTo(p2.x, 3);
+  });
+
+  it('moves a 5× delta proportionally faster with no constant change (AC-7)', () => {
+    const W = 800;
+    const H = 600;
+    const viewport = { width: W, height: H, insets: ZERO_INSETS };
+
+    /** Drive one snapshot pair and read how far the drawn agent has moved at a
+     *  chosen elapsed time, plus the full delta the snapshot delivered. */
+    const glideAt = (deltaCells: number, elapsedMs: number): { moved: number; full: number } => {
+      const sb = makeSandbox({ width: W, height: H, dpr: 1, raf: true });
+      const before = {
+        ...makeState(),
+        agents: [coLocatedAgent('a1', 'Alice', { x: 0, y: 4 })],
+      } as unknown as VisualizerState;
+      const after = {
+        ...makeState(),
+        agents: [coLocatedAgent('a1', 'Alice', { x: deltaCells, y: 4 })],
+      } as unknown as VisualizerState;
+      sb.ws.onmessage?.({ data: JSON.stringify(before) });
+      sb.tick(1000);
+      sb.ws.onmessage?.({ data: JSON.stringify(after) });
+      sb.tick(1100);
+      sb.tick(1100 + elapsedMs);
+      const p1 = layoutWorld(before, viewport).agents[0]!;
+      const p2 = layoutWorld(after, viewport).agents[0]!;
+      const names = sb.ctx.calls
+        .filter((c) => c.method === 'fillText' && c.args[0] === 'Alice')
+        .map((c) => c.args as [string, number, number]);
+      return { moved: names.at(-1)![1] - p1.x, full: p2.x - p1.x };
+    };
+
+    // Same interval (0.1 s), same elapsed (0.05 s): only the delta changes.
+    // Cell x must stay inside the 12-column grid, so 2 cells vs 10 cells is the
+    // same 5× ratio the spec's 6-vs-30 example states.
+    const at1x = glideAt(2, 50);
+    const at5x = glideAt(10, 50);
+
+    // Half the interval elapsed ⇒ half each delta traversed. This is what the
+    // fixed half-life got wrong (it closed ~32% in 0.05 s), and it is the part
+    // the scale-invariant ratio cannot see.
+    expect(at1x.moved).toBeCloseTo(at1x.full / 2, 2);
+    expect(at5x.moved).toBeCloseTo(at5x.full / 2, 2);
+    // And the larger delta moved proportionally faster, with no constant change.
+    expect(at5x.full / at1x.full).toBeCloseTo(5, 2);
+    expect(at5x.moved / at1x.moved).toBeCloseTo(5, 2);
+  });
+
+  it('caps the measured interval so a stalled tab does not crawl on resume', () => {
+    const W = 800;
+    const H = 600;
+    const sb = makeSandbox({ width: W, height: H, dpr: 1, raf: true });
+    const viewport = { width: W, height: H, insets: ZERO_INSETS };
+    const before = {
+      ...makeState(),
+      agents: [coLocatedAgent('a1', 'Alice', { x: 2, y: 4 })],
+    } as unknown as VisualizerState;
+    const after = {
+      ...makeState(),
+      agents: [coLocatedAgent('a1', 'Alice', { x: 11, y: 4 })],
+    } as unknown as VisualizerState;
+    const p1 = layoutWorld(before, viewport).agents[0]!;
+    const p2 = layoutWorld(after, viewport).agents[0]!;
+    const drawnX = (): number => {
+      const names = sb.ctx.calls
+        .filter((c) => c.method === 'fillText' && c.args[0] === 'Alice')
+        .map((c) => c.args as [string, number, number]);
+      return names.at(-1)![1];
+    };
+
+    sb.ws.onmessage?.({ data: JSON.stringify(before) });
+    sb.tick(1000);
+    // rAF was paused for 4 s (a backgrounded tab) while snapshots kept coming.
+    sb.ws.onmessage?.({ data: JSON.stringify(after) });
+    sb.tick(5000);
+    // The resume frame is still continuous — no teleport to the new cell...
+    expect(drawnX()).toBeCloseTo(p1.x, 3);
+    // ...but the interval was capped at 1 s, not the 4 s gap, so it arrives
+    // within a bounded time rather than crawling for the whole stall.
+    sb.tick(5500);
+    expect(drawnX()).toBeGreaterThan(p1.x);
+    sb.tick(6000);
+    expect(drawnX()).toBeCloseTo(p2.x, 3);
+  });
+});
+
+/**
+ * Spec 066 leg 3, R3 — the pacing interval is MEASURED, not the 0.1 s default
+ * (AC-6).
+ *
+ * Every case above observes snapshots 0.1 s apart, which is exactly
+ * `DEFAULT_SNAPSHOT_INTERVAL_S`. They would therefore all stay green if the
+ * shipped glue ignored the measured cadence and hardcoded the default — the
+ * original D3 bug in a different coat. The design's headline claim is the
+ * opposite: the interval comes from actual snapshot arrivals, so a server with
+ * a different `snapshotRateMs` (or a jittery mesh link) is paced correctly with
+ * no protocol change. This case drives non-default cadences and asserts the
+ * delta is traversed over THAT interval.
+ */
+describe('spec 066 leg 3 — the glide interval is measured from snapshot arrivals (AC-6)', () => {
+  /**
+   * Observe two snapshots `intervalMs` apart, then read the drawn x `elapsedMs`
+   * into the second delta. The snapshot pair always bridges the same 9-cell gap,
+   * so only the cadence and the elapsed time differ.
+   */
+  function glideAtElapsed(
+    intervalMs: number,
+    elapsedMs: number,
+  ): { drawn: number; p1: number; p2: number } {
+    const W = 800;
+    const H = 600;
+    const sb = makeSandbox({ width: W, height: H, dpr: 1, raf: true });
+    const viewport = { width: W, height: H, insets: ZERO_INSETS };
+    const before = {
+      ...makeState(),
+      agents: [coLocatedAgent('a1', 'Alice', { x: 2, y: 4 })],
+    } as unknown as VisualizerState;
+    const after = {
+      ...makeState(),
+      agents: [coLocatedAgent('a1', 'Alice', { x: 11, y: 4 })],
+    } as unknown as VisualizerState;
+
+    sb.ws.onmessage?.({ data: JSON.stringify(before) });
+    sb.tick(1000);
+    sb.ws.onmessage?.({ data: JSON.stringify(after) });
+    sb.tick(1000 + intervalMs);
+    sb.tick(1000 + intervalMs + elapsedMs);
+
+    const names = sb.ctx.calls
+      .filter((c) => c.method === 'fillText' && c.args[0] === 'Alice')
+      .map((c) => c.args as [string, number, number]);
+    return {
+      drawn: names.at(-1)![1],
+      p1: layoutWorld(before, viewport).agents[0]!.x,
+      p2: layoutWorld(after, viewport).agents[0]!.x,
+    };
+  }
+
+  it('paces a slower 0.2 s cadence over 0.2 s, not the 0.1 s default', () => {
+    // Half the measured interval elapsed ⇒ half-way. A hardcoded 0.1 s interval
+    // would have already arrived here.
+    const r = glideAtElapsed(200, 100);
+    expect(r.drawn).toBeCloseTo((r.p1 + r.p2) / 2, 3);
+  });
+
+  it('paces a faster 0.05 s cadence over 0.05 s, not the 0.1 s default', () => {
+    // Half the measured interval elapsed ⇒ half-way. A hardcoded 0.1 s interval
+    // would have moved only a quarter of the delta.
+    const r = glideAtElapsed(50, 25);
+    expect(r.drawn).toBeCloseTo((r.p1 + r.p2) / 2, 3);
+  });
+});
