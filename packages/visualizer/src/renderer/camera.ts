@@ -15,6 +15,7 @@
  * dimension (it smooths the camera offsets with `smoothTowards`, spec 062 R2).
  */
 
+import { smoothTowards } from './layout.js';
 import type { DoorLayout, EntityLayout, Point, Rect, RoomLayout, WorldLayout } from './layout.js';
 
 export interface Camera {
@@ -33,6 +34,30 @@ export const FIT_ALL_CAMERA: Camera = { scale: 1, offsetX: 0, offsetY: 0 };
  * no-op. At this scale the world exceeds the viewport and clamping matters.
  */
 export const FOLLOW_SCALE = 1.6;
+
+/** Seconds for the camera to close half the distance to its target. */
+export const CAMERA_HALF_LIFE_S = 0.25;
+
+/**
+ * Advance the camera one frame toward its target.
+ *
+ * Every component — scale included — goes through the same time-based smoother.
+ * The client previously smoothed the offsets while assigning `scale` outright, so
+ * releasing a follow was a hard zoom-out followed by a slide; keeping the policy
+ * here makes it assertable and stops the asymmetry coming back (spec 066, AC-5).
+ */
+export function smoothCamera(
+  current: Camera,
+  target: Camera,
+  dtSeconds: number,
+  halfLifeSeconds: number = CAMERA_HALF_LIFE_S,
+): Camera {
+  return {
+    scale: smoothTowards(current.scale, target.scale, dtSeconds, halfLifeSeconds),
+    offsetX: smoothTowards(current.offsetX, target.offsetX, dtSeconds, halfLifeSeconds),
+    offsetY: smoothTowards(current.offsetY, target.offsetY, dtSeconds, halfLifeSeconds),
+  };
+}
 
 function clamp(v: number, a: number, b: number): number {
   return Math.max(a, Math.min(b, v));
@@ -76,17 +101,27 @@ function clampOffset(
 
 /**
  * The camera for a selection. `null` (or an agent not present in the layout)
- * yields the fit-all view at the previous scale. Otherwise the camera follows
- * at `FOLLOW_SCALE`, centred on the agent and clamped to the world bounds.
+ * yields the **fit-all** view — scale 1 with zero offsets — regardless of where
+ * the camera was.
+ *
+ * The follow scale is deliberately NOT carried over on release. `layoutWorld`
+ * already centres the world at scale 1, so keeping the follow zoom while zeroing
+ * the offsets parks the view on the world origin, which is mostly empty space
+ * (spec 066, D2 — measured live: `{scale 1.6, offsetX -0.089}` after release,
+ * where fit-all is `{scale 1, 0}`, reported as "dragged to nowhere").
+ *
+ * `_previous` is accepted but intentionally not consulted: the release *target* is
+ * history-independent, and animating from wherever the camera was is the client's
+ * job (spec 066, R2 — the scale transition must glide rather than snap).
  */
 export function cameraFor(
   selection: string | null,
   layout: WorldLayout,
-  previous: Camera | null = null,
+  _previous: Camera | null = null,
 ): Camera {
-  if (selection === null) return { scale: previous?.scale ?? 1, offsetX: 0, offsetY: 0 };
+  if (selection === null) return { scale: 1, offsetX: 0, offsetY: 0 };
   const agent = layout.agents.find((a) => a.id === selection);
-  if (agent === undefined) return { scale: previous?.scale ?? 1, offsetX: 0, offsetY: 0 };
+  if (agent === undefined) return { scale: 1, offsetX: 0, offsetY: 0 };
 
   const scale = FOLLOW_SCALE;
   const vw = layout.viewport.width;

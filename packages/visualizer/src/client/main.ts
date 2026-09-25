@@ -19,7 +19,13 @@
 import { CanvasRenderer } from '../renderer/canvas-renderer.js';
 import { layoutWorld, smoothTowards } from '../renderer/layout.js';
 import type { Insets, Point, WorldLayout } from '../renderer/layout.js';
-import { FIT_ALL_CAMERA, cameraFor, transformLayout } from '../renderer/camera.js';
+import {
+  CAMERA_HALF_LIFE_S,
+  FIT_ALL_CAMERA,
+  cameraFor,
+  smoothCamera,
+  transformLayout,
+} from '../renderer/camera.js';
 import type { Camera } from '../renderer/camera.js';
 import { DRIVES } from '../renderer/theme.js';
 import type { VisualizerState } from '@evol-hive/shared';
@@ -35,8 +41,6 @@ type Command =
 
 /** Seconds for an agent to close half the distance to its new cell. */
 const GLIDE_HALF_LIFE_S = 0.09;
-/** Seconds for the camera to close half the distance to its target. */
-const CAMERA_HALF_LIFE_S = 0.25;
 const MAX_DPR = 3;
 /** Tap radius for selecting an agent, in CSS pixels. */
 const TAP_RADIUS = 44;
@@ -142,13 +146,11 @@ function main(): void {
           y: smoothTowards(current.y, at.y, dt, GLIDE_HALF_LIFE_S),
         });
       }
-      // Camera follow: pure target + the same smoother (spec 063, R1).
+      // Camera follow: pure target + the same smoother (spec 063, R1). Scale is
+      // smoothed too — assigning it outright made a release a hard zoom-out
+      // followed by a slide (spec 066, AC-5).
       const target = cameraFor(selectedAgentId, layout, camera);
-      camera = {
-        scale: target.scale,
-        offsetX: smoothTowards(camera.offsetX, target.offsetX, dt, CAMERA_HALF_LIFE_S),
-        offsetY: smoothTowards(camera.offsetY, target.offsetY, dt, CAMERA_HALF_LIFE_S),
-      };
+      camera = smoothCamera(camera, target, dt, CAMERA_HALF_LIFE_S);
       renderer.render(latest, {
         insets: measureInsets(),
         width: viewportW,
