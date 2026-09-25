@@ -221,3 +221,33 @@ State: `main` = legs 1–2 merged (`970e2ba`, `e9dfcc7`), leg 3 on `fix/066-leg3
   that invalidated one of my own diagnostics); **remove Save/Load**, decided at the spec gate.
 - **AC-12 belongs to leg 4**: amendment notes in specs 062/063 and the INDEX status update.
   Leg 3 deliberately did not touch the specs.
+
+## Leg 3 — live validation, and what it can and cannot prove
+
+Rebuilt `dist`, restarted the sim on leg-3 code (page grew to 46,576 bytes), loaded the served
+page and re-checked the earlier legs as a **regression** test — leg 3 rewrote the position
+pipeline, and the leg itself flagged that `hitTestAgent` resolves layout *targets* while the
+agent is drawn interpolated, so selection was the thing genuinely at risk.
+
+| Check | Result |
+| --- | --- |
+| AC-3 regression — all agents selectable | **3 of 3 hittable** (`agent-alice`, `agent-bob`, `agent-carol`) |
+| AC-4/AC-5 regression — follow, then release | follow mid-glide `1.5549`; after release `scale 1.0005`, offsets `≈0.3/0.05` → converged to fit-all |
+
+**Honest boundary.** The live run does *not* prove the pacing. Two different smoothers both
+produce intermediate positions, so sampling drawn pixels in a real browser cannot distinguish
+interval-paced linear motion from the old exponential glide — at least not reliably at frame
+granularity with a moving camera. The substantive evidence for R3 is the **deterministic
+served-bundle test**, which drives the page's own rAF manually and asserts the *absolute*
+half-interval fraction, exact arrival at the interval's end, and clamping beyond it. Those are
+assertions the old fixed half-life cannot satisfy (it closed 68.5% at the half-interval mark).
+What the live run adds is integration and regression: the page loads on the new code, agents
+render and remain selectable, and follow/release still converge.
+
+## Third instance of the QA-push pattern
+
+Leg 3's merge `4c59c98` again carried files the leg did not author: **+58 lines of qa-notes**
+and roughly **+67 further test lines** in `mobile-shell.integration.test.ts`. Merged `main` is
+therefore **119 visualizer tests**, against the **117** verified before the push. The standing
+check (`git show --stat <merge>` plus re-running the suite on merged `main`) caught it a third
+time; it is now load-bearing rather than advisory. All 119 pass.
