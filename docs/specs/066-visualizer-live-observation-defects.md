@@ -66,7 +66,7 @@ The control bar works — pause/play/speed were measured against the live sim (l
 
 - **The scene selector shows the wrong scene.** It renders `'minimal'` (the first appended option) while the **coffee-shop** scene is running, because the client never syncs the select to the scene actually in the snapshot. Touching it silently reloads a different scene.
 - **The Fog button's initial state is inverted.** `showFog` initialises to `true` (agents hidden) while the `on` class is only ever toggled *on click*, so the view starts fogged with the button looking off. This one is worth noting because it **invalidated a diagnostic**: a conditional click keyed off that class never fired, leaving fog enabled while the probe assumed it was off.
-- **Save/Load are unverified as functional.** Both route through `this.persistence?.` in the adapter, so without a persistence object they no-op silently, and `load` opens a `prompt()` dialog — poor on mobile. Whether the live demo wires persistence must be **determined in the leg, not assumed**, and the buttons made truthful either way.
+- **Save/Load are unverified as functional.** Both route through `this.persistence?.` in the adapter, so without a persistence object they no-op silently, and `load` opens a `prompt()` dialog — poor on mobile. **Decision (approved): remove them** rather than wire persistence. Unused controls cost scarce screen space on a phone, and a `prompt()` dialog is a poor mobile affordance.
 
 ## Requirements
 
@@ -96,7 +96,7 @@ The control bar works — pause/play/speed were measured against the live sim (l
 
 - The scene selector must reflect the scene the snapshot says is running, and must not present a value that differs from it.
 - The Fog button's active state must reflect the actual fog state **at startup**, not only after a click.
-- Save/Load must be truthful: if the running demo has no persistence, they must not be presented as working controls. The leg determines which is the case from the code and the live run, and records the finding.
+- **Save/Load are removed from the control bar** (Decision 6). A control that cannot act must not be presented; if a future spec wires persistence into a served run, the controls return with it.
 - Controls that only work in some configurations must be visible exactly when they work.
 
 ### R5 — Regression discipline (`visualizer`)
@@ -117,7 +117,7 @@ The control bar works — pause/play/speed were measured against the live sim (l
 - [ ] **AC-7 (R3)** — a larger delta over the same interval moves the agent proportionally faster (no constant retuning needed for 5×).
 - [ ] **AC-8 (R4)** — after a snapshot whose scene is *not* the first option, the scene selector's value equals the snapshot's scene; asserted through the served bundle.
 - [ ] **AC-9 (R4)** — the Fog button's active state matches the fog state at startup, and matches it after each toggle.
-- [ ] **AC-10 (R4)** — Save/Load are either functional in the live path or not presented as working, with the determination recorded in the spec notes (not assumed).
+- [ ] **AC-10 (R4)** — the Save and Load controls are absent from the served page, and no `prompt()`-based load path remains in the client.
 - [ ] **AC-11 (R5)** — the full `visualizer` suite is green, `pnpm typecheck` is clean, and touched files pass `npx prettier --check`.
 - [ ] **AC-12 (R5)** — specs 062/063 carry the amendment notes, and `docs/specs/INDEX.md` reflects this spec's status.
 
@@ -148,6 +148,7 @@ Pre-agreed boundaries only; these are the seams the legs write tests at.
 3. **Aliasing is an interpolation-pacing bug, not a speed bug.** The renderer must show the simulation's real speed (≈60 cells/s at 1×). If the *pacing of the simulation itself* is unsatisfying to watch, that is a simulation question and belongs in its own spec — deliberately out of scope here so the fix cannot quietly become "slow the renderer down until it looks nice".
 4. **Fidelity over prettiness in motion.** Interval-paced interpolation is chosen over a longer fixed half-life because a longer half-life would still cut corners and would misreport speed; it treats the symptom.
 5. **One position source.** D1 is fixed in layout, where both consumers already read from, rather than by teaching the hit test about de-collision — that keeps the invariant true by construction instead of by agreement.
+6. **Remove controls that cannot act (approved by the human at the spec gate).** Save/Load route through `this.persistence?.`, so absent a persistence object they no-op silently while still occupying the phone's scarcest resource — screen height — and offering a `prompt()` dialog. Wiring persistence is real scope with no user story behind it here, so the honest fix is deletion. Deliberately **not** replaced with a disabled state: a greyed-out button is still a promise.
 
 ## Out of Scope
 
@@ -155,7 +156,7 @@ Pre-agreed boundaries only; these are the seams the legs write tests at.
 - Simulation pacing, plan timing, LLM latency, or agent idleness ("doing nothing" observed while agents wait on LLM cycles is sim behaviour, not a rendering defect).
 - New visual features: user zoom, camera easing curves, animation of doors/objects, alternate skins.
 - The iOS home-screen icon (`apple-touch-icon` as SVG) and `apple-mobile-web-app-capable` — real AC-9 findings, deliberately left to a separate change so this spec stays about defects that break *use*, not polish.
-- Save-file format, persistence design, or offline behaviour beyond truthful control visibility.
+- Save-file format, persistence design, or offline behaviour. The Save/Load controls are **removed** rather than wired (Decision 6), so persistence in a served run is not pursued here.
 
 ## Notes
 
