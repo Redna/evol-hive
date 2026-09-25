@@ -849,3 +849,70 @@ describe('spec 066 leg 3 — the served glide bridges each delta over its interv
     expect(drawnX()).toBeCloseTo(p2.x, 3);
   });
 });
+
+/**
+ * Spec 066 leg 3, R3 — the pacing interval is MEASURED, not the 0.1 s default
+ * (AC-6).
+ *
+ * Every case above observes snapshots 0.1 s apart, which is exactly
+ * `DEFAULT_SNAPSHOT_INTERVAL_S`. They would therefore all stay green if the
+ * shipped glue ignored the measured cadence and hardcoded the default — the
+ * original D3 bug in a different coat. The design's headline claim is the
+ * opposite: the interval comes from actual snapshot arrivals, so a server with
+ * a different `snapshotRateMs` (or a jittery mesh link) is paced correctly with
+ * no protocol change. This case drives non-default cadences and asserts the
+ * delta is traversed over THAT interval.
+ */
+describe('spec 066 leg 3 — the glide interval is measured from snapshot arrivals (AC-6)', () => {
+  /**
+   * Observe two snapshots `intervalMs` apart, then read the drawn x `elapsedMs`
+   * into the second delta. The snapshot pair always bridges the same 9-cell gap,
+   * so only the cadence and the elapsed time differ.
+   */
+  function glideAtElapsed(
+    intervalMs: number,
+    elapsedMs: number,
+  ): { drawn: number; p1: number; p2: number } {
+    const W = 800;
+    const H = 600;
+    const sb = makeSandbox({ width: W, height: H, dpr: 1, raf: true });
+    const viewport = { width: W, height: H, insets: ZERO_INSETS };
+    const before = {
+      ...makeState(),
+      agents: [coLocatedAgent('a1', 'Alice', { x: 2, y: 4 })],
+    } as unknown as VisualizerState;
+    const after = {
+      ...makeState(),
+      agents: [coLocatedAgent('a1', 'Alice', { x: 11, y: 4 })],
+    } as unknown as VisualizerState;
+
+    sb.ws.onmessage?.({ data: JSON.stringify(before) });
+    sb.tick(1000);
+    sb.ws.onmessage?.({ data: JSON.stringify(after) });
+    sb.tick(1000 + intervalMs);
+    sb.tick(1000 + intervalMs + elapsedMs);
+
+    const names = sb.ctx.calls
+      .filter((c) => c.method === 'fillText' && c.args[0] === 'Alice')
+      .map((c) => c.args as [string, number, number]);
+    return {
+      drawn: names.at(-1)![1],
+      p1: layoutWorld(before, viewport).agents[0]!.x,
+      p2: layoutWorld(after, viewport).agents[0]!.x,
+    };
+  }
+
+  it('paces a slower 0.2 s cadence over 0.2 s, not the 0.1 s default', () => {
+    // Half the measured interval elapsed ⇒ half-way. A hardcoded 0.1 s interval
+    // would have already arrived here.
+    const r = glideAtElapsed(200, 100);
+    expect(r.drawn).toBeCloseTo((r.p1 + r.p2) / 2, 3);
+  });
+
+  it('paces a faster 0.05 s cadence over 0.05 s, not the 0.1 s default', () => {
+    // Half the measured interval elapsed ⇒ half-way. A hardcoded 0.1 s interval
+    // would have moved only a quarter of the delta.
+    const r = glideAtElapsed(50, 25);
+    expect(r.drawn).toBeCloseTo((r.p1 + r.p2) / 2, 3);
+  });
+});
