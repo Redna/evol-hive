@@ -22,6 +22,7 @@ import type { VisualizerState } from '@evol-hive/shared';
 import { getClientBundle } from '../src/server/client-bundle.js';
 import { layoutWorld, cellCenter, ZERO_INSETS } from '../src/renderer/layout.js';
 import type { Insets } from '../src/renderer/layout.js';
+import { FOLLOW_SCALE } from '../src/renderer/camera.js';
 import { THEME } from '../src/renderer/theme.js';
 
 interface RecordedCall {
@@ -543,5 +544,66 @@ describe('served selection + follow camera (spec 063, AC-7)', () => {
       pathname: '/',
     });
     expect(local.ws.url).toBe('ws://localhost:9/');
+  });
+});
+
+/**
+ * Spec 066 leg 1, R2 — the SERVED release (AC-4, AC-5).
+ *
+ * The pure `cameraFor`/`smoothCamera` tests (`spec-066-camera-release.test.ts`)
+ * prove the seam's behaviour, but the shipped defect (D2) lived in the client
+ * glue: `main.ts` smoothed the offsets and assigned `scale` outright. The pure
+ * tests cannot catch a regression that puts that asymmetry back — reverting
+ * `main.ts` to `scale: target.scale` would leave them all green. Spec 066's
+ * Test Seam 4 therefore names the served bundle + mock-DOM harness for AC-5.
+ *
+ * The camera scale is observed through the rendered world layer: the room floor
+ * is `transformLayout`-scaled by the camera, so `floorWidth / fitAllFloorWidth`
+ * is the live camera scale. The manual rAF makes the glide deterministic — no
+ * real timers, no browser.
+ */
+describe('spec 066 leg 1 — the served release returns to fit-all and glides (AC-4, AC-5)', () => {
+  it('glides the scale back to fit-all on release instead of snapping (AC-5, shipped glue)', () => {
+    const W = 800;
+    const H = 600;
+    const sb = makeSandbox({ width: W, height: H, dpr: 1, raf: true });
+    const state = makeState();
+    sb.ws.onmessage?.({ data: JSON.stringify(state) });
+
+    const base = layoutWorld(state, { width: W, height: H, insets: ZERO_INSETS });
+    const fitAllFloor = base.rooms[0]!.rect;
+    /** The most recent room-floor fill, in world-layer screen coordinates. */
+    const floor = (): number[] | undefined =>
+      fillRects(sb.ctx)
+        .filter((r) => r.fill === THEME.roomFloor)
+        .at(-1)?.rect;
+    /** Live camera scale, read off the scaled floor width. */
+    const scaleNow = (): number => (floor()?.[2] ?? 0) / fitAllFloor.w;
+
+    // Follow the agent to the 1.6x zoom (the production camera shape, AC-4).
+    const agent = base.agents[0]!;
+    const handlers = sb.canvasListeners['pointerdown'] ?? [];
+    for (const fn of handlers) fn({ clientX: agent.x, clientY: agent.y });
+    for (let t = 1000; t <= 4000; t += 100) sb.tick(t);
+    expect(scaleNow()).toBeCloseTo(FOLLOW_SCALE, 2);
+
+    // Release on empty canvas.
+    for (const fn of handlers) fn({ clientX: 1, clientY: H - 1 });
+    expect(sb.detailEl.classList.contains('hidden')).toBe(true);
+
+    // One frame later the scale has moved but has NOT snapped to fit-all.
+    sb.ctx.calls.length = 0;
+    sb.tick(4016);
+    const oneFrame = scaleNow();
+    expect(oneFrame).toBeLessThan(FOLLOW_SCALE); // ...it moved
+    expect(oneFrame).toBeGreaterThan(1); // ...but did not snap
+
+    // And it converges to fit-all within a bounded time (AC-5).
+    sb.ctx.calls.length = 0;
+    for (let t = 4032; t <= 4016 + 240 * 16; t += 16) sb.tick(t);
+    const settled = floor()!;
+    expect(settled[2] / fitAllFloor.w).toBeCloseTo(1, 2);
+    expect(settled[0]).toBeCloseTo(fitAllFloor.x, 1);
+    expect(settled[1]).toBeCloseTo(fitAllFloor.y, 1);
   });
 });
