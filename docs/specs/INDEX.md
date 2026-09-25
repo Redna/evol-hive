@@ -58,11 +58,11 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      71
+Total specs:      72
 ✅ Done:          68
 🔨 In Development: 0
 🔍 In Review:      0
-📝 Drafted:        1
+📝 Drafted:        2
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -119,3 +119,4 @@ Architecture sections fully implemented: 11/11
 | [063](063-visualizer-mobile-shell.md) | Visualizer Mobile Shell (2/2) — Secure Origin (reuses the environment's local CA + reverse proxy, same-origin `wss://`), Follow-Camera, Measured HUD & Installable PWA | §2, §3 | ✅ Done | [#232](https://github.com/Redna/evol-hive/issues/232) | [#233](https://github.com/Redna/evol-hive/pull/233), [#236](https://github.com/Redna/evol-hive/pull/236) | visualizer, examples |
 | [064](064-context-executable-offers.md) | Context Correctness (1/N) — Executable Offers: withdraw or implement `conversation_contribute`, stop naming un-offered `talk_to` (#225 slice 1) | §6, §8, §10 | ✅ Done | [#225](https://github.com/Redna/evol-hive/issues/225) | — | engine, cognition |
 | [065](065-reachable-area-offers.md) | Context Correctness (2/N) — Reachable Offers: stale area anchors and closed doors must leave the `targetArea` enum (#225 findings 2–3) | §3, §6, §10 | 📝 Drafted | [#225](https://github.com/Redna/evol-hive/issues/225) | — | engine |
+| [066](066-visualizer-live-observation-defects.md) | Visualizer Live-Observation Defects (3/3) — Co-located Agents, Camera Release, Motion Aliasing & Truthful Controls | §2, §3 | 📝 Drafted | — | — | visualizer |
