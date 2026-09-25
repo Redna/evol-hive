@@ -170,6 +170,32 @@ export function smoothTowards(
   return current + (target - current) * k;
 }
 
+/**
+ * Interval-paced linear motion for agents (spec 066, R3). Positions an entity
+ * `elapsedSeconds` into a delta it must traverse over `intervalSeconds` — the
+ * snapshot interval the delta was delivered in — clamped so it starts at
+ * `from`, arrives exactly at `to` when the interval completes, and never
+ * overshoots.
+ *
+ * Pacing against the interval (rather than a fixed half-life) is what makes
+ * observed speed match simulated speed: a larger delta over the same interval
+ * moves proportionally faster, so a 5× `timeScale` needs no retuned constant.
+ * Pure and clock-free at its seam (spec 062, R2): elapsed time in, position out.
+ */
+export function motionTowards(
+  from: Point,
+  to: Point,
+  elapsedSeconds: number,
+  intervalSeconds: number,
+): Point {
+  const progress =
+    intervalSeconds > 0 ? Math.min(Math.max(elapsedSeconds / intervalSeconds, 0), 1) : 1;
+  return {
+    x: from.x + (to.x - from.x) * progress,
+    y: from.y + (to.y - from.y) * progress,
+  };
+}
+
 interface GridPos {
   col: number;
   row: number;
