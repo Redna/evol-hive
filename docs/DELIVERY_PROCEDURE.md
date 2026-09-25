@@ -97,7 +97,11 @@ spec → build → verify → QA → live, as a sequence of legs.
    - the **leg packet** (see below).
 2. **Leg.** One fresh session does one bounded job, then records its outcome as a
    YAAM note (awaited, report the message verbatim) and commits on the branch.
-   It must not push, merge, or open PRs.
+   It must not push, merge, or open PRs. The fresh session may be a **tracked
+   subsession dispatched from the dispatcher session** (see "Dispatch legs as
+   subsessions" under Environment discipline): the dispatcher keeps the ledger
+   and merge duties and receives the leg's result and filtered transcript, while
+   the leg's bounded job is unchanged.
 3. **Spec gate** (only when the issue needs a spec). Review the spec against the
    code, correct the ACs that don't match reality, then merge.
 4. **PR + CI/QA.** Push the branch, open the PR; GitHub runs CI + QA. Bot-approve
@@ -111,6 +115,8 @@ spec → build → verify → QA → live, as a sequence of legs.
 
 ```
 charter:   issue #, spec # and path, branch
+dispatch:  fresh session or tracked subsession of the dispatcher (the parent keeps
+           ledger + merge duties; the leg still does not push, merge or open PRs)
 scope:     exactly which requirements this leg owns (and which are the next leg's)
 constraints: the invariants that must not be violated (enum = legality, byte-identity, no retry, …)
 verify:    the exact commands + pass counts that prove the leg
@@ -134,6 +140,18 @@ largest transcript in the workspace is ~19 MB, and the daemon has OOM'd at
 4–6 GB heap on a 7.7 GB box.
 
 - **Short legs.** Do not accumulate one giant conversation; hand off instead.
+- **Dispatch legs as subsessions, not as chapters of one conversation.** A leg's
+  job is already bounded, so it can run in a **tracked subsession** of the
+  dispatcher session (`spawn_subsession`) instead of extending the dispatcher's
+  context. The dispatcher keeps the ledger and merge duties and receives the
+  child's result and filtered transcript at the join point, which keeps the
+  parent's heap flat across a multi-leg chain — the same win as "short legs",
+  without losing the dispatcher's knowledge of branch/PR state.
+- **One leg at a time — a workspace constraint, not a preference.** Subsessions
+  share the same working tree and checkout, so two legs running concurrently
+  would collide on branches, files and the index. The serialized chain required
+  by shared files is *also* the constraint that makes subsession dispatch safe;
+  a parallel frontier would need separate worktrees first.
 - **Close finished sessions.** Twelve idle sessions are the other half of the heap.
 - **Restart the daemon** when its heap creeps up (`systemctl --user restart
 pi-web-sessiond`) — and do it _between_ legs, not mid-leg.
