@@ -1,0 +1,111 @@
+# 066 — Visualizer Live-Observation Defects — implementation notes
+
+- **Spec:** `docs/specs/066-visualizer-live-observation-defects.md`
+- **Issue:** [#257](https://github.com/Redna/evol-hive/issues/257)
+- **Legs:** 1 of 4 (`#258`, merged `970e2ba`) · 2 of 4 · 3 pending · 4 pending
+- These notes exist because the leg-1 QA pass flagged that spec 066 had **no design or
+  implementation notes**, only a spec and PR bodies. Per ADR-003 the committed note *is*
+  the handoff, so this file is the durable record rather than the PR text.
+
+## How the defects were found (and how to reproduce the search)
+
+Not by the suite. By a live real-LLM run observed through the **phone path** — spec 063's
+own AC-9, the criterion that had been sitting unverified — plus a scripted browser session
+against that running sim.
+
+Recipe (environment values are operator-specific and deliberately not recorded in this
+public repo — see the spec's Context note):
+
+1. `pnpm build` — **mandatory**: examples and live sims resolve workspace packages to
+   `dist/`, so a stale dist silently runs old code.
+2. Launch the demo with a real LLM: `USE_REAL_LLM=true LLM_MODEL=<available model> npx tsx examples/visualizer-demo.ts`.
+   Note the demo's default model is `llama3.1`, which is **not** installed by default — the
+   model must be set explicitly or the run fails.
+3. Open the served page through the environment's TLS endpoint, with `?debug=1` to expose
+   `window.__viz` (`hitTest`, `select`, `snapshot()` → `{selected, camera, agents}`).
+4. Probe with a browser session: scan the viewport through `__viz.hitTest` to find agents,
+   read `__viz.snapshot().camera` before/after a release, and click controls while counting
+   server-log lines per interval to measure whether they act.
+
+**Three of the four defects were invisible to the test suite** because they live on code
+paths no test executed (a default argument, a draw/select pair that was never compared, and
+client glue smoothing policy). The probe approach is what made them measurable.
+
+## Leg 1 — releasing follow returns to fit-all (`#258`)
+
+- **Cause:** `cameraFor` returned `previous.scale` (the 1.6× follow zoom) with zeroed
+  offsets on release → a magnified view anchored on the world origin.
+- **Red-first evidence:** new tests passed `previous` explicitly (the production shape) and
+  failed `3 | 1 passed` before the fix; the one that passed was the no-`previous` case the
+  old suite already covered. That asymmetry *is* the defect: `renderer-camera.test.ts` called
+  `cameraFor(null, layout)` with no third argument, so the buggy branch was only ever
+  exercised with its `1` default.
+- **Design:** the release target is history-independent. `_previous` is retained in the
+  signature (the seam AC-4 names, and the client passes it) but deliberately not consulted,
+  and documented as such — deleting it would have deviated from the AC approved at the gate.
+- **AC-5:** the client smoothed offsets while assigning `scale` outright, so a release was a
+  hard zoom-out then a slide. That policy lived inline in `client/main.ts`; it moved to a pure
+  `smoothCamera()` in `renderer/camera.ts`, and `CAMERA_HALF_LIFE_S` moved out of the DOM
+  glue, matching spec 062's rule that visual rules live in the renderer.
+- **QA strengthened this leg:** CI's QA pass added a served-bundle test observing the camera
+  scale through the rendered floor width, and demonstrated its own red-first evidence by
+  restoring `scale: target.scale` (one pure frame reads exactly `1` — snapped — versus
+  strictly between `1` and `FOLLOW_SCALE` when smoothed). That covers a regression the pure
+  tests cannot: reverting the glue leaves every pure `smoothCamera` test green.
+
+## Leg 2 — co-located agents are separately placed
+
+- **Cause:** `layoutWorld` placed every agent at its raw cell centre, so agents sharing a
+  cell received identical coordinates. The renderer paints in order (last on top) while
+  `hitTestAgent` returns the nearest/first, so the two consumers disagreed — measured live, a
+  probe at the drawn chip returned `agent-alice` where the chip was labelled **"Carol"**.
+- **Red-first evidence:** `3 failed | 2 passed` before the fix. The two passes are honest
+  non-cases (a lone agent, and an occupant of a *different* cell) — they do not involve
+  co-location, so they should not discriminate. Verified by stashing the source change and
+  re-running: the same three fail, the same two pass.
+- **Design:** a deterministic ring inside the cell (`cellClusterSlot`), radius a fraction of
+  the smaller cell dimension, only when a cell has more than one occupant — so the common
+  case is byte-identical to before. Slots are assigned from a **sorted copy** of each cell's
+  occupants, because the order of `state.agents` is a transport detail and a layout that
+  agreed only by matching that order could still tear.
+- **Uniqueness is the assertion, deliberately.** It is the invariant that makes both
+  consumers agree *by construction*: positions live in the layout and both the renderer and
+  the hit test read the layout, so no test has to re-derive a screen position to prove a tap
+  lands on the right agent. A test that recomputed the hit-test maths would be tautological.
+- **Honest limitation:** a cell (~26×38 px at phone sizes) is smaller than an agent chip, so
+  co-located agents remain visually overlapping even when their points are distinct. The fix
+  makes them *separately selectable and correctly labelled*, which is the reported defect
+  (wrong card) and the D1 draw/select inversion. Fully separating the chips would require
+  drawing outside the cell and colliding with neighbours — out of scope, and it would trade a
+  correctness bug for a layout lie.
+
+## Protocol finding — CI QA pushes to the PR branch, so the verified SHA is not the merged tree
+
+Measured, not inferred. Leg 1's merge commit `970e2ba` contains **two files I did not author**:
+`docs/specs/notes/066-visualizer-live-observation-defects-qa-notes.md` (+54) and **+62 lines
+in `packages/visualizer/tests/mobile-shell.integration.test.ts`**. The QA workflow pushed them
+during the merge window, and the squash merge carried them in.
+
+This is the second time this has bitten; it was recorded as a lesson before and now has a
+measurement. Two consequences worth carrying forward:
+
+1. **A matrix run before a QA push does not describe the merged tree.** I verified
+   "visualizer 101" and merged "visualizer 102". The discrepancy surfaced only because an
+   unexplained +1 test count was chased down — the same class of mistake as trusting a count
+   over a set. Re-verify the merged `main`, or diff the merge commit, rather than assuming the
+   pre-push measurement still holds.
+2. **Unreviewed code can merge under my name.** The QA additions here turned out to be good
+   (they closed a seam I had skipped), but that was luck plus review *after* merging. The
+   check belongs before: `git show --stat <merge>` or `git diff main...HEAD` immediately
+   prior.
+
+## What is left
+
+- **Leg 3** — R3/AC-6/AC-7: motion paced against the snapshot interval (~60 ticks/s engine vs
+  10 snapshots/s client ⇒ ~6 cells per snapshot on a fixed 0.09 s glide).
+- **Leg 4** — R4/AC-8/AC-9/AC-10: scene-select sync, Fog initial state, and removal of the
+  Save/Load controls (approved at the spec gate).
+- **AC-12 (docs)** — specs 062/063 amendment notes and the INDEX status are the final leg's
+  deliverable.
+- Live validation after leg 2: rebuild, restart the sim, and re-probe the viewport to confirm
+  that a probe at a drawn chip now returns that chip's agent (AC-3's real-device evidence).

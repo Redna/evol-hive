@@ -52,3 +52,61 @@ The one-frame scale is exactly `1` (snapped) under the old glue and strictly bet
 - **AC-8, AC-9, AC-10 (R4, D4 truthful controls)** — deferred to leg 4.
 - **AC-12 (R5 docs)** — spec 062/063 amendment notes and `docs/specs/INDEX.md` status are the final leg's deliverable; not present yet, so not claimed.
 - No design/implementation notes exist for spec 066; if the workflow expects them at `docs/specs/notes/066-…`, that is a process gap for the leg owner, not a test gap.
+
+---
+
+# 066 — Visualizer Live-Observation Defects — QA notes (leg 2)
+
+- **PR:** [#259](https://github.com/Redna/evol-hive/pull/259) — `fix/066-leg2-co-located-agents`
+- **Scope of this leg:** R1 / **AC-1, AC-2, AC-3** (leg 2 of four; D2/R2 landed in leg 1, D3/R3 and D4/R4 land in later legs per the approved serialized chain).
+- **Spec:** `docs/specs/066-visualizer-live-observation-defects.md`
+- **Design/implementation notes:** `docs/specs/notes/066-…-implementation-notes.md` (added by this PR — closes the leg-1 gap where 066 had no notes).
+- **Verdict:** ✅ All testable leg-2 acceptance criteria now have tests; full suite, `typecheck`, `lint` and `prettier` are green.
+
+## Coverage summary
+
+| AC       | Requirement                                                                                                                                                              | Covered by                                                                                                                                                                     | Status |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| **AC-1** | Two co-located agents produce different `x`/`y` from `layoutWorld`; a third agent in a different cell lands on neither                                                   | `packages/visualizer/tests/spec-066-co-located-agents.test.ts` (2-agent, 3-agent, different-cell cases)                                                                          | ✅ dev |
+| **AC-2** | `layoutWorld` is deterministic for co-located agents: identical input → identical positions across repeated calls                                                          | `spec-066-co-located-agents.test.ts` — "assigns the same slot regardless of the order of `state.agents`" invokes `layoutWorld` repeatedly and asserts per-agent equality; order-independence is the strictly stronger form of this AC | ✅ dev |
+| **AC-3** | A probe at the screen position of a **drawn** agent selects **that agent's id** (the D1 inversion is gone), asserted through the served client bundle with the mock-DOM harness | **QA added** — `packages/visualizer/tests/mobile-shell.integration.test.ts`, "spec 066 leg 2 — the served tap selects the agent it drew (AC-3)"                                  | ✅ QA  |
+
+**3 / 3 leg-2 acceptance criteria tested.**
+
+AC-11 (full suite green, typecheck, prettier) is satisfied by the run below. AC-12 (spec 062/063 amendment notes, INDEX status) belongs to the final leg and is **not** claimed here — see Gaps.
+
+## Tests added by QA
+
+`packages/visualizer/tests/mobile-shell.integration.test.ts`
+— new describe block **"spec 066 leg 2 — the served tap selects the agent it drew (AC-3)"**, plus a small `coLocatedAgent` fixture helper.
+
+**Why it was missing.** The Developer's AC-1/AC-2 tests assert the *layout invariant* — co-located agents get distinct points. That is the right unit seam, and the implementation notes argue (correctly) that uniqueness makes the two consumers agree *by construction*. But D1 was not a layout-only failure: it was an **inversion between two consumers of the layout** — the renderer paints in order (last drawn on top) while `hitTestAgent` returns the nearest/first. A regression that decoupled the hit test from the layout (for example, re-deriving positions inside `hitTestAgent`) would leave every pure `layoutWorld` test green while re-opening the measured bug. Spec 066's Test Seam 4 explicitly names the served bundle + mock-DOM harness for AC-3, and issue #257's leg 2 is worded "the tap that lands on a chip selects that chip's agent". This closes the seam the Developer skipped.
+
+The test feeds a snapshot with **Alice and Bob in one cell** (Alice first, so the renderer paints Bob's chip on top), locates each agent's drawn name pill in the recorded canvas calls (proving the tap coordinates are the *drawn* positions, not a second derivation), then drives the shipped `pointerdown` glue. The card must open for Bob when Bob's chip is tapped, and for Alice when Alice's is.
+
+## Red-first evidence
+
+Reverting only `packages/visualizer/src/renderer/layout.ts` to its pre-leg-2 revision (`git show HEAD~1:… > layout.ts`) and running the new case:
+
+```
+× spec 066 leg 2 — the served tap selects the agent it drew (AC-3)
+  > tapping a co-located agent's drawn chip selects that agent, not its cell-mate
+  → expected 'Alice' to be 'Bob' // Object.is equality
+```
+
+Exactly the measured D1 symptom: a tap on the chip drawn on top (Bob) selected the agent whose chip was underneath (Alice). The source was restored immediately after (`git diff` on `layout.ts` clean). The Developer's own red-first evidence (`3 failed | 2 passed`) is unchanged.
+
+## Test results
+
+- `pnpm test` — **all green**: shared 399, memory 101, **visualizer 108** (+1 QA integration test; 16 files), engine 922, cognition 1252, assembly 89, examples 253, cli 115.
+- `pnpm typecheck` — clean.
+- `pnpm lint` — clean.
+- `npx prettier --check` on the touched file — clean.
+- Root `pnpm test` requires `pnpm build` first (shared resolves from `dist/`); built all packages before the run.
+
+## Gaps / not tested here
+
+- **AC-6, AC-7 (R3, D3 motion aliasing)** — deferred to leg 3.
+- **AC-8, AC-9, AC-10 (R4, D4 truthful controls)** — deferred to leg 4.
+- **AC-12 (R5 docs)** — spec 062/063 amendment notes and `docs/specs/INDEX.md` status are the final leg's deliverable; not present yet, so not claimed.
+- **AC-3 real-device evidence.** The served-bundle test proves the glue is tap-correct against the shipped bundle; a live phone re-probe (the implementation notes' "What is left") remains the human close-out for AC-3 and is not automatable here.

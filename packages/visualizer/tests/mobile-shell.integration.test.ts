@@ -342,6 +342,26 @@ function makeState(): VisualizerState {
   } as unknown as VisualizerState;
 }
 
+/** One positioned agent for the co-location (spec 066, R1) cases. */
+function coLocatedAgent(
+  agentId: string,
+  name: string,
+  position: { x: number; y: number },
+): Record<string, unknown> {
+  return {
+    agentId,
+    name,
+    location: 'kitchen',
+    position,
+    drives: { energy: 50, hunger: 50, social: 50, comfort: 50, curiosity: 50 },
+    currentGoal: '',
+    currentPlan: null,
+    pperPhase: 'perceive',
+    isThinking: false,
+    relationships: [],
+  };
+}
+
 function expectedInsets(opts: { topInset?: number; bottomInset?: number }): Insets {
   return { top: opts.topInset ?? 0, right: 0, bottom: opts.bottomInset ?? 0, left: 0 };
 }
@@ -605,5 +625,73 @@ describe('spec 066 leg 1 — the served release returns to fit-all and glides (A
     expect(settled[2] / fitAllFloor.w).toBeCloseTo(1, 2);
     expect(settled[0]).toBeCloseTo(fitAllFloor.x, 1);
     expect(settled[1]).toBeCloseTo(fitAllFloor.y, 1);
+  });
+});
+
+/**
+ * Spec 066 leg 2, R1 — the SERVED tap selects the agent it drew (AC-3).
+ *
+ * AC-1/AC-2 are asserted purely in `spec-066-co-located-agents.test.ts`: the
+ * layout now hands co-located agents distinct points. But the reported defect
+ * (D1) was the *inversion* between the two consumers of that layout — the
+ * renderer paints in order (last on top) while `hitTestAgent` returned the
+ * nearest/first — so a tap on the visible chip opened a different agent's card.
+ * A pure `layoutWorld` test never touches the shipped glue, so a regression
+ * that decoupled the hit test from the layout (the exact shape of D1) would
+ * leave it green.
+ *
+ * Spec 066's Test Seam 4 names the served bundle + mock-DOM harness for AC-3,
+ * so this drives the page the server actually ships: feed a snapshot with two
+ * agents sharing one cell, locate each drawn chip, tap it, and require the card
+ * to open for *that* agent.
+ */
+describe('spec 066 leg 2 — the served tap selects the agent it drew (AC-3)', () => {
+  it('tapping a co-located agent’s drawn chip selects that agent, not its cell-mate', () => {
+    const W = 800;
+    const H = 600;
+    const sb = makeSandbox({ width: W, height: H, dpr: 1 });
+
+    // Both agents share the same room and the same grid cell — the D1 shape.
+    // Alice is first in the array; Bob is last, so his chip is painted on top.
+    const coLocated = {
+      ...makeState(),
+      agents: [
+        coLocatedAgent('alice', 'Alice', { x: 5, y: 4 }),
+        coLocatedAgent('bob', 'Bob', { x: 5, y: 4 }),
+      ],
+    } as unknown as VisualizerState;
+
+    sb.ws.onmessage?.({ data: JSON.stringify(coLocated) });
+
+    const layout = layoutWorld(coLocated, { width: W, height: H, insets: ZERO_INSETS });
+    const at = new Map(layout.agents.map((a) => [a.id, a]));
+
+    // The drawn chips: each agent's name pill is painted at that agent's own
+    // layout point, so the coordinates below are genuinely the drawn positions,
+    // not a second derivation.
+    const drawn = sb.ctx.calls
+      .filter((c) => c.method === 'fillText')
+      .map((c) => c.args as [string, number, number]);
+    for (const [id, name] of [
+      ['alice', 'Alice'],
+      ['bob', 'Bob'],
+    ] as const) {
+      expect(
+        drawn.filter(([text, x]) => text === name && Math.abs(x - at.get(id)!.x) < 0.5).length,
+      ).toBeGreaterThan(0);
+    }
+
+    const handlers = sb.canvasListeners['pointerdown'] ?? [];
+    expect(handlers.length).toBeGreaterThan(0);
+
+    // Tap Bob's drawn chip first. Before the fix Alice and Bob shared one
+    // point, the renderer drew Bob on top, and the hit test returned Alice — so
+    // this is exactly the reported "tapping the visible agent opens another".
+    for (const fn of handlers) fn({ clientX: at.get('bob')!.x, clientY: at.get('bob')!.y });
+    expect(sb.nameEl.textContent).toBe('Bob');
+
+    // And Alice's own chip still selects Alice.
+    for (const fn of handlers) fn({ clientX: at.get('alice')!.x, clientY: at.get('alice')!.y });
+    expect(sb.nameEl.textContent).toBe('Alice');
   });
 });

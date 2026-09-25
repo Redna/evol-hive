@@ -101,6 +101,27 @@ export function cellCenter(rect: Rect, cell: Point): Point {
   };
 }
 
+/** Fraction of the smaller cell dimension used as the cluster ring radius. */
+const CLUSTER_RADIUS_FRACTION = 0.3;
+
+/**
+ * Position for one of several agents sharing a grid cell (spec 066, R1).
+ *
+ * A lone occupant keeps the exact cell centre — the common case must not move.
+ * Co-located agents are placed on a small ring inside their own cell, so they
+ * stay readable as "in that cell" while occupying distinct points.
+ *
+ * Deterministic by construction: the result depends only on the slot index and
+ * the occupant count, never on call order or on a `Map`'s iteration order.
+ */
+export function cellClusterSlot(rect: Rect, cell: Point, index: number, count: number): Point {
+  const centre = cellCenter(rect, cell);
+  if (count <= 1) return centre;
+  const radius = Math.min(rect.w / GRID_COLS, rect.h / GRID_ROWS) * CLUSTER_RADIUS_FRACTION;
+  const angle = -Math.PI / 2 + (2 * Math.PI * index) / count;
+  return { x: centre.x + Math.cos(angle) * radius, y: centre.y + Math.sin(angle) * radius };
+}
+
 /** Legacy slot for an agent with no grid position (pre-grid saves). */
 export function legacySlot(rect: Rect, index: number): Point {
   return { x: rect.x + 40 + index * 60, y: rect.y + rect.h - 50 };
@@ -456,12 +477,43 @@ export function layoutWorld(state: VisualizerState, viewport: Viewport): WorldLa
     });
   }
 
+  // Agents sharing a cell must not share coordinates (spec 066, R1): the
+  // renderer paints in order (last on top) while the hit test returns the
+  // nearest (first), so identical points left a drawn agent unselectable — and
+  // selecting the wrong one. Slots come from a sorted copy of each cell's
+  // occupants so the result does not depend on the order of `state.agents`,
+  // which is a transport detail.
+  const cellSlots = new Map<string, number>();
+  const cellCounts = new Map<string, number>();
+  const groups = new Map<string, string[]>();
+  for (const a of state.agents) {
+    if (a.position === undefined) continue;
+    const key = `${a.location}:${a.position.x},${a.position.y}`;
+    const ids = groups.get(key);
+    if (ids === undefined) groups.set(key, [a.agentId]);
+    else ids.push(a.agentId);
+  }
+  for (const ids of groups.values()) {
+    ids.sort();
+    ids.forEach((id, slot) => {
+      cellSlots.set(id, slot);
+      cellCounts.set(id, ids.length);
+    });
+  }
+
   const agents: EntityLayout[] = [];
   state.agents.forEach((a, index) => {
     const rl = roomById.get(a.location);
     if (rl === undefined) return;
     const at =
-      a.position !== undefined ? cellCenter(rl.rect, a.position) : legacySlot(rl.rect, index);
+      a.position !== undefined
+        ? cellClusterSlot(
+            rl.rect,
+            a.position,
+            cellSlots.get(a.agentId) ?? 0,
+            cellCounts.get(a.agentId) ?? 1,
+          )
+        : legacySlot(rl.rect, index);
     const explored = fogActive ? viewer?.fog?.exploredCells[a.location] : undefined;
     const visible =
       !fogActive ||
