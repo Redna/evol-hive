@@ -64,7 +64,7 @@ The defect is therefore **aliasing, not engine stepping** — an earlier reading
 
 The control bar works — pause/play/speed were measured against the live sim (log lines per 4 s: baseline 17, **paused 4**, **play 32**, **5× 39**, back to 1× 18) — but two controls misreport state:
 
-- **The scene selector shows the wrong scene.** It renders `'minimal'` (the first appended option) while the **coffee-shop** scene is running, because the client never syncs the select to the scene actually in the snapshot. Touching it silently reloads a different scene.
+- **The scene selector shows the wrong scene.** It renders `'minimal'` (the first appended option) while the **coffee-shop** scene is running, because the client never syncs the select to the scene actually in the snapshot. Touching it silently reloads a different scene. **Resolved by removal at the human gate** (Decision 6), because the truth was not reachable in scope — see R4 and the Notes.
 - **The Fog button's initial state is inverted.** `showFog` initialises to `true` (agents hidden) while the `on` class is only ever toggled *on click*, so the view starts fogged with the button looking off. This one is worth noting because it **invalidated a diagnostic**: a conditional click keyed off that class never fired, leaving fog enabled while the probe assumed it was off.
 - **Save/Load are unverified as functional.** Both route through `this.persistence?.` in the adapter, so without a persistence object they no-op silently, and `load` opens a `prompt()` dialog — poor on mobile. **Decision (approved): remove them** rather than wire persistence. Unused controls cost scarce screen space on a phone, and a `prompt()` dialog is a poor mobile affordance.
 
@@ -94,7 +94,7 @@ The control bar works — pause/play/speed were measured against the live sim (l
 
 ### R4 — The control bar reports the true state (`visualizer`)
 
-- The scene selector must reflect the scene the snapshot says is running, and must not present a value that differs from it.
+- **The scene selector is removed from the control bar** (Decision 6). It cannot report the running scene: `VisualizerState` carries no scene id, and this spec's Constraints forbid adding one, so no in-scope implementation can make it truthful. A selector that opens on a value it cannot verify is worse than no selector — and it silently reloads a different scene when touched.
 - The Fog button's active state must reflect the actual fog state **at startup**, not only after a click.
 - **Save/Load are removed from the control bar** (Decision 6). A control that cannot act must not be presented; if a future spec wires persistence into a served run, the controls return with it.
 - Controls that only work in some configurations must be visible exactly when they work.
@@ -115,7 +115,7 @@ The control bar works — pause/play/speed were measured against the live sim (l
 - [ ] **AC-5 (R2)** — releasing follow converges to fit-all within a bounded time, and `scale` changes gradually rather than in one frame.
 - [ ] **AC-6 (R3)** — given a delta delivered over a known interval, the interpolated position is proportional to elapsed time within that interval and **arrives at the target as the interval completes**; asserted as a pure function with no timers.
 - [ ] **AC-7 (R3)** — a larger delta over the same interval moves the agent proportionally faster (no constant retuning needed for 5×).
-- [ ] **AC-8 (R4)** — after a snapshot whose scene is *not* the first option, the scene selector's value equals the snapshot's scene; asserted through the served bundle.
+- [ ] **AC-8 (R4)** — the scene selector is absent from the served page, and the client no longer hardcodes a scene list nor sends `selectScene`.
 - [ ] **AC-9 (R4)** — the Fog button's active state matches the fog state at startup, and matches it after each toggle.
 - [ ] **AC-10 (R4)** — the Save and Load controls are absent from the served page, and no `prompt()`-based load path remains in the client.
 - [ ] **AC-11 (R5)** — the full `visualizer` suite is green, `pnpm typecheck` is clean, and touched files pass `npx prettier --check`.
@@ -129,6 +129,7 @@ The control bar works — pause/play/speed were measured against the live sim (l
 - **No protocol change required**: R3 must be satisfied without raising the snapshot rate, though raising it is permitted if measured necessary. If the rate changes, bandwidth to a phone over a mesh network is the budget to respect.
 - **Phone-first**: 44 px minimum targets, safe-area insets respected, no layout that overflows a 390 px-wide viewport.
 - **Deterministic rendering**: no `Math.random`, no dependence on `Map` iteration order, no clock in the pure modules.
+- **No protocol change to make the control bar truthful.** Removing the controls that cannot tell the truth (Decision 6) is chosen over widening the snapshot: a `sceneId` on `VisualizerState` would touch `shared` and `engine`, outside this spec's scope, and a fully truthful selector deserves its own spec rather than a rider on a bug-fix change.
 - **Do not chase**: `pnpm typecheck` excludes `tests/`; a tests-inclusive run has ~703 known errors and is not a target. Do not edit `dist/` or goldens in spec-021/spec-055.
 
 ## Test Seams
@@ -138,7 +139,7 @@ Pre-agreed boundaries only; these are the seams the legs write tests at.
 1. **`renderer/layout.ts` — `layoutWorld` agent placement** (pure function, no DOM): co-location spread, determinism, and no cross-cell collision (AC-1, AC-2).
 2. **`renderer/layout.ts` — the motion function** (pure, clock-free): interval-paced interpolation and speed scaling (AC-6, AC-7). Spec 062 R2 already places motion here; this extends, not relocates it.
 3. **`renderer/camera.ts` — `cameraFor(selection, layout, previous)`** (pure): release-to-fit-all **with a live follow camera as `previous`** (AC-4). The existing file's default-argument gap is the seam to close.
-4. **Served client bundle + mock DOM** (`getClientBundle()` in the existing `mobile-shell.integration.test.ts` harness): tap-selects-what-is-drawn, scene-select sync, and fog initial state (AC-3, AC-5, AC-8, AC-9). This exercises the shipped glue, not a copy.
+4. **Served client bundle + mock DOM** (`getClientBundle()` in the existing `mobile-shell.integration.test.ts` harness): tap-selects-what-is-drawn, control absence, and fog initial state (AC-3, AC-5, AC-8, AC-9). This exercises the shipped glue, not a copy.
 5. **Adapter/shell capability** — Save/Load truthfulness (AC-10): assert visibility against whether persistence is wired, rather than mocking a persistence object into existence.
 
 ## Design Decisions
@@ -148,7 +149,10 @@ Pre-agreed boundaries only; these are the seams the legs write tests at.
 3. **Aliasing is an interpolation-pacing bug, not a speed bug.** The renderer must show the simulation's real speed (≈60 cells/s at 1×). If the *pacing of the simulation itself* is unsatisfying to watch, that is a simulation question and belongs in its own spec — deliberately out of scope here so the fix cannot quietly become "slow the renderer down until it looks nice".
 4. **Fidelity over prettiness in motion.** Interval-paced interpolation is chosen over a longer fixed half-life because a longer half-life would still cut corners and would misreport speed; it treats the symptom.
 5. **One position source.** D1 is fixed in layout, where both consumers already read from, rather than by teaching the hit test about de-collision — that keeps the invariant true by construction instead of by agreement.
-6. **Remove controls that cannot act (approved by the human at the spec gate).** Save/Load route through `this.persistence?.`, so absent a persistence object they no-op silently while still occupying the phone's scarcest resource — screen height — and offering a `prompt()` dialog. Wiring persistence is real scope with no user story behind it here, so the honest fix is deletion. Deliberately **not** replaced with a disabled state: a greyed-out button is still a promise.
+6. **Remove controls that cannot tell the truth (approved by the human at the spec gate).** Two controls failed this test for different reasons, and both are deleted rather than repaired:
+   - **Save/Load** route through `this.persistence?.`, so absent a persistence object they no-op silently while still occupying the phone's scarcest resource — screen height — and offering a `prompt()` dialog. Wiring persistence is real scope with no user story behind it here.
+   - **The scene selector** could not be made truthful *in scope*: reporting the running scene needs a scene id in the snapshot, `VisualizerState` has none, and this spec's Constraints put `shared`/`engine` out of bounds. The alternative — widen the protocol — is a different change with its own justification.
+   Deliberately **not** replaced with a disabled state: a greyed-out control is still a promise.
 
 ## Out of Scope
 
@@ -163,4 +167,7 @@ Pre-agreed boundaries only; these are the seams the legs write tests at.
 - **How these were found.** Not by the suite: by a live real-LLM run viewed through the phone path, plus a scripted browser session against the running sim (viewport probe over the canvas, the page's own `?debug=1` camera hook, and control clicks measured against the server log). Three of the four defects are on code paths the tests never execute, which is why they survived review.
 - **Diagnostic correction recorded.** An intermediate reading held that the engine resolves a walk in one execute step; `navigation.ts:243` shows one cell per tick, so the defect is client-side aliasing. The wrong reading is recorded here because it shaped the first version of R3.
 - **A defect can invalidate a diagnosis.** The Fog button's stale `on` class caused a probe to run with fog enabled while assuming it was disabled, briefly producing a false "two agents are dropped from the layout" conclusion. Test instrumentation must not key off the state it is meant to be measuring.
+- **Spec drift caught during implementation: an AC asked for state the protocol never carried.** AC-8 originally required the scene selector to equal *the snapshot's* scene. `VisualizerState` has no scene id — the only `sceneId` in the shared types is on the outbound `selectScene` command — and this spec's own Constraints forbid adding one. The AC was written from the symptom ("the dropdown lies") without checking that the data existed, which is exactly the drift the spec gate exists to catch; it survived because the same session authored *and* approved the spec. Caught when leg 4 was scoped against the code, and resolved by removal at the gate.
+  **The general form worth checking for: an AC that reads state must name the field that carries it.** An AC phrased as "the UI reflects X" is only implementable if X is in the payload; otherwise it is a wish, not a criterion.
 - **Evidence lives in** `docs/specs/notes/066-*-notes.md` per ADR-003 (local memory is not CI's; committed notes are the handoff).
+- **Environment values stay out.** The reproduction recipe in the implementation notes uses placeholders only (this is a public repository), consistent with spec 063's rule.
