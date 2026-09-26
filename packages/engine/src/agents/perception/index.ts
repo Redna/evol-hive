@@ -28,12 +28,40 @@ import type { SocialManager } from '../../social/social-manager.js';
 import type { ConversationManagerImpl } from '../../social/conversation-manager.js';
 import type { SelfModelManager } from '../state/self-model-manager.js';
 
+/**
+ * Narrow reachability port (spec 065, R4) — the spatial authority's ONE
+ * notion of "passable" this cycle. Implemented by the navigation system and
+ * injected at assembly; the perception provider never routes on its own.
+ */
+export interface AreaReachabilityPort {
+  /** True when `areaId` (a room id or an object anchor) has an open route. */
+  canReachArea(agentId: string, areaId: string): boolean;
+}
+
 /** Constructor options for {@link PerceptionDataProviderImpl}. */
 export interface PerceptionDataProviderOptions {
   agentManager: AgentManager;
   smartObjectRegistry: SmartObjectRegistry;
   driveSystem: DriveSystem;
   feedbackStore: SystemFeedbackStore;
+  /**
+   * Spec 065, R4 — optional. When absent, door-derived areas are offered
+   * exactly as before (degrade to pre-065 behaviour).
+   */
+  reachability?: AreaReachabilityPort;
+}
+
+/**
+ * Structural view of the `spatialMemory` fields the provider reads. Mirrors
+ * `AgentInternalState['spatialMemory']` without importing the shared type
+ * into the `fog()` signature.
+ */
+interface SpatialMemoryView {
+  visitedRooms: string[];
+  knownDoors: string[];
+  discoveredAt: Record<string, number>;
+  observedObjects?: Record<string, string>;
+  exploredCells?: Record<string, string[]>;
 }
 
 /**
@@ -52,17 +80,30 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
   private selfModelManager: SelfModelManager | undefined;
   /** Tick source (spec 044) — scene-novelty input for the social urge model. */
   private tickSource: (() => number | undefined) | undefined;
+  /** Reachability port (spec 065, R4) — absent until wired (degrade). */
+  private reachability: AreaReachabilityPort | undefined;
 
   constructor(
     agentManager: AgentManager,
     smartObjectRegistry: SmartObjectRegistry,
     driveSystem: DriveSystem,
     feedbackStore: SystemFeedbackStore,
+    reachability?: AreaReachabilityPort,
   ) {
     this.agentManager = agentManager;
     this.smartObjectRegistry = smartObjectRegistry;
     this.driveSystem = driveSystem;
     this.feedbackStore = feedbackStore;
+    this.reachability = reachability;
+  }
+
+  /**
+   * Wire the spatial authority's reachability port (spec 065, R4). Optional:
+   * without it the provider degrades to the pre-065 projection, so existing
+   * construction sites and tests keep working unchanged.
+   */
+  setReachabilityPort(port: AreaReachabilityPort): void {
+    this.reachability = port;
   }
 
   getAgentLocation(agentId: string): string {
@@ -83,13 +124,7 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
   // without `spatialMemory` perceive everything (backward compat).
 
   /** The agent's spatial memory, or `null` when fog is not wired (legacy). */
-  private fog(agentId: string): {
-    visitedRooms: string[];
-    knownDoors: string[];
-    discoveredAt: Record<string, number>;
-    observedObjects?: Record<string, string>;
-    exploredCells?: Record<string, string[]>;
-  } | null {
+  private fog(agentId: string): SpatialMemoryView | null {
     const state = this.agentManager.getState(agentId);
     return state?.spatialMemory ?? null;
   }
@@ -173,6 +208,13 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
    * rooms, and observed object anchors — the exact targetArea enum value
    * space. Deterministic order: visited rooms (arrival order), then
    * door-adjacent rooms, then observed anchors (insertion order).
+   *
+   * Spec 065: knowledge ≠ offer. This projection is the OFFER, so it is
+   * narrowed to destinations executable this cycle — a room known ONLY
+   * through a currently-unroutable door is withheld, while `knownDoors`
+   * keeps the memory (R3). A personally visited room stays offered
+   * regardless of door state (AC-2), and a live anchor's room is not the
+   * anchor's own area id. Stale anchors are corrected first (R2).
    */
   getKnownAreas(agentId: string): string[] {
     const mem = this.fog(agentId);
@@ -185,14 +227,63 @@ export class PerceptionDataProviderImpl implements PerceptionDataProvider {
         areas.push(id);
       }
     };
+    const visited = new Set(mem.visitedRooms);
+    // R2: correct false anchors BEFORE folding them in — a removed object is
+    // neither offered nor remembered; a relocated one routes to its room.
+    const anchors = this.reconcileObservedAnchors(agentId, mem);
     for (const room of mem.visitedRooms) add(room);
     for (const pair of mem.knownDoors) {
       const [a, b] = pair.split('|');
-      if (a !== undefined) add(a);
-      if (b !== undefined) add(b);
+      for (const room of [a, b]) {
+        if (room === undefined) continue;
+        // R3: door knowledge is preserved. Only the OFFER is gated, and only
+        // for a room known solely through a door — a visited room outlives
+        // any door state (AC-2). No port → today's behaviour (degrade).
+        if (visited.has(room)) {
+          add(room);
+          continue;
+        }
+        if (this.reachability === undefined || this.reachability.canReachArea(agentId, room)) {
+          add(room);
+        }
+      }
     }
-    for (const anchor of Object.keys(mem.observedObjects ?? {})) add(anchor);
+    for (const anchor of Object.keys(anchors)) add(anchor);
     return areas;
+  }
+
+  /**
+   * R2 (spec 065): the anchor map is memory, and memory may assert something
+   * false after spec-030 world mutation. Prune anchors for objects that no
+   * longer exist and re-point anchors whose object moved to its current
+   * room, so the enum never offers a dead destination and `navigateToArea`
+   * routes an object anchor to the room it is actually in. Returns the
+   * corrected map (insertion order preserved). Idempotent once corrected.
+   */
+  private reconcileObservedAnchors(
+    agentId: string,
+    mem: SpatialMemoryView,
+  ): Record<string, string> {
+    const observed = mem.observedObjects ?? {};
+    const corrected: Record<string, string> = {};
+    let changed = false;
+    for (const [objectId, seenRoom] of Object.entries(observed)) {
+      const object = this.smartObjectRegistry.get(objectId);
+      if (object === null) {
+        changed = true; // removed from the world — the anchor is false memory
+        continue;
+      }
+      if (object.roomId !== seenRoom) {
+        changed = true; // relocated — re-point at its current room
+      }
+      corrected[objectId] = object.roomId;
+    }
+    if (changed) {
+      this.agentManager.updateState(agentId, {
+        spatialMemory: { ...mem, observedObjects: corrected },
+      });
+    }
+    return corrected;
   }
 
   /**

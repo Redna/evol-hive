@@ -76,7 +76,7 @@ export class NavigationSystemImpl {
     const state = this.options.agentManager.getState(agentId);
     if (!state) return false;
     if (state.location === toRoomId) return true; // already there
-    const route = this.options.grid.route(state.location, toRoomId);
+    const route = this.openRoute(agentId, toRoomId);
     if (route.length === 0) return false;
 
     // Start walking toward the current room's door cell.
@@ -88,6 +88,33 @@ export class NavigationSystemImpl {
     const roomQueue = route.slice(1);
     this.walks.set(agentId, { cells, roomQueue });
     return true;
+  }
+
+  /**
+   * The single "passable" decision (spec 065, R4): the open route from the
+   * agent's current room. Returns [] when no open route exists. Both
+   * {@link requestWalk} and {@link canReachArea} go through here, so the walk
+   * and the targetArea-offer query cannot diverge.
+   */
+  private openRoute(agentId: string, toRoomId: string): string[] {
+    const state = this.options.agentManager.getState(agentId);
+    if (!state) return [];
+    return this.options.grid.route(state.location, toRoomId);
+  }
+
+  /**
+   * Reachability port (spec 065, R1/R4), consumed by the perception provider
+   * to gate the `targetArea` enum: is `areaId` routable from the agent's
+   * current room through OPEN doors this cycle? `areaId` may be a room id or
+   * an object anchor (resolved to the room it was observed in). False = no
+   * open route. Reuses {@link openRoute} — no second notion of "passable".
+   */
+  canReachArea(agentId: string, areaId: string): boolean {
+    const state = this.options.agentManager.getState(agentId);
+    if (!state) return false;
+    if (state.location === areaId) return true; // already standing in the room
+    const targetRoom = state.spatialMemory?.observedObjects?.[areaId] ?? areaId;
+    return this.openRoute(agentId, targetRoom).length > 0;
   }
 
   /** Is the agent currently walking? */
@@ -160,7 +187,7 @@ export class NavigationSystemImpl {
         }
         return 'no-route'; // anchor unreachable (fully blocked)
       }
-      const route = this.options.grid.route(state.location, objectRoom);
+      const route = this.openRoute(agentId, objectRoom);
       if (route.length === 0) return 'no-route';
       if (!this.requestWalkTo(agentId, objectRoom)) return 'no-route';
       this.pendingAreas.set(agentId, { area: targetArea, kind: 'object' });
@@ -169,7 +196,7 @@ export class NavigationSystemImpl {
 
     // (4) Room target (spec 039, R1 — visited or door-adjacent rooms only).
     if (!this.isKnownRoom(agentId, targetArea)) return 'unknown-area';
-    const route = this.options.grid.route(state.location, targetArea);
+    const route = this.openRoute(agentId, targetArea);
     if (route.length === 0) return 'no-route';
     if (!this.requestWalkTo(agentId, targetArea)) return 'no-route';
     this.pendingAreas.set(agentId, { area: targetArea, kind: 'room' });
