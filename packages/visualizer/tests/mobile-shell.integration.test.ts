@@ -142,7 +142,7 @@ interface Sandbox {
   canvasListeners: Record<string, ((ev?: unknown) => void)[]>;
   detailEl: { classList: { contains(c: string): boolean } };
   nameEl: { textContent: string };
-  fogButton: { onclick: (() => void) | null };
+  fogButton: { onclick: (() => void) | null; classList: { contains(c: string): boolean } };
   setViewport(width: number, height: number): void;
   tick(ts?: number): void;
   ws: MockWebSocket;
@@ -914,5 +914,54 @@ describe('spec 066 leg 3 — the glide interval is measured from snapshot arriva
     // would have moved only a quarter of the delta.
     const r = glideAtElapsed(50, 25);
     expect(r.drawn).toBeCloseTo((r.p1 + r.p2) / 2, 3);
+  });
+});
+
+/**
+ * Spec 066 leg 4, R4 — the control bar reports the true state (AC-8, AC-9, AC-10).
+ *
+ * D4 observed on a live phone run: the Fog button looked off while the view
+ * started fogged, and the scene selector showed `minimal` while the coffee-shop
+ * scene was running. The selector could not be made truthful in scope —
+ * `VisualizerState` carries no scene id, and spec 066's Constraints forbid
+ * adding one — so it was removed at the human gate, together with Save/Load
+ * (which no-op silently without persistence). These cases pin the removals
+ * and the startup fog class on the *served bundle*, not a copy.
+ */
+describe('spec 066 leg 4 — truthful controls (AC-8, AC-9, AC-10)', () => {
+  it('the Fog button carries `on` at startup, matching the fogged initial view (AC-9)', () => {
+    // `showFog` initialises to `true` (agents hidden) but the `on` class was
+    // only ever toggled on click, so the button looked off while the view was
+    // fogged. Red on current `main`.
+    const sb = makeSandbox({ width: 800, height: 600, dpr: 1, raf: true });
+    expect(sb.fogButton.classList.contains('on')).toBe(true);
+  });
+
+  it('the Fog button toggles `on` off and back on with the fog state (AC-9)', () => {
+    const sb = makeSandbox({ width: 800, height: 600, dpr: 1, raf: true });
+    expect(sb.fogButton.classList.contains('on')).toBe(true);
+    sb.fogButton.onclick?.();
+    expect(sb.fogButton.classList.contains('on')).toBe(false);
+    sb.fogButton.onclick?.();
+    expect(sb.fogButton.classList.contains('on')).toBe(true);
+  });
+
+  it('the client bundle hardcodes no scene list and sends no selectScene (AC-8)', () => {
+    const js = getClientBundle();
+    expect(js).not.toContain('sceneSelect');
+    expect(js).not.toContain('selectScene');
+    expect(js).not.toContain('coffee-shop');
+    expect(js).not.toContain('morning-routine');
+  });
+
+  it('the client bundle keeps no Save/Load controls and no prompt() path (AC-10)', () => {
+    const js = getClientBundle();
+    expect(js).not.toContain('btnSave');
+    expect(js).not.toContain('btnLoad');
+    expect(js).not.toContain('prompt(');
+    // The server-side command protocol is unchanged (out of scope); only the
+    // client stops sending these.
+    expect(js).not.toContain("{ type: 'save' }");
+    expect(js).not.toContain("{ type: 'load'");
   });
 });

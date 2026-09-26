@@ -31,13 +31,7 @@ import { DRIVES } from '../renderer/theme.js';
 import type { VisualizerState } from '@evol-hive/shared';
 
 /** A control command sent to the server over the WebSocket. */
-type Command =
-  | { type: 'play' }
-  | { type: 'pause' }
-  | { type: 'setSpeed'; timeScale: number }
-  | { type: 'save' }
-  | { type: 'load'; stateJson: string }
-  | { type: 'selectScene'; sceneId: string };
+type Command = { type: 'play' } | { type: 'pause' } | { type: 'setSpeed'; timeScale: number };
 
 /**
  * Snapshot-cadence fallback, in seconds, used only until the first interval is
@@ -384,31 +378,21 @@ function main(): void {
       send({ type: 'setSpeed', timeScale: Number(button.dataset.speed) });
     };
   });
-  (getElement('btnSave') as HTMLButtonElement).onclick = () => send({ type: 'save' });
   // Fog is a VIEW toggle, not a simulation command (spec 062, R6).
   const btnFog = getElement('btnFog') as HTMLButtonElement;
+  const fogClass = (btnFog as unknown as { classList?: { toggle(c: string, on: boolean): void } })
+    .classList;
+  // `showFog` starts `true` (agents hidden), so the button must carry `on`
+  // before the first click. Toggling only in the handler left a stale class at
+  // startup, which invalidated one of the dispatcher's own diagnostics — a
+  // probe conditioned on this class never fired (spec 066, D4/AC-9).
+  fogClass?.toggle('on', showFog);
   btnFog.onclick = () => {
     showFog = !showFog;
-    (
-      btnFog as unknown as { classList?: { toggle(c: string, on: boolean): void } }
-    ).classList?.toggle('on', showFog);
-  };
-  (getElement('btnLoad') as HTMLButtonElement).onclick = () => {
-    const json = prompt('Paste save state JSON:');
-    if (json !== null && json !== '') send({ type: 'load', stateJson: json });
+    fogClass?.toggle('on', showFog);
   };
   const close = document.getElementById('dClose');
   if (close !== null) close.onclick = () => select(null);
-  const sceneSelect = getElement('sceneSelect') as HTMLSelectElement;
-  for (const id of ['minimal', 'morning-routine', 'coffee-shop']) {
-    const option = document.createElement('option');
-    option.value = id;
-    option.text = id;
-    sceneSelect.appendChild(option);
-  }
-  sceneSelect.onchange = () => {
-    send({ type: 'selectScene', sceneId: sceneSelect.value });
-  };
 
   // ── PWA: install affordance + service worker (spec 063, R4/R5) ───────────
   const btnInstall = document.getElementById('btnInstall');

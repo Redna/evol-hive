@@ -156,6 +156,13 @@ describe('served HTML — spec-023 browser contract intact', () => {
     // Controls still wired (spec 023 glue).
     expect(html).toContain('btnPlay');
     expect(html).toContain('btnPause');
-    expect(html).toContain('sceneSelect');
+    // Spec 066 leg 4 (AC-8, AC-10): controls that cannot tell the truth are
+    // removed, not disabled. The served page contains no scene selector, no
+    // Save/Load, no selectScene send path and no prompt() load path.
+    expect(html).not.toContain('sceneSelect');
+    expect(html).not.toContain('selectScene');
+    expect(html).not.toContain('btnSave');
+    expect(html).not.toContain('btnLoad');
+    expect(html).not.toContain('prompt(');
   });
 });

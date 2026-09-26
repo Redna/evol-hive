@@ -5,7 +5,7 @@
 - Architecture: [§2 — System Overview (visualizer transport)](../architecture/02-system-overview.md), [§3 — Agent State Schema (`position`)](../architecture/03-agent-state-schema.md)
 - Related specs: [062 — Visualizer World View (1/2)](062-visualizer-world-view.md) (the pure `layoutWorld` seam, motion as a separate pure function, measured HUD insets), [063 — Visualizer Mobile Shell (2/2)](063-visualizer-mobile-shell.md) (follow-camera as a pure function, PWA, mobile observation workflow — **amended here**), [023 — Canvas 2D Visualizer](023-visual-output-canvas-renderer.md) (browser contract, control channel), [027 — Real-LLM Visualizer Demo](027-real-llm-visualizer-demo.md) (launch path)
 - Package: `visualizer` (pure renderer modules, client shell, server-served page). `shared`/`engine`/`memory`/`cognition` **untouched**.
-- Status: 📝 Drafted
+- Status: ✅ Done
 - Supersedes nothing; **amends specs 062 and 063** where they are quoted below.
 
 ## Problem Summary
@@ -108,18 +108,18 @@ The control bar works — pause/play/speed were measured against the live sim (l
 
 ## Acceptance Criteria
 
-- [ ] **AC-1 (R1)** — two agents with an identical `position` in one room produce **different** `x`/`y` from `layoutWorld`, and a third agent in a different cell does not land on either.
-- [ ] **AC-2 (R1)** — `layoutWorld` is deterministic for co-located agents: identical input yields identical positions across repeated calls.
-- [ ] **AC-3 (R1)** — a probe at the screen position of a drawn agent selects **that agent's id** (the inversion in D1 is gone), asserted through the served client bundle with the mock-DOM harness.
-- [ ] **AC-4 (R2)** — `cameraFor(null, layout, followCamera)` returns `{ scale: 1, offsetX: 0, offsetY: 0 }` **with `previous` a live follow camera** (the case the existing suite omits), and the same for an unknown selection.
-- [ ] **AC-5 (R2)** — releasing follow converges to fit-all within a bounded time, and `scale` changes gradually rather than in one frame.
-- [ ] **AC-6 (R3)** — given a delta delivered over a known interval, the interpolated position is proportional to elapsed time within that interval and **arrives at the target as the interval completes**; asserted as a pure function with no timers.
-- [ ] **AC-7 (R3)** — a larger delta over the same interval moves the agent proportionally faster (no constant retuning needed for 5×).
-- [ ] **AC-8 (R4)** — the scene selector is absent from the served page, and the client no longer hardcodes a scene list nor sends `selectScene`.
-- [ ] **AC-9 (R4)** — the Fog button's active state matches the fog state at startup, and matches it after each toggle.
-- [ ] **AC-10 (R4)** — the Save and Load controls are absent from the served page, and no `prompt()`-based load path remains in the client.
-- [ ] **AC-11 (R5)** — the full `visualizer` suite is green, `pnpm typecheck` is clean, and touched files pass `npx prettier --check`.
-- [ ] **AC-12 (R5)** — specs 062/063 carry the amendment notes, and `docs/specs/INDEX.md` reflects this spec's status.
+- [x] **AC-1 (R1)** — two agents with an identical `position` in one room produce **different** `x`/`y` from `layoutWorld`, and a third agent in a different cell does not land on either.
+- [x] **AC-2 (R1)** — `layoutWorld` is deterministic for co-located agents: identical input yields identical positions across repeated calls.
+- [x] **AC-3 (R1)** — a probe at the screen position of a drawn agent selects **that agent's id** (the inversion in D1 is gone), asserted through the served client bundle with the mock-DOM harness.
+- [x] **AC-4 (R2)** — `cameraFor(null, layout, followCamera)` returns `{ scale: 1, offsetX: 0, offsetY: 0 }` **with `previous` a live follow camera** (the case the existing suite omits), and the same for an unknown selection.
+- [x] **AC-5 (R2)** — releasing follow converges to fit-all within a bounded time, and `scale` changes gradually rather than in one frame.
+- [x] **AC-6 (R3)** — given a delta delivered over a known interval, the interpolated position is proportional to elapsed time within that interval and **arrives at the target as the interval completes**; asserted as a pure function with no timers.
+- [x] **AC-7 (R3)** — a larger delta over the same interval moves the agent proportionally faster (no constant retuning needed for 5×).
+- [x] **AC-8 (R4)** — the scene selector is absent from the served page, and the client no longer hardcodes a scene list nor sends `selectScene`.
+- [x] **AC-9 (R4)** — the Fog button's active state matches the fog state at startup, and matches it after each toggle.
+- [x] **AC-10 (R4)** — the Save and Load controls are absent from the served page, and no `prompt()`-based load path remains in the client.
+- [x] **AC-11 (R5)** — the full `visualizer` suite is green, `pnpm typecheck` is clean, and touched files pass `npx prettier --check`.
+- [x] **AC-12 (R5)** — specs 062/063 carry the amendment notes, and `docs/specs/INDEX.md` reflects this spec's status.
 
 ## Constraints
 

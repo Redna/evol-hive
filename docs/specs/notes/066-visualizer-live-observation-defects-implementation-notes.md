@@ -2,7 +2,7 @@
 
 - **Spec:** `docs/specs/066-visualizer-live-observation-defects.md`
 - **Issue:** [#257](https://github.com/Redna/evol-hive/issues/257)
-- **Legs:** 1 of 4 (`#258`, merged `970e2ba`) · 2 of 4 (`#259`, merged `e9dfcc7`) · 3 of 4 (this branch) · 4 pending
+- **Legs:** 1 of 4 (`#258`, merged `970e2ba`) · 2 of 4 (`#259`, merged `e9dfcc7`) · 3 of 4 (`#262`, merged `4c59c98`) · 4 of 4 (`fix/066-leg4-truthful-controls`, this branch — R4 + AC-12 docs)
 - These notes exist because the leg-1 QA pass flagged that spec 066 had **no design or
   implementation notes**, only a spec and PR bodies. Per ADR-003 the committed note *is*
   the handoff, so this file is the durable record rather than the PR text.
@@ -154,16 +154,19 @@ measurement. Two consequences worth carrying forward:
 
 ## What is left
 
-- **Leg 4** — R4/AC-8/AC-9/AC-10: scene-select sync, Fog initial state, and removal of
-  the Save/Load controls (approved at the spec gate).
+**Nothing — all four legs are implemented.** The items below were the plan; each is now
+closed by the section named.
+
+- **Leg 4** — R4/AC-8/AC-9/AC-10: scene-selector removal, Fog initial state, and removal of
+  the Save/Load controls (approved at the spec gate). **Done** — see “Leg 4 — truthful
+  controls” below.
 - **AC-12 (docs)** — specs 062/063 amendment notes and the INDEX status are the final leg's
-  deliverable. Leg 3's change contradicts 062 R2's fixed-half-life wording, so that
-  amendment note is owed by leg 4.
-- Live validation after leg 2: rebuild, restart the sim, and re-probe the viewport to confirm
-  that a probe at a drawn chip now returns that chip's agent (AC-3's real-device evidence).
-- Live validation after leg 3: a real run should be watched at 1× and 5× to confirm the
-  observed speed scales with the sim's speed. This is the dispatcher's job after merge —
-  leg 3 deliberately did not restart the running sim.
+  deliverable. **Done** — see the same section.
+- Live validation after leg 2: confirmed on a rebuilt `dist` (AC-3 3-of-3 hittable).
+- Live validation after leg 3: the pacing itself is proven by the deterministic served-bundle
+  test, not by the live run (a live sample cannot distinguish two smoothers at frame
+  granularity); the live run proves integration and regression only. See “Leg 3 — live
+  validation”.
 
 ## Live validation — legs 1 and 2 (real path, new code)
 
@@ -251,3 +254,91 @@ and roughly **+67 further test lines** in `mobile-shell.integration.test.ts`. Me
 therefore **119 visualizer tests**, against the **117** verified before the push. The standing
 check (`git show --stat <merge>` plus re-running the suite on merged `main`) caught it a third
 time; it is now load-bearing rather than advisory. All 119 pass.
+
+## Leg 4 — truthful controls, and closing the docs (`fix/066-leg4-truthful-controls`)
+
+Scope: R4 only — **AC-8, AC-9, AC-10** — plus **AC-12** (the amendment notes this spec
+owes specs 062/063, and the INDEX status). Nothing in `engine/**`, `shared/**`, or the
+snapshot/command protocol was touched.
+
+### Baseline re-checked, not trusted
+
+Merged `main` (`4821d2c`) was re-run before starting: **119 tests, 17 files**, all green —
+matching the number the leg-3 note predicted after the third QA push. The earlier lesson
+(trust the merged tree, not the pre-push matrix) is why this was the first command.
+
+### What changed
+
+- **AC-10 — Save/Load removed.** `visualizer-server.ts` no longer emits
+  `<button id="btnSave">` / `<button id="btnLoad">`; `client/main.ts` drops both handlers and
+  the entire `prompt('Paste save state JSON:')` load path. The client `Command` union lost its
+  now-unused `save` / `load` / `selectScene` members. The **server's** `save`/`load`/`selectScene`
+  command handling is untouched — the protocol is unchanged and out of scope; only the client
+  stopped sending them. This is Decision 6: a control that routes through `this.persistence?.`
+  and no-ops silently still costs screen height.
+- **AC-8 — scene selector removed.** The `<select id="sceneSelect">` markup, the hardcoded
+  `['minimal', 'morning-routine', 'coffee-shop']` option list, its `onchange`, and the client's
+  `selectScene` send path are gone. The selector could not be made truthful *in scope*: the
+  snapshot (`VisualizerState`) carries no scene id and this spec's Constraints put `shared`/`engine`
+  out of bounds — so the AC was rewritten from "sync the selector" to "remove it" at the gate.
+- **AC-9 — Fog's active state is truthful from startup.** `showFog` initialises to `true`, so
+  the button now carries `on` before the first click and after each toggle. A comment records
+  *why* it matters beyond cosmetics: the stale class previously invalidated one of the
+  dispatcher's own diagnostics (a probe conditioned on `on` never fired while the view was fogged).
+
+### Red-first evidence (captured before the source changes)
+
+`cd packages/visualizer && npx vitest run tests/mobile-shell.integration.test.ts tests/visualizer-server-html.test.ts`
+— **5 failed | 21 passed (26)**:
+
+1. `served HTML — spec-023 browser contract intact > is a single HTML response …` — the existing
+   assertion `expect(html).toContain('sceneSelect')` was **inverted to assert absence** (trap 2),
+   and it failed.
+2. `spec 066 leg 4 … > the Fog button carries \`on\` at startup` — stale class, red on `main`.
+3. `spec 066 leg 4 … > the Fog button toggles \`on\` off and back on` — same cause.
+4. `spec 066 leg 4 … > the client bundle hardcodes no scene list and sends no selectScene` —
+   the bundle verbatim contained `getElement("sceneSelect")`, the option loop and the
+   `selectScene` send.
+5. `spec 066 leg 4 … > the client bundle keeps no Save/Load controls and no prompt() path` —
+   the bundle contained `btnSave`, `btnLoad` and `prompt("Paste save state JSON:")`.
+
+After the fix, the same two files: **26 passed (26)**. Full package: **119 → 123 tests, 17 files**,
+all green. The `+4` are the four new leg-4 cases; the html inversion lives inside an existing test.
+
+### AC-12 — docs
+
+- **062** Notes gained an amendment: R2's fixed half-life no longer describes agent motion — it
+  is interval-paced (`motionTowards`) as of leg 3. `smoothTowards` survives for the camera only.
+- **063** Notes gained two amendments: R3's release is now history-independent fit-all with a
+  gliding scale (leg 1), and **AC-9 (the phone walk) has now been exercised** — recording the four
+  defects it found and the iOS home-screen icon gap (`apple-touch-icon` is an SVG where iOS needs a
+  PNG, and `apple-mobile-web-app-capable` is absent) that is deliberately left to a separate change.
+- **INDEX**: 066 → ✅ Done; summary tally corrected to Done 69 / In Development 0 (Total 72,
+  Drafted 1, Superseded 2). Guarded by `packages/cli/tests/spec-index-integrity.test.ts` — run and
+  green (6 tests), because the guard compares **sets** and the tally, not just a plausible count.
+- Spec 066's own acceptance criteria are now ticked and its header status is ✅ Done.
+
+### Verification (this leg)
+
+| Command | Result |
+| --- | --- |
+| `cd packages/visualizer && npx vitest run` | **123 passed (17 files)** (baseline 119) |
+| `pnpm build` | clean |
+| `pnpm test` (repo root) | shared 399 · memory 101 · engine 922 · cognition 1252 · assembly 89 · examples 253 · cli 115 · visualizer 123 — all green |
+| `pnpm typecheck` | clean |
+| `pnpm lint` | clean |
+| `npx prettier --check` on touched files | clean |
+
+### Honest limitations / deviations
+
+- **No live re-validation in this leg.** The running sim was deliberately left alone (it serves the
+  merged code, and live validation is the dispatcher's job after merge). AC-8/AC-9/AC-10 are asserted
+  through the *served bundle* and the served page — the exact strings the server inlines — so they
+  exercise the shipped glue, not a copy, but they are not a phone observation.
+- **The scene selector is removed, not fixed.** A future spec that carries a `sceneId` on the
+  snapshot is the only way to make it truthful; that would touch `shared`/`engine` and is explicitly
+  out of scope here.
+- **The client `Command` union shrank.** That is a client-local type; the server still accepts and
+  validates `save`/`load`/`selectScene`, so no protocol contract changed.
+- **Docs are not prettier-enforced** (`format:check` covers `packages/*/src/**` and
+  `packages/*/tests/**` only), so the specs were formatted by hand to the existing style.
