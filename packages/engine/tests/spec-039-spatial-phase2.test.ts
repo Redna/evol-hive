@@ -346,6 +346,10 @@ describe('social fog-lifting via talk_to (spec 039, AC-4)', () => {
     });
 
     const registry = new SmartObjectRegistryImpl();
+    // Spec 065 R2: an observed anchor is true memory only while the object
+    // exists in the world — the transfer test needs a world to be truthful
+    // about. Register the workbench so `workbench-1` is a live anchor.
+    registry.register(makeObject('workbench-1', 'workshop', [makeAffordance('craft', {})]));
     const perception = new PerceptionDataProviderImpl(
       agents,
       registry,

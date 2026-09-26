@@ -435,6 +435,10 @@ export function assembleGameLoop(
   // Navigation port for targetArea steps (spec 039, R2) — the execute bridge
   // routes area intents through the grid's doorway graph.
   core.bridges.execute.setNavigation(navigation);
+  // Reachability port (spec 065, R4/R1): the perception provider's `targetArea`
+  // enum asks the SAME spatial authority the walk uses whether a door-derived
+  // area is routable this cycle — one notion of "passable", no second BFS.
+  core.bridges.perception.setReachabilityPort(navigation);
   core.gameLoop.registerSystem(navigation); // (0.6) NavigationSystem (spec 038)
   // Seat every active agent on the grid (deterministic spawn near the door)
   // and seed its spatial memory: the start room is personally visited, its
