@@ -99,17 +99,19 @@ So the fix restricts the *offer*, not the *knowledge* — except for one case th
 
 ### R5 — A guard for the class
 
-- A test MUST fail if the `targetArea` enum contains an area for which the same cycle's navigation returns `'no-route'`. Asserted against both the enum and the navigation result, not against literals.
+- A test MUST fail if the `targetArea` enum contains an area that the same cycle's navigation says is unreachable **and that this spec gates** — that is, a room offered by virtue of **door knowledge alone**. Asserted against both the enum and the navigation result, not against literals.
+- **The guard's scope is deliberately narrower than "every offered area".** AC-2 keeps a personally **visited** room offered even when the door is closed, and in a two-room world that visited room genuinely returns `'no-route'` — so a universal guard would fail a *correct* implementation. As first worded, R5 and AC-2 could not both hold; corrected 2026-09-26 while implementing (the same spec-vs-reality class as spec 066's AC-8).
+- **Known gap, deliberately not closed here.** Areas exempt from gating are outside the guard: visited rooms (by AC-2) and **live object anchors** (R1 says anchors stay offered "exactly as today"). The anchors are the larger residual — an anchor whose object sits in a room behind a now-closed door is still offered while navigation returns `'no-route'`. Same defect class, different branch of the projection. Recorded as a gap for a later slice rather than silently widened into this one.
 
 ## Acceptance Criteria
 
-- [ ] **AC-1** (R1, finding 3) — Door open → neighbour offered; door closed (same agent, knowledge retained) → neighbour **not** offered, and `knownDoors` still contains the pair.
-- [ ] **AC-2** (R3) — After the door reopens, the neighbour is offered again without re-observation; a visited room stays offered even with the door closed.
-- [ ] **AC-3** (R2, finding 2) — A removed object's anchor disappears from the offered areas and from perception; a relocated object's anchor points at its new room.
-- [ ] **AC-4** (R1) — Reachable behaviour is unchanged: visited rooms, open-door neighbours and live anchors are all still offered (spec 039 R1 regression).
-- [ ] **AC-5** (R4) — The reachability decision comes from the existing spatial authority (one source), demonstrated by a test that flips door state and observes the enum follow.
-- [ ] **AC-6** (R5) — The guard exists and **fails** when a stale area is re-admitted (verified red before green).
-- [ ] **AC-7** — Existing suites stay green, explicitly including spec 038/039/030 spatial and dynamic-scene suites, and the `knownAreas`/`targetArea` tests in cognition.
+- [x] **AC-1** (R1, finding 3) — Door open → neighbour offered; door closed (same agent, knowledge retained) → neighbour **not** offered, and `knownDoors` still contains the pair.
+- [x] **AC-2** (R3) — After the door reopens, the neighbour is offered again without re-observation; a visited room stays offered even with the door closed.
+- [x] **AC-3** (R2, finding 2) — A removed object's anchor disappears from the offered areas and from perception; a relocated object's anchor points at its new room.
+- [x] **AC-4** (R1) — Reachable behaviour is unchanged: visited rooms, open-door neighbours and live anchors are all still offered (spec 039 R1 regression).
+- [x] **AC-5** (R4) — The reachability decision comes from the existing spatial authority (one source), demonstrated by a test that flips door state and observes the enum follow.
+- [x] **AC-6** (R5) — The guard exists and **fails** when a stale *door-only* area is re-admitted (verified red before green), and does **not** fire for a visited room that AC-2 keeps offered.
+- [x] **AC-7** — Existing suites stay green, explicitly including spec 038/039/030 spatial and dynamic-scene suites, and the `knownAreas`/`targetArea` tests in cognition.
 
 ## Constraints
 
@@ -123,7 +125,7 @@ So the fix restricts the *offer*, not the *knowledge* — except for one case th
 ## Test Seams
 
 1. **`getKnownAreas`** — the projection itself, asserted as data for a given `spatialMemory` + world state (door closed/open, object removed/relocated). Primary seam for R1–R3.
-2. **Navigation agreement** — the guard (R5/AC-6) builds the enum and asks the same cycle's navigation for the route, so the two cannot disagree silently.
+2. **Navigation agreement** — the guard (R5/AC-6) builds the enum and asks the same cycle's navigation for the route, so the two cannot disagree silently. Its scope is the areas R1 gates (door-only rooms), **not** the AC-2 exemptions; a guard over the exemptions would contradict AC-2 by construction.
 3. **Existing spatial suites** — spec 038/039/030 behaviour is the regression net for AC-4.
 
 ## Out of Scope
