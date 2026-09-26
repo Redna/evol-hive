@@ -946,6 +946,59 @@ describe('spec 066 leg 4 — truthful controls (AC-8, AC-9, AC-10)', () => {
     expect(sb.fogButton.classList.contains('on')).toBe(true);
   });
 
+  it('the Fog button’s active class tracks the actual fog view at startup and after each toggle (AC-9)', () => {
+    // D4's harm was not cosmetic: a dispatcher diagnostic keyed off this class,
+    // so the class must match the *view*, not merely be present. Read the view
+    // through the selection card (a fogged agent is not hit-tested), which is
+    // independent of the class the same variable already feeds.
+    const sb = makeSandbox({ width: 800, height: 600, dpr: 1 });
+    const state = {
+      ...makeState(),
+      agents: [
+        {
+          agentId: 'a1',
+          name: 'Watcher',
+          location: 'kitchen',
+          position: { x: 1, y: 1 },
+          drives: { energy: 50, hunger: 50, social: 50, comfort: 50, curiosity: 50 },
+          currentGoal: '',
+          currentPlan: null,
+          pperPhase: 'perceive',
+          isThinking: false,
+          relationships: [],
+          fog: { visitedRooms: ['kitchen'], exploredCells: { kitchen: ['1,1'] } },
+        },
+        coLocatedAgent('a2', 'Hidden', { x: 11, y: 4 }),
+      ],
+    } as unknown as VisualizerState;
+    sb.ws.onmessage?.({ data: JSON.stringify(state) });
+    const layout = layoutWorld(state, { width: 800, height: 600, insets: ZERO_INSETS });
+    const hidden = layout.agents.find((a) => a.id === 'a2')!;
+    const handlers = sb.canvasListeners['pointerdown'] ?? [];
+    const tapHidden = (): void => {
+      for (const fn of handlers) fn({ clientX: hidden.x, clientY: hidden.y });
+    };
+    const cardHidden = (): boolean => sb.detailEl.classList.contains('hidden');
+
+    // Startup: the view is fogged, so the class is `on` and the hidden agent
+    // is not selectable.
+    expect(sb.fogButton.classList.contains('on')).toBe(true);
+    tapHidden();
+    expect(cardHidden()).toBe(true);
+
+    // Toggle off: class off, and the agent becomes drawn and selectable.
+    sb.fogButton.onclick?.();
+    expect(sb.fogButton.classList.contains('on')).toBe(false);
+    tapHidden();
+    expect(cardHidden()).toBe(false);
+
+    // Toggle back on: class on, and the agent is hidden again.
+    sb.fogButton.onclick?.();
+    expect(sb.fogButton.classList.contains('on')).toBe(true);
+    tapHidden();
+    expect(cardHidden()).toBe(true);
+  });
+
   it('the client bundle hardcodes no scene list and sends no selectScene (AC-8)', () => {
     const js = getClientBundle();
     expect(js).not.toContain('sceneSelect');

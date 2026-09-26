@@ -168,3 +168,91 @@ The source was restored immediately after (`git diff src/client/main.ts` clean).
 - **`hitTestAgent` vs interpolated draw position.** The implementation notes record (honestly) that a tap during a glide resolves against the layout *target* while the agent is drawn interpolated, so it can miss by up to one interval. This predates leg 3 and is outside AC-6/AC-7; recorded rather than silently widened.
 - **Frame-granularity speed wobble.** The measured interval is sampled at frame granularity (~16 ms at 60 FPS), so a jittery arrival cadence yields a small speed wobble rather than perfectly constant velocity. Deliberate (the alternative is a hardcoded protocol rate); not an AC and not automatable without a real clock.
 - **Live validation at 1× and 5×.** The implementation notes assign the real-run watch (observed speed scales with `timeScale`) to the dispatcher after merge; leg 3 deliberately did not restart the running sim. Not automatable here.
+
+---
+
+# 066 — Visualizer Live-Observation Defects — QA notes (leg 4)
+
+- **PR:** [#265](https://github.com/Redna/evol-hive/pull/265) — `fix/066-leg4-truthful-controls`
+- **Scope of this leg:** R4 / **AC-8, AC-9, AC-10** plus **AC-12** (the amendment notes and INDEX
+  status this spec owes). Leg 4 of 4 — the whole spec closes here.
+- **Spec:** `docs/specs/066-visualizer-live-observation-defects.md`
+- **Design/implementation notes:** `docs/specs/notes/066-…-implementation-notes.md` (the Leg 4
+  section was added by this PR).
+- **Verdict:** ✅ All four leg-4 acceptance criteria now have tests; the full matrix, `typecheck`,
+  `lint` and `prettier` are green.
+
+## Coverage summary
+
+| AC       | Requirement                                                                                                                                                          | Covered by                                                                                                                                                                                                                                                                     | Status |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| **AC-8** | The scene selector is absent from the served page, and the client no longer hardcodes a scene list nor sends `selectScene`                                            | dev — `visualizer-server-html.test.ts` (served HTML has no `sceneSelect`/`selectScene`); `mobile-shell.integration.test.ts` leg-4 (the bundle has no `sceneSelect`, `selectScene`, `coffee-shop`, `morning-routine`)                                                               | ✅     |
+| **AC-9** | The Fog button's active state matches the fog state at startup, and after each toggle                                                                                 | dev — `mobile-shell.integration.test.ts` leg-4 (`on` at startup; toggles off/on) **+ QA added** — the class↔view lockstep case across off→on→off; **+ QA added** — `dist-bundle.e2e.test.ts` pins the startup class wiring in the built artifact                                  | ✅     |
+| **AC-10** | The Save and Load controls are absent from the served page, and no `prompt()`-based load path remains in the client                                                   | dev — `visualizer-server-html.test.ts` (served HTML has no `btnSave`/`btnLoad`/`prompt(`); `mobile-shell.integration.test.ts` leg-4 (bundle has no `btnSave`, `btnLoad`, `prompt(`, `save`/`load` commands)                                                                     | ✅     |
+| **AC-12** | Specs 062/063 carry the amendment notes, and `docs/specs/INDEX.md` reflects this spec's status                                                                        | **QA added** — `packages/cli/tests/spec-066-ledger-qa.test.ts` (amendment links in 062/063; INDEX row = ✅ Done; spec header = ✅ Done; 0 unticked / 12 ticked ACs), underpinned by the existing `spec-index-integrity` guard (sets + tally)                                       | ✅     |
+
+**4 / 4 leg-4 acceptance criteria tested.** AC-11 (suite green, `typecheck`, prettier) is satisfied
+by the run below.
+
+## Tests added by QA
+
+1. `packages/visualizer/tests/mobile-shell.integration.test.ts` — new case **“the Fog button’s
+   active class tracks the actual fog view at startup and after each toggle (AC-9)”**.
+   **Why it was missing.** The Developer’s cases assert the `on` class in isolation, and an older
+   spec-063 case asserts fog hit-testing in isolation — but nothing pinned the class and the view
+   together across a full off→on→off cycle. D4’s harm was a diagnostic keyed off the class, so the
+   class and the actual fog state must stay in lockstep. **Red-first:** mutating the handler to
+   re-enable the `on` class *without* re-enabling `showFog` (the class and the view decoupled) makes
+   the final assertion fail (`expected false to be true`) while the Developer’s class-only toggle
+   case stays green. Source restored immediately.
+
+2. `packages/visualizer/tests/dist-bundle.e2e.test.ts` — new E2E case **“serves the spec-066 leg-4
+   truthful controls from the built artifact (AC-8, AC-9, AC-10)”**.
+   **Why it was missing.** Every other leg-4 test imports `src/`, so a stale `dist/` — the exact trap
+   `AGENTS.md` records (live sims resolve `@evol-hive/visualizer` to built `dist/`, not source) —
+   would pass the whole suite while the running sim still served the removed controls. **Red-first:**
+   injecting `<button id="btnSave">` into `dist/index.js` fails `not to contain 'btnSave'`; dist was
+   restored byte-for-byte (never committed). The case also asserts the startup `fogClass?.toggle("on",
+   showFog)` wiring reaches the served page.
+
+3. `packages/cli/tests/spec-066-ledger-qa.test.ts` — four policy cases pinning **AC-12**, same
+   precedent as `spec-index-integrity-qa.test.ts`: the amendment links in 062/063, the INDEX 066 row
+   = `✅ Done` matching the spec header, and no unticked ACs (12 checked / 0 open). It asserts
+   existence and linkage, not prose, so wording changes do not rot it.
+
+## Red-first evidence
+
+| Added test | Mutation (temporary, all reverted) | Result |
+| --- | --- | --- |
+| AC-9 class↔view lockstep | Fog handler re-enables the class but not `showFog` (view) | × `expected false to be true` (final tap re-hides the view) — Developer class-only case stays green |
+| AC-8/10 dist E2E | `<button id="btnSave">` injected into `dist/index.js` | × `expected '<!DOCTYPE html>…' not to contain 'btnSave'` |
+| AC-12 ledger guard | (positive control; asserts current tree) | ✓ 4/4 |
+
+No implementation file was modified; each source mutation was restored and verified clean
+(`git diff --quiet`) before proceeding.
+
+## Test results
+
+- `pnpm test` (repo root, after `pnpm build`) — **all green**: shared 399 · memory 101 · engine 922 ·
+  cognition 1252 · assembly 89 · examples 253 · **cli 119** · **visualizer 125**.
+- Delta from the Developer’s legs: **visualizer 123 → 125** (+2 QA), **cli 115 → 119** (+4 QA).
+- `pnpm typecheck` — clean.
+- `pnpm lint` — clean.
+- `npx prettier --check` on the three touched test files — clean.
+- Root `pnpm test` requires `pnpm build` first (shared resolves from `dist/`); built all packages
+  before the run.
+
+## Gaps / not tested here
+
+- **No phone observation.** AC-8/9/10 are asserted through the served page and the exact inlined
+  bundle (from `src` and from the built `dist/`), not a real device. The implementation notes record
+  that this leg deliberately did not restart the running sim; the live walk remains the dispatcher’s
+  post-merge close-out, as for legs 1–3.
+- **AC-12 amendment prose.** The guard asserts that the amendment notes exist and link to 066, and
+  that the ledger status is truthful. It does not assert their wording — that would be a brittle
+  content test and the prose is reviewed at the PR gate instead.
+- **iOS home-screen icon / `apple-mobile-web-app-capable`.** A real spec-063 AC-9 finding, explicitly
+  left out of spec 066 (documented in 063’s amendment); not tested here.
+- **A truthful scene selector remains untestable by design.** It would require a `sceneId` on
+  `VisualizerState` (touching `shared`/`engine`), which this spec’s Constraints forbid; the
+  deliverable is removal, which is asserted.

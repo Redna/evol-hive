@@ -129,6 +129,68 @@ describe('dist bundle E2E — built @evol-hive/visualizer artifact (spec 042)', 
     },
   );
 
+  it.skipIf(!distAvailable)(
+    'serves the spec-066 leg-4 truthful controls from the built artifact (AC-8, AC-9, AC-10)',
+    async () => {
+      // Every other leg-4 test imports `src/`, so a stale `dist/` would pass
+      // while the running sim (which resolves @evol-hive/visualizer to dist —
+      // see AGENTS.md) still served the removed controls. This runs against the
+      // real production artifact.
+      const dist = (await import(DIST_ENTRY.href)) as {
+        VisualizerServer: new (opts: Record<string, unknown>) => {
+          start(): Promise<void>;
+          stop(): Promise<void>;
+          getPort(): number;
+        };
+      };
+      const state = {
+        tickNumber: 1,
+        simulationTime: 1,
+        isRunning: true,
+        timeScale: 1,
+        rooms: [{ id: 'kitchen', name: 'Kitchen', description: '', connections: [], objects: [] }],
+        agents: [],
+      } as unknown as VisualizerState;
+      const scene: SceneDefinition = {
+        id: 'minimal',
+        name: 'Minimal',
+        rooms: [
+          { id: 'kitchen', name: 'Kitchen', description: '', connections: [], objectIds: [] },
+        ],
+        objects: [],
+        agents: [],
+      };
+      const server = new dist.VisualizerServer({
+        adapter: {
+          getSnapshot: () => state,
+          handleCommand: async (_cmd: VisualizerCommand) => {},
+        },
+        port: 0,
+        scenes: new Map<string, SceneDefinition>([['minimal', scene]]),
+      });
+      try {
+        await server.start();
+        const res = await fetch(`http://localhost:${server.getPort()}/`);
+        expect(res.status).toBe(200);
+        const html = await res.text();
+
+        // AC-8/AC-10: the served page (markup + inlined bundle) contains no
+        // scene selector, no Save/Load and no prompt() load path.
+        expect(html).not.toContain('sceneSelect');
+        expect(html).not.toContain('selectScene');
+        expect(html).not.toContain('btnSave');
+        expect(html).not.toContain('btnLoad');
+        expect(html).not.toContain('prompt(');
+        // AC-9: the Fog control survives, and its startup class is applied from
+        // the same `showFog` the view uses (the D4 stale-class fix).
+        expect(html).toContain('btnFog');
+        expect(html).toContain('fogClass?.toggle("on", showFog);');
+      } finally {
+        await server.stop();
+      }
+    },
+  );
+
   it.skipIf(!distAvailable)('dist bundle does not inline the esbuild API', async () => {
     // The tsup regression guard: esbuild's build API must stay an external
     // runtime import of the dist bundle, not an inlined CJS copy (which broke
