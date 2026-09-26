@@ -106,9 +106,13 @@ spec → build → verify → QA → live, as a sequence of legs.
    code, correct the ACs that don't match reality, then merge.
 4. **PR + CI/QA.** Push the branch, open the PR; GitHub runs CI + QA. Bot-approve
    or human-approve per the approval rule; squash-merge.
-5. **Live validation** (engine-behavior issues). Rebuild dist, run the 40-minute
-   sim, measure against the spec's ACs **on the tick axis** (log-line quintiles are
-   skewed by late failure bursts). Record evidence in `docs/specs/notes/`.
+5. **Live validation** (engine-behavior issues). Rebuild dist, run the sim **through
+   `scripts/live-sim.mts`** (a 40-minute run is `SIM_BUDGET_MINUTES=40`; it pauses when
+   the budget is spent and needs an explicit `kill -CONT -<pid>` to continue), measure
+   against the spec's ACs **on the tick axis** (log-line quintiles are skewed by late
+   failure bursts), and record evidence in `docs/specs/notes/`. Never leave a sim
+   running unattended: an unattended run spends quota at roughly 50 cloud LLM calls a
+   minute and produces no observation.
 6. **Close.** Evidence comment on the issue, close it, update `docs/specs/INDEX.md`.
 
 ## Leg packet (the fields a leg starts from)
