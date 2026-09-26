@@ -68,8 +68,32 @@ So the fix restricts the *offer*, not the *knowledge* — except for one case th
 > where the grid already lives. R2 (object existence) *is* implementable here —
 > `smartObjectRegistry` is available.
 >
-> Pick one before writing code; both stay inside `engine`, so this is a seam
-> choice, not a boundary change.
+> **Seam RESOLVED (2026-09-25) — inject a narrow port from the spatial authority.**
+> The code settled it rather than a preference:
+>
+> 1. **The spatial authority already owns the decision.** `WorldGrid.route(from, to)`
+>    is documented as "BFS over the room connection graph (**open doors only**) …
+>    pure function of topology + door state", and its `isConnectionOpen` is an
+>    **injected predicate** supplied at `assembly.ts` from
+>    `sceneManager.getConnectedRooms` — so door state is already a first-class,
+>    *dynamic* input to the spatial layer. That is what makes "currently closed"
+>    meaningful at all.
+> 2. **Navigation already holds that grid and already answers routability**
+>    publicly: `requestWalk(agentId, toRoomId): boolean` ("false = no open
+>    route").
+> 3. The alternative — computing the filtered projection where the grid lives —
+>    would drag spec-039 knowledge assembly (`visitedRooms` + `knownDoors` +
+>    `observedObjects`) into the spatial layer, duplicating knowledge logic there
+>    to avoid adding one predicate.
+>
+> So `PerceptionDataProviderOptions` gains an optional narrow port,
+> `canReachArea(agentId, areaId): boolean`, implemented by the spatial authority
+> **reusing the same route the walk uses** (R4: one decision, reused — no second
+> notion of "passable"). Wired in `assembly.ts`, where both objects already
+> exist. Both options stay inside `engine`: a seam choice, not a boundary change.
+>
+> R2 (object existence) stays where it is — `smartObjectRegistry` is already
+> available to the provider.
 
 - The current-door-state check MUST reuse the existing spatial authority (the grid/navigation route or door-state lookup) rather than introducing a second, divergent notion of "passable" (`grid.ts` / `navigation.ts` own it).
 
