@@ -502,9 +502,6 @@ export class VisualizerServer {
   </span>
   <button id="btnFog">Fog</button>
   <button id="btnInstall" class="hidden">Install</button>
-  <button id="btnSave">Save</button>
-  <button id="btnLoad">Load</button>
-  <select id="sceneSelect"></select>
 </div>
 <script>
 ${getClientBundle()}
