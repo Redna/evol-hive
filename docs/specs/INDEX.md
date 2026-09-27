@@ -58,11 +58,11 @@ Living index of all feature specifications. Updated by the Architect when creati
 ## Spec Status Summary
 
 ```
-Total specs:      73
+Total specs:      75
 ✅ Done:          70
-🔨 In Development: 0
+🔨 In Development: 1
 🔍 In Review:      0
-📝 Drafted:        1
+📝 Drafted:        2
 🚫 Blocked:        0
 ⛔ Superseded:     2
 
@@ -120,4 +120,6 @@ Architecture sections fully implemented: 11/11
 | [064](064-context-executable-offers.md) | Context Correctness (1/N) — Executable Offers: withdraw or implement `conversation_contribute`, stop naming un-offered `talk_to` (#225 slice 1) | §6, §8, §10 | ✅ Done | [#225](https://github.com/Redna/evol-hive/issues/225) | — | engine, cognition |
 | [065](065-reachable-area-offers.md) | Context Correctness (2/N) — Reachable Offers: stale area anchors and closed doors must leave the `targetArea` enum (#225 findings 2–3) | §3, §6, §10 | ✅ Done | [#225](https://github.com/Redna/evol-hive/issues/225) | — | engine |
 | [066](066-visualizer-live-observation-defects.md) | Visualizer Live-Observation Defects (3/3) — Co-located Agents, Camera Release, Motion Aliasing & Truthful Controls | §2, §3 | ✅ Done | — | — | visualizer |
-| [067](067-live-run-evidence.md) | A Live Run Must Leave Evidence — never spend compute without a record (session samples, run summary, launcher refusal) | §9, §11 | 📝 Drafted | — | — | assembly, examples, scripts |
+| [067](067-live-run-evidence.md) | A Live Run Must Leave Evidence — session samples sink, launcher refusal (leg 1 shipped; run summary remains) | §9, §11 | 🔨 In Development | — | — | assembly, examples, scripts |
+| [068](068-exhaustible-preconditions.md) | Exhaustible Preconditions — offers the world can never satisfy (cup/water depletion livelock) | §4, §5, §9 | 📝 Drafted | [#225](https://github.com/Redna/evol-hive/issues/225) | — | engine, examples |
+| [069](069-agent-memory-persistence.md) | Agent Memory Survives the Run — checkpoint and replay the agent event log | §3, §11 | 📝 Drafted | — | — | engine, assembly, examples, scripts |
