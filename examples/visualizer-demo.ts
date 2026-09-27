@@ -46,7 +46,8 @@ import {
 import type { EngineCore } from '@evol-hive/engine';
 import type { LLMClient } from '@evol-hive/cognition';
 import type { GuardrailEngineImpl } from '@evol-hive/cognition';
-import { assembleWorld, MockOrchestrator } from '@evol-hive/assembly';
+import { assembleWorld, MockOrchestrator, resolveSampleSink } from '@evol-hive/assembly';
+import type { System1AssemblyOptions } from '@evol-hive/assembly';
 import { VisualizerServer } from '@evol-hive/visualizer';
 
 // ── Built-in scenes ──────────────────────────────────────────────────────────
@@ -276,6 +277,36 @@ export interface StartVisualizerDemoOptions {
 }
 
 /**
+ * Resolve the System-1 wiring for a demo run (spec 067 R1/AC-1/AC-4).
+ *
+ * A real-LLM run always gets a file sink: `SYSTEM1_SESSION_LOG_DIR` when set,
+ * otherwise the `session-logs` default — mirroring `dynamic-world-sim.ts`. A
+ * cheap run (`USE_REAL_LLM=false`) gets no System-1 wiring at all: its sink
+ * would be in-memory, so no directory is forced and nothing is written (AC-4).
+ *
+ * Exported as the testable sink-decision seam (spec 067 Test Seam 1).
+ */
+export function system1OptionsForRun(
+  useRealLlm: boolean,
+  env: NodeJS.ProcessEnv = process.env,
+): System1AssemblyOptions | undefined {
+  if (!useRealLlm) return undefined;
+  const sink = resolveSampleSink({
+    useRealLlm: true,
+    ...(env['SYSTEM1_SESSION_LOG_DIR'] !== undefined
+      ? { sessionLogDir: env['SYSTEM1_SESSION_LOG_DIR'] }
+      : {}),
+  });
+  return {
+    useRealLlm: true,
+    ...(sink.kind === 'file' ? { sessionLogDir: sink.directory } : {}),
+    ...(env['SYSTEM1_GATE_ARTIFACT'] !== undefined
+      ? { gateArtifactPath: env['SYSTEM1_GATE_ARTIFACT'] }
+      : {}),
+  };
+}
+
+/**
  * Build and start the visualizer demo. Returns a handle with the server,
  * adapter, engine core, orchestrator, port, and a `stop()` function.
  *
@@ -311,11 +342,18 @@ export async function startVisualizerDemo(
     );
   }
 
+  // Spec 067 R1/AC-1: the real-LLM path must sink its System-1 samples. The
+  // decision (default `session-logs`, `SYSTEM1_SESSION_LOG_DIR` overrides) is
+  // made by the shared, pure resolver so a spending run can never fall back to
+  // the in-memory sink. Mock mode wires no System 1 at all (AC-4).
+  const system1 = system1OptionsForRun(useRealLLM);
+
   // One call, fully wired (spec 050 R2): the promoted assembler owns ALL
   // wiring. Mock mode (no env, no mock client) gets no-op-orchestrator parity;
   // real mode wires the cognition stack + memory maintenance.
   const world = assembleWorld({
     config,
+    ...(system1 !== undefined ? { system1 } : {}),
     sceneSetup: (core) => {
       loadScene(core, scene);
       if (useRealLLM) {
@@ -374,6 +412,14 @@ export async function startVisualizerDemo(
   // Start the simulation so the visualizer shows live state. In real mode the
   // PPER scheduler fires cycles for every agent each tick (§9.2) — agents
   // perceive, plan, execute affordances, and reflect on canvas.
+  // Spec 067 AC-2: name the model and where the evidence will land *before* the
+  // first agent cycle, so a spending run announces its output up front.
+  // eslint-disable-next-line no-console
+  console.log(
+    useRealLLM && system1?.sessionLogDir !== undefined
+      ? `\n  📝 model=${process.env['LLM_MODEL'] ?? DEFAULT_LLM_MODEL} session samples → ${system1.sessionLogDir}/ (System 1, JSONL)`
+      : '\n  📝 mock run (USE_REAL_LLM=false) — no session samples written',
+  );
   core.gameLoop.start();
 
   const stop = async (): Promise<void> => {

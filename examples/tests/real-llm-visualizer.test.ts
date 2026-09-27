@@ -9,7 +9,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import * as http from 'node:http';
 import * as net from 'node:net';
 import type { AddressInfo } from 'node:net';
@@ -42,6 +44,9 @@ const ENV_KEYS = [
   'LLM_MAX_TOOL_CALL_ITERATIONS',
   'EMBEDDING_MODEL_PATH',
   'EMBEDDING_TOKENIZER_PATH',
+  // Spec 067 (R1/AC-1): the real-LLM demo now writes System-1 session samples
+  // to a directory. Point it at a temp dir so no test writes into the repo tree.
+  'SYSTEM1_SESSION_LOG_DIR',
 ] as const;
 
 /** Save env vars, mutate, and restore after the (possibly async) callback. */
@@ -73,12 +78,19 @@ async function withEnv<T>(
   }
 }
 
+let sessionLogDir: string;
+
 beforeEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
+  // Spec 067: real-LLM `startVisualizerDemo` calls sink samples; keep them out
+  // of the repo tree by using a fresh temp directory for every test.
+  sessionLogDir = mkdtempSync(join(tmpdir(), 'evol-hive-067-viz-'));
+  process.env['SYSTEM1_SESSION_LOG_DIR'] = sessionLogDir;
 });
 
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
+  rmSync(sessionLogDir, { recursive: true, force: true });
   vi.restoreAllMocks();
 });
 
@@ -513,6 +525,10 @@ describe('AC-5: executed PPER cycles drive live visualizer state', () => {
         expect(phaseValuesObserved.size).toBeGreaterThan(0);
         expect(llm.requests.some((r) => r.isPlanPhase)).toBe(true);
       } finally {
+        // Settle in-flight cycle appends before afterEach removes the sink dir
+        // (the writer swallows a late ENOENT, but it should not be produced).
+        handle.core.gameLoop.stop();
+        await new Promise((r) => setTimeout(r, 500));
         await handle.stop();
       }
     } finally {
@@ -607,6 +623,93 @@ describe('AC-9: env-var parity of the shared assembly', () => {
       await llm.close();
     }
   });
+});
+
+// ── Spec 067 (leg 1): a real-LLM run leaves parseable evidence ───────────────
+//
+// AC-1 and AC-11 asserted behaviourally across the real visualizer path: the
+// demo announces its model and evidence destination before the first cycle
+// (AC-2), then the scheduler's settled cycles actually write per-agent JSONL
+// into the configured directory, and those lines parse with the existing
+// sample schema. This is the end-to-end seam — nothing here is asserted by
+// reading the demo's source.
+function readAllSamples(dir: string): Record<string, unknown>[] {
+  if (!existsSync(dir)) return [];
+  const samples: Record<string, unknown>[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.jsonl')) continue;
+    for (const line of readFileSync(join(dir, name), 'utf8').split('\n')) {
+      if (line.trim() === '') continue;
+      samples.push(JSON.parse(line) as Record<string, unknown>);
+    }
+  }
+  return samples;
+}
+
+describe('spec 067 (leg 1) — a real-LLM run writes parseable evidence', () => {
+  it('announces model + destination, then sinks schema-valid JSONL samples', async () => {
+    const llm = await startScriptedLLMServer();
+    const logs: string[] = [];
+    const logSpy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      logs.push(args.map((a) => String(a)).join(' '));
+    });
+    try {
+      const handle = await withEnv(
+        { USE_REAL_LLM: 'true', LLM_BASE_URL: llm.url, LLM_MODEL: 'test-model-067' },
+        () => startVisualizerDemo({ port: 0 }),
+      );
+      try {
+        // AC-2: the destination and the model are named before cycles start.
+        const announcement = logs.find((line) => line.includes('session samples'));
+        expect(announcement, 'the demo must announce its evidence sink').toBeDefined();
+        expect(announcement).toContain(sessionLogDir);
+        expect(announcement).toContain('test-model-067');
+
+        // AC-1: drive the scheduler until at least one cycle settles. A
+        // spending run's samples must land in the configured directory.
+        const deadline = Date.now() + 25_000;
+        while (readAllSamples(sessionLogDir).length === 0 && Date.now() < deadline) {
+          handle.core.gameLoop.injectElapsed(0.25);
+          await new Promise((r) => setTimeout(r, 10));
+        }
+
+        const samples = readAllSamples(sessionLogDir);
+        expect(samples.length, 'no JSONL samples were written to the sink').toBeGreaterThan(0);
+
+        // AC-11: parseable JSONL carrying the existing sample schema fields.
+        const sample = samples[0]!;
+        expect(sample).toMatchObject({
+          schemaVersion: expect.any(Number),
+          agentId: expect.any(String),
+          tickNumber: expect.any(Number),
+          simTime: expect.any(Number),
+          label: expect.stringMatching(/^(react|ignore)$/),
+          hardTrigger: expect.any(Boolean),
+          pReact: expect.any(Number),
+          outcome: {
+            planChanged: expect.any(Boolean),
+            drivesChanged: expect.any(Boolean),
+            memoryWritten: expect.any(Boolean),
+            conversationContinued: expect.any(Boolean),
+          },
+        });
+        // `scalar` and `embedding` are part of the serialization contract even
+        // when the feature source has not produced them yet (they are `null`).
+        expect(sample).toHaveProperty('scalar');
+        expect(sample).toHaveProperty('embedding');
+      } finally {
+        // Let any in-flight settle promises finish appending before afterEach
+        // removes the temp dir. The session writer swallows a late ENOENT by
+        // design, but the test must not manufacture one under parallel load.
+        handle.core.gameLoop.stop();
+        await new Promise((r) => setTimeout(r, 500));
+        await handle.stop();
+      }
+    } finally {
+      logSpy.mockRestore();
+      await llm.close();
+    }
+  }, 40_000);
 });
 
 // ── Type-level guard: scenes map type ────────────────────────────────────────

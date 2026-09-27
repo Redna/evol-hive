@@ -118,6 +118,7 @@ import {
   System1OutcomeRecorderImpl,
 } from '@evol-hive/engine';
 import { createEngineCore, assembleGameLoop } from '@evol-hive/engine';
+import { resolveSampleSink } from './sample-sink.js';
 
 // ── Mock embedding provider (no network, deterministic) ─────────────────────
 
@@ -502,9 +503,17 @@ export interface System1AssemblyOptions {
   gateArtifactPath?: string;
   /**
    * Directory for per-agent JSONL session sample logs (Req 9). When omitted,
-   * samples land in an in-memory sink (introspection only).
+   * samples land in an in-memory sink (introspection only) — unless
+   * `useRealLlm` is set, in which case a spending run defaults to
+   * `session-logs` and can never select the in-memory sink (spec 067 R1).
    */
   sessionLogDir?: string;
+  /**
+   * Whether this run spends real LLM calls (`USE_REAL_LLM=true`). A spending
+   * run must write its samples, so the sink is always file-backed (spec 067
+   * AC-9/AC-10) — the decision lives in `resolveSampleSink`.
+   */
+  useRealLlm?: boolean;
   /**
    * LLM proposal provider for the salience-weighted identity hook (Req 16/17).
    * When omitted, a zero-proposal provider is used (identity never drifts —
@@ -593,10 +602,17 @@ export function assembleSystem1(
 
   const gate = new System1GateServiceImpl({ head: gateHead, featureSource: featureService });
 
-  // ── Session sample log (Req 9): per-agent JSONL or in-memory ─────────────
-  const sampleLog = options.sessionLogDir
-    ? new JsonlSessionSampleLog(makeFileSampleLogWriter(options.sessionLogDir))
-    : new JsonlSessionSampleLog(new InMemorySampleLogWriter());
+  // ── Session sample log (Req 9 + spec 067 R1): per-agent JSONL or in-memory.
+  // The decision is a pure function of the run's configuration (spec 067 Test
+  // Seam 1), so a spending run can never silently fall back to memory.
+  const sampleSink = resolveSampleSink({
+    useRealLlm: options.useRealLlm === true,
+    ...(options.sessionLogDir !== undefined ? { sessionLogDir: options.sessionLogDir } : {}),
+  });
+  const sampleLog =
+    sampleSink.kind === 'file'
+      ? new JsonlSessionSampleLog(makeFileSampleLogWriter(sampleSink.directory))
+      : new JsonlSessionSampleLog(new InMemorySampleLogWriter());
 
   // ── Outcome probe (engine state → OutcomeSnapshot) ────────────────────────
   const tracker = new System1AgentTracker();
