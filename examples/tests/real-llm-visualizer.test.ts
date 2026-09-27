@@ -9,7 +9,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import * as http from 'node:http';
 import * as net from 'node:net';
 import type { AddressInfo } from 'node:net';
@@ -42,6 +44,9 @@ const ENV_KEYS = [
   'LLM_MAX_TOOL_CALL_ITERATIONS',
   'EMBEDDING_MODEL_PATH',
   'EMBEDDING_TOKENIZER_PATH',
+  // Spec 067 (R1/AC-1): the real-LLM demo now writes System-1 session samples
+  // to a directory. Point it at a temp dir so no test writes into the repo tree.
+  'SYSTEM1_SESSION_LOG_DIR',
 ] as const;
 
 /** Save env vars, mutate, and restore after the (possibly async) callback. */
@@ -73,12 +78,19 @@ async function withEnv<T>(
   }
 }
 
+let sessionLogDir: string;
+
 beforeEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
+  // Spec 067: real-LLM `startVisualizerDemo` calls sink samples; keep them out
+  // of the repo tree by using a fresh temp directory for every test.
+  sessionLogDir = mkdtempSync(join(tmpdir(), 'evol-hive-067-viz-'));
+  process.env['SYSTEM1_SESSION_LOG_DIR'] = sessionLogDir;
 });
 
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
+  rmSync(sessionLogDir, { recursive: true, force: true });
   vi.restoreAllMocks();
 });
 

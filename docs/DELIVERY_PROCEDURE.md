@@ -108,7 +108,11 @@ spec → build → verify → QA → live, as a sequence of legs.
    or human-approve per the approval rule; squash-merge.
 5. **Live validation** (engine-behavior issues). Rebuild dist, run the sim **through
    `scripts/live-sim.mts`** (a 40-minute run is `SIM_BUDGET_MINUTES=40`; it pauses when
-   the budget is spent and needs an explicit `kill -CONT -<pid>` to continue), measure
+   the budget is spent and needs an explicit `kill -CONT -<pid>` to continue). **A
+   launch must have an evidence sink**: the launcher prints `evidence=<dir>` in its
+   banner, defaults the samples to `session-logs/`, honours `SYSTEM1_SESSION_LOG_DIR`,
+   and refuses a real-LLM run with none unless `SIM_NO_EVIDENCE=1` acknowledges it —
+   never start a spending run that cannot leave samples. Measure
    against the spec's ACs **on the tick axis** (log-line quintiles are skewed by late
    failure bursts), and record evidence in `docs/specs/notes/`. Never leave a sim
    running unattended: an unattended run spends quota at roughly 50 cloud LLM calls a
