@@ -68,6 +68,18 @@ describe('spec 067 AC-4 — cheap deterministic runs keep the in-memory sink', (
       directory: '/tmp/explicit',
     });
   });
+
+  it('treats a blank or whitespace directory as not configured on a cheap run', () => {
+    // The rule is "explicitly configured"; an empty/whitespace value is not a
+    // directory, so a cheap run must stay in memory rather than create a file
+    // in an ambiguous location.
+    for (const sessionLogDir of ['', '   ', '\t']) {
+      expect(
+        resolveSampleSink({ useRealLlm: false, sessionLogDir }),
+        `dir=${JSON.stringify(sessionLogDir)}`,
+      ).toEqual({ kind: 'memory', directory: null });
+    }
+  });
 });
 
 describe('spec 067 — assembleSystem1 uses the decision (behavioral)', () => {

@@ -75,6 +75,21 @@ describe('spec 067 AC-2/AC-9 — the launcher configures and announces an eviden
     expect(result.code).toBe(0);
   }, 30_000);
 
+  it('states model, budget and evidence destination in the banner line (R3)', async () => {
+    const result = await runLauncher({
+      SIM_CMD: 'echo CHILD_EVIDENCE=[$SYSTEM1_SESSION_LOG_DIR]',
+      LLM_MODEL: 'test-model-067',
+      SIM_BUDGET_MINUTES: '7',
+    });
+    // One line, all three facts — the operator sees what will be spent and
+    // where the evidence lands before anything starts.
+    const banner = result.stdout.split('\n').find((line) => line.includes('[live-sim] model='));
+    expect(banner, 'the launcher must print a model banner').toBeDefined();
+    expect(banner).toContain('model=test-model-067');
+    expect(banner).toContain('budget=7 min');
+    expect(banner).toContain('evidence=session-logs');
+  }, 30_000);
+
   it('honours SYSTEM1_SESSION_LOG_DIR as the override', async () => {
     const result = await runLauncher({
       SIM_CMD: 'echo CHILD_EVIDENCE=[$SYSTEM1_SESSION_LOG_DIR]',
@@ -105,6 +120,17 @@ describe('spec 067 AC-3 — the launcher refuses a spending run with no sink', (
     expect(`${result.stdout}${result.stderr}`).toMatch(/sample sink/i);
     expect(result.code).not.toBe(0);
     expect(result.stdout).not.toContain('[live-sim] child pid');
+    expect(result.stdout).not.toContain('SHOULD_NOT_RUN');
+  }, 30_000);
+
+  it('treats a whitespace-only evidence directory as blank and refuses', async () => {
+    // A directory of spaces is not a directory — the same silent-discard risk.
+    const result = await runLauncher({
+      SIM_CMD: 'echo SHOULD_NOT_RUN',
+      SYSTEM1_SESSION_LOG_DIR: '   ',
+    });
+    expect(`${result.stdout}${result.stderr}`).toMatch(/REFUSING/);
+    expect(result.code).not.toBe(0);
     expect(result.stdout).not.toContain('SHOULD_NOT_RUN');
   }, 30_000);
 
